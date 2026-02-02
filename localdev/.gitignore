@@ -1,0 +1,11 @@
+# docker/localstack
+.localstack/
+localstack_data/
+docker-data/
+tmp/
+node_modules/
+*.log
+
+# env
+.env
+.env.*

@@ -1,0 +1,43 @@
+# node/pnpm
+node_modules/
+.pnpm-store/
+.pnp.cjs
+.pnp.loader.mjs
+
+# build
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# nest
+.nest/
+
+# logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env
+.env
+.env.*
+
+# os
+.DS_Store
+Thumbs.db
+
+# tooling
+.turbo/
+.cache/
+
+# local dev
+.localstack/
+localstack_data/
+docker-data/
+tmp/
+
+# cdk
+cdk.out/
