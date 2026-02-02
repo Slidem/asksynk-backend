@@ -1,13 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "rootDir": "../..",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@/api/*": ["src/*"],
