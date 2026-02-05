@@ -8,8 +8,20 @@
   },
   "scripts": {
     "dev:api": "pnpm --filter @asksynk/api dev",
+    "localdev:up": "bash localdev/up.sh",
+    "localdev:down": "bash localdev/down.sh",
+    "localdev:reset": "bash localdev/reset.sh",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
+    "format": "prettier -w .",
+    "format:check": "prettier --check .",
     "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.7.0",
+    "eslint": "^9.7.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.20.0"
   }
 }

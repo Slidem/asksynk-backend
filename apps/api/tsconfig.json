@@ -10,9 +10,14 @@
     "baseUrl": ".",
     "paths": {
       "@/api/*": ["src/*"],
+      "@/migrations/*": ["../migrations/src/*"],
       "@/shared/*": ["../../packages/shared/src/*"]
     }
   },
-  "include": ["src/**/*.ts", "../../packages/shared/src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../migrations/src/**/*.ts",
+    "../../packages/shared/src/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

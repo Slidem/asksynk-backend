@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "eslint .",
+    "lint": "pnpm -w eslint .",
     "test": "jest"
-  }
+  },
+  "devDependencies": {}
 }
