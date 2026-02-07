@@ -1,7 +1,7 @@
-const js = require("@eslint/js");
-const tseslint = require("typescript-eslint");
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
-module.exports = tseslint.config(
+export default [
   {
     ignores: [
       "**/dist/**",
@@ -23,8 +23,9 @@ module.exports = tseslint.config(
           "./apps/migrations/tsconfig.json",
           "./packages/shared/tsconfig.json",
         ],
-        tsconfigRootDir: __dirname,
+        // eslint-disable-next-line no-undef
+        tsconfigRootDir: new URL(".", import.meta.url).pathname,
       },
     },
   },
-);
+];

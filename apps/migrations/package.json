@@ -8,6 +8,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "dotenv": "^16.6.1",
     "drizzle-orm": "^0.44.4",
     "pg": "^8.13.1"
   },
