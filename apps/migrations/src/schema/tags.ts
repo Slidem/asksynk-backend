@@ -3,6 +3,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  serial,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -15,13 +16,13 @@ export const answerModeEnum = pgEnum("answer_mode", [
 ]);
 
 export const tags = pgTable("tags", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   color: text("color").notNull(),
   answerMode: answerModeEnum("answer_mode").notNull(),
-  responseTimeMillis: integer("responfications_settings_time_millis"),
+  responseTimeMillis: integer("response_time_millis").notNull(),
   notificationsSettings: jsonb("notifications_settings")
     .notNull()
     .$type<{

@@ -1,5 +1,5 @@
 {
-  "id": "19f64737-e299-427d-b5c8-1c0dd5bc66e8",
+  "id": "628ac608-4a2f-42ed-b4d6-6f0c14968de2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -10,7 +10,7 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
@@ -45,14 +45,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "responfications_settingsse_time_millis": {
-          "name": "responfications_settingsse_time_millis",
+        "response_time_millis": {
+          "name": "response_time_millis",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "noti": {
-          "name": "noti",
+        "notifications_settings": {
+          "name": "notifications_settings",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
@@ -86,7 +86,10 @@
     "public.answer_mode": {
       "name": "answer_mode",
       "schema": "public",
-      "values": ["timeblock", "immediately"]
+      "values": [
+        "timeblock",
+        "immediately"
+      ]
     }
   },
   "schemas": {},

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev:api": "pnpm --filter @asksynk/api dev",
+    "dev:migrate": "pnpm --filter @asksynk/migrations db:push",
     "localdev:up": "bash localdev/up.sh",
     "localdev:down": "bash localdev/down.sh",
     "localdev:reset": "bash localdev/reset.sh",
