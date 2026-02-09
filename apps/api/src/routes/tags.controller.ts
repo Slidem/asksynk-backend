@@ -1,8 +1,8 @@
+import { TagDto } from "@/api/dtos/tagDto";
 import {
   CreateTagRequestDto,
   ListTagsByUserIdRequestDto,
 } from "@/api/dtos/tagRequestsDto";
-import { TagDto } from "@/api/dtos/tagDto";
 import { TagsService } from "@/api/services/tags.service";
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 
