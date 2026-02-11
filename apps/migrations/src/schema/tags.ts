@@ -18,7 +18,7 @@ export const answerModeEnum = pgEnum("answer_mode", [
 export const tags = pgTable("tags", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
-  name: text("name").notNull(),
+  name: text("name").unique().notNull(),
   description: text("description"),
   color: text("color").notNull(),
   answerMode: answerModeEnum("answer_mode").notNull(),

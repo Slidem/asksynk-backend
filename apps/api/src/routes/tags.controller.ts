@@ -4,7 +4,7 @@ import {
   ListTagsByUserIdRequestDto,
 } from "@/api/dtos/tagRequestsDto";
 import { TagsService } from "@/api/services/tags.service";
-import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Post, Put, Query } from "@nestjs/common";
 
 @Controller("tags")
 export class TagsController {
@@ -20,5 +20,10 @@ export class TagsController {
     @Query() query: ListTagsByUserIdRequestDto,
   ): Promise<TagDto[]> {
     return this.tagsService.listTagsByUserId(query.userId);
+  }
+
+  @Put()
+  putTag(@Body() putTag: CreateTagRequestDto): Promise<TagDto> {
+    return this.tagsService.putTag(putTag);
   }
 }

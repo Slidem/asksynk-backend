@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": "../..",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/worker/*": ["src/*"],
+      "@/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../packages/shared/src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,4 +1,10 @@
 services:
+  nats:
+    image: "nats:2.10-alpine"
+    container_name: asksynk-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
   postgres:
     image: "pgvector/pgvector:pg17"
     container_name: asksynk-postgres
