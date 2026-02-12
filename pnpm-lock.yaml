@@ -56,6 +56,9 @@ importers:
       drizzle-orm:
         specifier: ^0.44.4
         version: 0.44.7(@types/pg@8.16.0)(pg@8.18.0)
+      jose:
+        specifier: ^5.10.0
+        version: 5.10.0
       nats:
         specifier: ^2.29.1
         version: 2.29.3
@@ -2306,6 +2309,9 @@ packages:
     peerDependenciesMeta:
       node-notifier:
         optional: true
+
+  jose@5.10.0:
+    resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
 
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
@@ -5826,6 +5832,8 @@ snapshots:
       - babel-plugin-macros
       - supports-color
       - ts-node
+
+  jose@5.10.0: {}
 
   joycon@3.1.1: {}
 

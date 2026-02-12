@@ -1,8 +1,8 @@
+import { Module } from "@nestjs/common";
+import { NatsModule } from "@/api/modules/nats.module";
 import { TagRepository } from "@/api/repository/tag.repository";
 import { TagsController } from "@/api/routes/tags.controller";
 import { TagsService } from "@/api/services/tags.service";
-import { Module } from "@nestjs/common";
-import { NatsModule } from "@/api/modules/nats.module";
 
 @Module({
   imports: [NatsModule],

@@ -1,5 +1,5 @@
 import { ContextLogger } from "nestjs-context-logger";
-import { CreateTagRequestDto } from "@/api/dtos/tagRequestsDto";
+import { CreateTagInput } from "@/api/dtos/tagRequestsDto";
 import { Injectable } from "@nestjs/common";
 import { NatsService } from "@/api/services/nats.service";
 import { TagDto } from "@/api/dtos/tagDto";
@@ -27,7 +27,7 @@ export class TagsService {
   ) {}
 
   @Transactional()
-  async createTag(createTag: CreateTagRequestDto): Promise<TagDto> {
+  async createTag(createTag: CreateTagInput): Promise<TagDto> {
     this.logger.info("Creating tag", {
       userId: createTag.userId,
       name: createTag.name,
@@ -50,7 +50,7 @@ export class TagsService {
   }
 
   @Transactional()
-  async putTag(putTag: CreateTagRequestDto): Promise<TagDto> {
+  async putTag(putTag: CreateTagInput): Promise<TagDto> {
     this.logger.info("Putting tag", {
       userId: putTag.userId,
       name: putTag.name,

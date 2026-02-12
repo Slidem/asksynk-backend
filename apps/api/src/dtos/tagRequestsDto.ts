@@ -1,7 +1,6 @@
 import { TagDto } from "@/api/dtos/tagDto";
 
 export interface CreateTagRequestDto {
-  userId: string; // TODO: will soon be taken from context
   name: string;
   description: string;
   color?: string;
@@ -10,6 +9,6 @@ export interface CreateTagRequestDto {
   notificationsSettings?: TagDto["notificationsSettings"];
 }
 
-export interface ListTagsByUserIdRequestDto {
-  userId: string; // TODO: will soon be taken from context
+export interface CreateTagInput extends CreateTagRequestDto {
+  userId: string;
 }

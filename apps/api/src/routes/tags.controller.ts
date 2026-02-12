@@ -1,29 +1,32 @@
 import { TagDto } from "@/api/dtos/tagDto";
-import {
-  CreateTagRequestDto,
-  ListTagsByUserIdRequestDto,
-} from "@/api/dtos/tagRequestsDto";
+import { CreateTagRequestDto } from "@/api/dtos/tagRequestsDto";
 import { TagsService } from "@/api/services/tags.service";
-import { Body, Controller, Get, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Get, Post, Put } from "@nestjs/common";
+import { AuthUser } from "@/api/auth/authUser.decorator";
+import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 
 @Controller("tags")
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Post()
-  createTag(@Body() createTag: CreateTagRequestDto): Promise<TagDto> {
-    return this.tagsService.createTag(createTag);
+  createTag(
+    @Body() createTag: CreateTagRequestDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TagDto> {
+    return this.tagsService.createTag({ ...createTag, userId: user.id });
   }
 
   @Get()
-  listTagsByUserId(
-    @Query() query: ListTagsByUserIdRequestDto,
-  ): Promise<TagDto[]> {
-    return this.tagsService.listTagsByUserId(query.userId);
+  listTagsByUserId(@AuthUser() user: AuthUserType): Promise<TagDto[]> {
+    return this.tagsService.listTagsByUserId(user.id);
   }
 
   @Put()
-  putTag(@Body() putTag: CreateTagRequestDto): Promise<TagDto> {
-    return this.tagsService.putTag(putTag);
+  putTag(
+    @Body() putTag: CreateTagRequestDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TagDto> {
+    return this.tagsService.putTag({ ...putTag, userId: user.id });
   }
 }

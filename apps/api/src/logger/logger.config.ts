@@ -1,1 +1,1 @@
-export { LoggerConfigModule } from "@/shared/logger/logger.config";
+export { LoggerConfigModule } from "@/shared/logger.config";

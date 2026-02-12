@@ -1,12 +1,12 @@
+import { AuthGuardModule } from "../auth/authGuard.module";
 import { ConfigModule } from "@nestjs/config";
 import { DbModule } from "@/api/modules/db.module";
-import { DummyController } from "@/api/routes/dummy.controller";
 import { HealthController } from "@/api/routes/health.controller";
-import { LoggerConfigModule } from "../logger/logger.config";
+import { LoggerConfigModule } from "@/api/logger/logger.config";
 import { Module } from "@nestjs/common";
 import { NatsModule } from "@/api/modules/nats.module";
 import { TagsModule } from "@/api/modules/tag.module";
-import { TxModule } from "./tx.module";
+import { TxModule } from "@/api/modules/tx.module";
 
 @Module({
   imports: [
@@ -16,8 +16,8 @@ import { TxModule } from "./tx.module";
     NatsModule,
     TxModule,
     TagsModule,
+    AuthGuardModule,
   ],
-  providers: [],
-  controllers: [HealthController, DummyController],
+  controllers: [HealthController],
 })
 export class AppModule {}

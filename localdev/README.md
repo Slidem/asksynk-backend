@@ -5,6 +5,7 @@ Local development environment using Docker Compose.
 ## Goals
 
 - Local Postgres (pgvector extension enabled)
+- Local Keycloak (realm import, test users)
 
 ## Commands
 
@@ -15,3 +16,15 @@ Local development environment using Docker Compose.
 ## DB
 
 - URL: `postgres://asksynk:asksynk@localhost:5432/asksynk`
+
+## Keycloak
+
+- URL: `http://localhost:8080`
+- Admin: `admin` / `admin`
+- Realm: `asksynk`
+- Clients:
+  - `asksynk-web` redirect `https://localhost:5137/*`
+  - `asksynk-mobile` redirect `myapp://*`
+- Test users (password `password`):
+  - `test.user`
+  - `dev.user`
