@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { JSONCodec, NatsConnection, connect } from "nats";
 import { TagEventPayload, TagEventSubject } from "@/shared/events";
+import { EmailSender } from "@/worker/email/email.sender";
 
 import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
@@ -11,7 +12,10 @@ export class NatsSubscriberService implements OnModuleInit, OnModuleDestroy {
   private connection: NatsConnection | null = null;
   private readonly jsonCodec = JSONCodec<TagEventPayload>();
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly emailSender: EmailSender,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const servers = this.configService.getOrThrow<string>("NATS_URL");
@@ -50,6 +54,12 @@ export class NatsSubscriberService implements OnModuleInit, OnModuleDestroy {
             id: payload.id,
             userId: payload.userId,
             name: payload.name,
+          });
+
+          await this.emailSender.send({
+            to: "dev.user@asksynk.local",
+            subject: `Tag event: ${payload.name}`,
+            text: `Tag ${payload.name} updated for user ${payload.userId}`,
           });
         }
       })();

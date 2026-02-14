@@ -42,6 +42,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  mailpit:
+    image: "axllent/mailpit:latest"
+    container_name: asksynk-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
 volumes:
   asksynk-postgres-data:

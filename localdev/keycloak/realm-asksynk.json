@@ -2,6 +2,12 @@
   "realm": "asksynk",
   "enabled": true,
   "displayName": "asksynk",
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "noreply@asksynk.local",
+    "fromDisplayName": "asksynk"
+  },
   "clients": [
     {
       "clientId": "asksynk-web",
@@ -9,8 +15,8 @@
       "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
-      "redirectUris": ["https://localhost:5137/*"],
-      "webOrigins": ["https://localhost:5137"],
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true
     },
