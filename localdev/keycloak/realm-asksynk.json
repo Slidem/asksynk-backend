@@ -1,6 +1,7 @@
 {
   "realm": "asksynk",
   "enabled": true,
+  "registrationAllowed": true,
   "displayName": "asksynk",
   "smtpServer": {
     "host": "mailpit",
