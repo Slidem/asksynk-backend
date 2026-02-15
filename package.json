@@ -17,7 +17,8 @@
     "lint": "pnpm -r lint",
     "format": "prettier -w .",
     "format:check": "prettier --check .",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "secret:better-auth": "pnpm --filter @asksynk/scripts generate-secret"
   },
   "devDependencies": {
     "@eslint/js": "^9.7.0",

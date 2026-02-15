@@ -1,17 +1,17 @@
 import { ConfigService } from "@nestjs/config";
-import { EmailMessage } from "@/worker/email/email.types";
+import { EmailMessage } from "./email.types";
 import { Injectable } from "@nestjs/common";
 import { createTransport } from "nodemailer";
 
 @Injectable()
-export class EmailSender {
+export class EmailService {
   constructor(private readonly configService: ConfigService) {}
 
   async send(message: EmailMessage): Promise<void> {
     const environment = this.configService.get<string>("ENVIRONMENT") ?? "dev";
 
     if (environment !== "dev") {
-      throw new Error("email provider not configured");
+      throw new Error("Email provider not configured for production");
     }
 
     const host = this.configService.get<string>("SMTP_HOST") ?? "localhost";

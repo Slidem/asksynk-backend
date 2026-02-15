@@ -1,3 +1,4 @@
+import { AuthController } from "@/api/routes/auth.controller";
 import { AuthGuardModule } from "../auth/authGuard.module";
 import { ConfigModule } from "@nestjs/config";
 import { DbModule } from "@/api/modules/db.module";
@@ -18,6 +19,6 @@ import { TxModule } from "@/api/modules/tx.module";
     TagsModule,
     AuthGuardModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AuthController],
 })
 export class AppModule {}

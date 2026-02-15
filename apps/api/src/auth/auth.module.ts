@@ -1,12 +1,12 @@
 import { AuthGuard } from "@/api/auth/auth.guard";
 import { AuthService } from "@/api/auth/auth.service";
+import { BetterAuthModule } from "@/api/auth/better-auth.module";
 import { ConfigModule } from "@nestjs/config";
 import { Module } from "@nestjs/common";
-import { UsersModule } from "@/api/modules/users.module";
 
 @Module({
-  imports: [ConfigModule, UsersModule],
+  imports: [ConfigModule, BetterAuthModule.forRoot()],
   providers: [AuthService, AuthGuard],
-  exports: [AuthGuard, AuthService],
+  exports: [AuthGuard, AuthService, BetterAuthModule],
 })
 export class AuthModule {}
