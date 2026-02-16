@@ -31,7 +31,7 @@ export const createAuth = (config: AuthConfig) => {
       usePlural: true,
       schema: {
         ...authSchema,
-        user: users,
+        users,
       },
     }),
 
