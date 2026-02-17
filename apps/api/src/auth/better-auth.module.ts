@@ -21,11 +21,16 @@ export class BetterAuthModule {
             config: ConfigService,
             emailService: EmailService,
           ): Auth => {
+            const trustedOrigins = config
+              .getOrThrow<string>("TRUSTED_ORIGINS")
+              .split(",")
+              .map((origin) => origin.trim())
+              .filter(Boolean);
             return createAuth({
               databaseUrl: config.getOrThrow<string>("DATABASE_URL"),
               secret: config.getOrThrow<string>("AUTH_SECRET"),
               baseUrl: config.get<string>("AUTH_URL"),
-              trustedOrigins: ["http://localhost:5173"],
+              trustedOrigins,
               sendMagicLink: async ({ email, url }) => {
                 await emailService.send({
                   to: email,

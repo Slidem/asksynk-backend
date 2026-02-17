@@ -18,3 +18,13 @@
 - **User import aliases** Avoid relative imports, use import aliases as defined in tsconfig
 - **Always prompt me for testing commands** Never run any commands to test implementation like "pnpm run dev:api" or running migrations yourself; prompt me so i can do it manually; and then continue after i done so
 - Local dev uses `localdev/` docker compose for Postgres + pgvector; Drizzle migrations live in `apps/migrations`
+
+## Project Notes
+
+- Monorepo via pnpm workspaces: `apps/*`, `packages/*`, `scripts`
+- Node `24.13.0`, pnpm `10.15.0` (root package.json engines)
+- Root scripts: `dev:api`, `dev:worker`, `dev:migrate`, `localdev:{up,down,reset}`, `secret:better-auth`
+- Env examples: `apps/api/.env.example`, `apps/background-worker/.env.example`, `apps/migrations/.env.example`
+- Tech: TypeScript, NestJS (api/worker), Drizzle ORM + drizzle-kit, Postgres + pgvector, NATS, better-auth
+- Tooling: pnpm, ESLint, Prettier, Jest, ts-jest, tsx
+- Structure: `apps/api`, `apps/background-worker`, `apps/migrations`, `apps/cron`, `packages/shared`, `scripts`
