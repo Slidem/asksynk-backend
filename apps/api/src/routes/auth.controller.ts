@@ -1,7 +1,7 @@
 import { All, Controller, Req, Res, Inject } from "@nestjs/common";
 import { Request, Response } from "express";
-import { BETTER_AUTH } from "@/api/auth/better-auth.module";
-import { Auth } from "@/api/auth/better-auth";
+import { BETTER_AUTH } from "@/api/auth/betterAuth.module";
+import { Auth } from "@/api/auth/betterAuth";
 import { Public } from "@/api/auth/public.decorator";
 import { toNodeHandler } from "better-auth/node";
 

@@ -1,6 +1,6 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import { BETTER_AUTH } from "./better-auth.module";
-import { Auth } from "./better-auth";
+import { BETTER_AUTH } from "./betterAuth.module";
+import { Auth } from "./betterAuth";
 import { AuthSession } from "./auth.types";
 
 @Injectable()

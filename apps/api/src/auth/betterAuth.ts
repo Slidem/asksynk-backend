@@ -14,6 +14,10 @@ export type AuthConfig = {
   baseUrl?: string;
   trustedOrigins?: string[];
   sendMagicLink?: (params: { email: string; url: string }) => Promise<void>;
+  sendVerificationEmail?: (params: {
+    email: string;
+    url: string;
+  }) => Promise<void>;
 };
 
 export const createAuth = (config: AuthConfig) => {
@@ -37,7 +41,14 @@ export const createAuth = (config: AuthConfig) => {
 
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
+    },
+
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url }) => {
+        await (config.sendVerificationEmail?.({ email: user.email, url }) ??
+          Promise.resolve());
+      },
     },
 
     session: {

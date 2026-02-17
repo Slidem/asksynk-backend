@@ -1,4 +1,4 @@
-import { Auth, createAuth } from "./better-auth";
+import { Auth, createAuth } from "./betterAuth";
 import { DynamicModule, Global, Module } from "@nestjs/common";
 
 import { ConfigService } from "@nestjs/config";
@@ -37,6 +37,14 @@ export class BetterAuthModule {
                   subject: "Sign in to AskSynk",
                   text: `Click this link to sign in: ${url}`,
                   html: `<p>Click <a href="${url}">here</a> to sign in to AskSynk.</p>`,
+                });
+              },
+              sendVerificationEmail: async ({ email, url }) => {
+                await emailService.send({
+                  to: email,
+                  subject: "Verify your email",
+                  text: `Click this link to verify your email: ${url}`,
+                  html: `<p>Click <a href="${url}">here</a> to verify your email.</p>`,
                 });
               },
             });
