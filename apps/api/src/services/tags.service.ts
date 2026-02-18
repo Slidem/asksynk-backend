@@ -1,6 +1,10 @@
 import { ContextLogger } from "nestjs-context-logger";
-import { CreateTagInput } from "@/api/dtos/tagRequestsDto";
-import { Injectable } from "@nestjs/common";
+import {
+  CreateTagInput,
+  ListTagsInput,
+  UpdateTagInput,
+} from "@/api/dtos/tagRequestsDto";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { NatsService } from "@/api/services/nats.service";
 import { TagDto } from "@/api/dtos/tagDto";
 import { TagEventSubject } from "@/shared/events";
@@ -50,50 +54,89 @@ export class TagsService {
   }
 
   @Transactional()
-  async putTag(putTag: CreateTagInput): Promise<TagDto> {
-    this.logger.info("Putting tag", {
-      userId: putTag.userId,
-      name: putTag.name,
+  async listTags(userId: string, listTags: ListTagsInput): Promise<TagDto[]> {
+    this.logger.info("Listing tags", { userId, listTags });
+
+    return this.tagsRepository.listTagsByUserIdWithFilters(userId, {
+      answerMode: listTags.answerMode,
+      orderBy: listTags.orderBy ?? "createdAt",
+      orderDirection: listTags.orderDirection ?? "desc",
+      search: listTags.search,
+      limit: listTags.limit,
+      offset: listTags.offset,
     });
-
-    const existing = await this.tagsRepository.getTagByName(putTag.name);
-    if (!existing) {
-      const createdTag = await this.tagsRepository.createTag({
-        ...this.DEFAULT_TAG_SETTINGS,
-        ...putTag,
-      });
-
-      this.natsService.publishTagEvent(TagEventSubject.Created, {
-        id: createdTag.id,
-        userId: createdTag.userId,
-        name: createdTag.name,
-      });
-
-      return createdTag;
-    } else {
-      this.logger.info("Tag already exists, updating it instead", {
-        name: putTag.name,
-        existingTagId: existing.id,
-      });
-
-      const updatedTag = await this.tagsRepository.updateTag(existing.id, {
-        ...this.DEFAULT_TAG_SETTINGS,
-        ...putTag,
-      });
-
-      this.natsService.publishTagEvent(TagEventSubject.Updated, {
-        id: updatedTag.id,
-        userId: updatedTag.userId,
-        name: updatedTag.name,
-      });
-
-      return updatedTag;
-    }
   }
 
   @Transactional()
-  async listTagsByUserId(userId: string): Promise<TagDto[]> {
-    this.logger.info("Listing tags by user id", { userId });
-    return this.tagsRepository.listTagsByUserId(userId);
+  async updateTag(updateTag: UpdateTagInput): Promise<TagDto> {
+    this.logger.info("Updating tag", {
+      userId: updateTag.userId,
+      tagId: updateTag.tagId,
+    });
+
+    const existing = await this.tagsRepository.getTagById(updateTag.tagId);
+    if (!existing || existing.userId !== updateTag.userId) {
+      throw new NotFoundException("Tag not found");
+    }
+
+    const updatePayload: Partial<{
+      name: string;
+      description?: string | null;
+      color: string;
+      answerMode: TagDto["answerMode"];
+      responseTimeMillis: number;
+      notificationsSettings: TagDto["notificationsSettings"];
+    }> = {};
+
+    if (updateTag.name !== undefined) {
+      updatePayload.name = updateTag.name;
+    }
+
+    if (updateTag.description !== undefined) {
+      updatePayload.description = updateTag.description;
+    }
+
+    if (updateTag.color !== undefined) {
+      updatePayload.color = updateTag.color;
+    }
+
+    if (updateTag.answerMode !== undefined) {
+      updatePayload.answerMode = updateTag.answerMode;
+    }
+
+    if (updateTag.responseTimeMillis !== undefined) {
+      updatePayload.responseTimeMillis = updateTag.responseTimeMillis;
+    }
+
+    if (updateTag.notificationsSettings !== undefined) {
+      updatePayload.notificationsSettings = updateTag.notificationsSettings;
+    }
+
+    const updatedTag = await this.tagsRepository.updateTagById(
+      updateTag.tagId,
+      updatePayload,
+    );
+
+    this.natsService.publishTagEvent(TagEventSubject.Updated, {
+      id: updatedTag.id,
+      userId: updatedTag.userId,
+      name: updatedTag.name,
+    });
+
+    return updatedTag;
+  }
+
+  @Transactional()
+  async deleteTag(userId: string, tagId: string): Promise<TagDto> {
+    this.logger.info("Deleting tag", { userId, tagId });
+
+    const existing = await this.tagsRepository.getTagById(tagId);
+    if (!existing || existing.userId !== userId) {
+      throw new NotFoundException("Tag not found");
+    }
+
+    const deletedTag = await this.tagsRepository.deleteTagById(tagId);
+
+    return deletedTag;
   }
 }

@@ -1,7 +1,20 @@
 import { TagDto } from "@/api/dtos/tagDto";
-import { CreateTagRequestDto } from "@/api/dtos/tagRequestsDto";
+import {
+  CreateTagRequestDto,
+  ListTagsQueryDto,
+  UpdateTagRequestDto,
+} from "@/api/dtos/tagRequestsDto";
 import { TagsService } from "@/api/services/tags.service";
-import { Body, Controller, Get, Post, Put } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 
@@ -18,15 +31,56 @@ export class TagsController {
   }
 
   @Get()
-  listTagsByUserId(@AuthUser() user: AuthUserType): Promise<TagDto[]> {
-    return this.tagsService.listTagsByUserId(user.id);
+  listTags(
+    @Query() query: ListTagsQueryDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TagDto[]> {
+    return this.tagsService.listTags(user.id, {
+      answerMode:
+        query.answerMode === "timeblock" || query.answerMode === "immediately"
+          ? query.answerMode
+          : undefined,
+      orderBy:
+        query.orderBy === "createdAt" || query.orderBy === "updatedAt"
+          ? query.orderBy
+          : undefined,
+      orderDirection:
+        query.orderDirection === "asc" || query.orderDirection === "desc"
+          ? query.orderDirection
+          : undefined,
+      search:
+        query.search && query.search.trim().length >= 3
+          ? query.search.trim()
+          : undefined,
+      limit:
+        query.limit !== undefined && Number.isFinite(Number(query.limit))
+          ? Math.max(0, Number(query.limit))
+          : undefined,
+      offset:
+        query.offset !== undefined && Number.isFinite(Number(query.offset))
+          ? Math.max(0, Number(query.offset))
+          : undefined,
+    });
   }
 
-  @Put()
-  putTag(
-    @Body() putTag: CreateTagRequestDto,
+  @Patch(":id")
+  updateTag(
+    @Param("id") tagId: string,
+    @Body() updateTag: UpdateTagRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagDto> {
-    return this.tagsService.putTag({ ...putTag, userId: user.id });
+    return this.tagsService.updateTag({
+      ...updateTag,
+      userId: user.id,
+      tagId,
+    });
+  }
+
+  @Delete(":id")
+  deleteTag(
+    @Param("id") tagId: string,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TagDto> {
+    return this.tagsService.deleteTag(user.id, tagId);
   }
 }
