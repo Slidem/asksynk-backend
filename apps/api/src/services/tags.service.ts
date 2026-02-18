@@ -1,10 +1,11 @@
-import { ContextLogger } from "nestjs-context-logger";
 import {
   CreateTagInput,
   ListTagsInput,
   UpdateTagInput,
 } from "@/api/dtos/tagRequestsDto";
 import { Injectable, NotFoundException } from "@nestjs/common";
+
+import { ContextLogger } from "nestjs-context-logger";
 import { NatsService } from "@/api/services/nats.service";
 import { TagDto } from "@/api/dtos/tagDto";
 import { TagEventSubject } from "@/shared/events";
@@ -32,22 +33,24 @@ export class TagsService {
 
   @Transactional()
   async createTag(createTag: CreateTagInput): Promise<TagDto> {
-    this.logger.info("Creating tag", {
-      userId: createTag.userId,
-      name: createTag.name,
-    });
+    const notificationsSettings = createTag.notificationsSettings
+      ? {
+          ...this.DEFAULT_TAG_SETTINGS.notificationsSettings,
+          ...createTag.notificationsSettings,
+        }
+      : this.DEFAULT_TAG_SETTINGS.notificationsSettings;
 
     const createdTag = await this.tagsRepository.createTag({
       ...this.DEFAULT_TAG_SETTINGS,
       userId: createTag.userId,
       name: createTag.name,
       description: createTag.description,
-    });
-
-    this.natsService.publishTagEvent(TagEventSubject.Created, {
-      id: createdTag.id,
-      userId: createdTag.userId,
-      name: createdTag.name,
+      color: createTag.color ?? this.DEFAULT_TAG_SETTINGS.color,
+      answerMode: createTag.answerMode ?? this.DEFAULT_TAG_SETTINGS.answerMode,
+      responseTimeMillis:
+        createTag.responseTimeMillis ??
+        this.DEFAULT_TAG_SETTINGS.responseTimeMillis,
+      notificationsSettings,
     });
 
     return createdTag;
@@ -116,12 +119,6 @@ export class TagsService {
       updateTag.tagId,
       updatePayload,
     );
-
-    this.natsService.publishTagEvent(TagEventSubject.Updated, {
-      id: updatedTag.id,
-      userId: updatedTag.userId,
-      name: updatedTag.name,
-    });
 
     return updatedTag;
   }

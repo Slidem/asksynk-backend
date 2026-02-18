@@ -27,7 +27,15 @@ export class TagsController {
     @Body() createTag: CreateTagRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagDto> {
-    return this.tagsService.createTag({ ...createTag, userId: user.id });
+    return this.tagsService.createTag({
+      ...createTag,
+      answerMode:
+        createTag.answerMode === "timeblock" ||
+        createTag.answerMode === "immediately"
+          ? createTag.answerMode
+          : undefined,
+      userId: user.id,
+    });
   }
 
   @Get()
