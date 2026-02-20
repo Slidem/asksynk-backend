@@ -8,7 +8,6 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 import { NatsService } from "@/api/services/nats.service";
 import { TagDto } from "@/api/dtos/tagDto";
-import { TagEventSubject } from "@/shared/events";
 import { TagRepository } from "@/api/repository/tag.repository";
 import { Transactional } from "@nestjs-cls/transactional";
 

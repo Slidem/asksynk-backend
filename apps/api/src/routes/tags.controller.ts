@@ -43,6 +43,8 @@ export class TagsController {
     @Query() query: ListTagsQueryDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagDto[]> {
+    console.info("Received listTags request", { user, query });
+
     return this.tagsService.listTags(user.id, {
       answerMode:
         query.answerMode === "timeblock" || query.answerMode === "immediately"
