@@ -59,6 +59,9 @@ importers:
       drizzle-orm:
         specifier: ^0.44.4
         version: 0.44.7(@types/pg@8.16.0)(kysely@0.28.11)(pg@8.18.0)
+      hashids:
+        specifier: ^2.3.0
+        version: 2.3.0
       nats:
         specifier: ^2.29.1
         version: 2.29.3
@@ -2350,6 +2353,9 @@ packages:
   has-symbols@1.1.0:
     resolution: {integrity: sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==}
     engines: {node: '>= 0.4'}
+
+  hashids@2.3.0:
+    resolution: {integrity: sha512-ljM73TE/avEhNnazxaj0Dw3BbEUuLC5yYCQ9RSkSUcT4ZSU6ZebdKCIBJ+xT/DnSYW36E9k82GH1Q6MydSIosQ==}
 
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
@@ -5901,6 +5907,8 @@ snapshots:
       es-define-property: 1.0.1
 
   has-symbols@1.1.0: {}
+
+  hashids@2.3.0: {}
 
   hasown@2.0.2:
     dependencies:
