@@ -8,6 +8,12 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { users } from "@/migrations/schema/users";
 
+const FIVE_MINUTES_IN_SECONDS = 60 * 5;
+
+const ONE_DAY_IN_SECONDS = 60 * 60 * 24;
+
+const ONE_WEEK_IN_SECONDS = ONE_DAY_IN_SECONDS * 7;
+
 export type AuthConfig = {
   databaseUrl: string;
   secret: string;
@@ -17,6 +23,7 @@ export type AuthConfig = {
   sendVerificationEmail?: (params: {
     email: string;
     url: string;
+    userName?: string;
   }) => Promise<void>;
 };
 
@@ -46,18 +53,21 @@ export const createAuth = (config: AuthConfig) => {
 
     emailVerification: {
       sendVerificationEmail: async ({ user, url }) => {
-        await (config.sendVerificationEmail?.({ email: user.email, url }) ??
-          Promise.resolve());
+        await (config.sendVerificationEmail?.({
+          email: user.email,
+          url,
+          userName: user.name,
+        }) ?? Promise.resolve());
       },
     },
 
     session: {
       cookieCache: {
         enabled: true,
-        maxAge: 5 * 60,
+        maxAge: FIVE_MINUTES_IN_SECONDS,
       },
-      expiresIn: 60 * 60 * 24 * 7,
-      updateAge: 60 * 60 * 24,
+      expiresIn: ONE_WEEK_IN_SECONDS,
+      updateAge: ONE_DAY_IN_SECONDS,
     },
 
     user: {

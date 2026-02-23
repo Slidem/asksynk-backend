@@ -2,6 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { EmailMessage } from "./email.types";
 import { Injectable } from "@nestjs/common";
 import { createTransport } from "nodemailer";
+import { renderTemplate } from "./email.templates";
 
 @Injectable()
 export class EmailService {
@@ -17,14 +18,30 @@ export class EmailService {
     const host = this.configService.get<string>("SMTP_HOST") ?? "localhost";
     const port = Number(this.configService.get<string>("SMTP_PORT") ?? 1025);
 
+    let subject: string | undefined;
+    let html: string | undefined;
+    let text: string | undefined;
+
+    if ("template" in message) {
+      const appUrl = this.configService.get<string>("APP_URL");
+      const rendered = renderTemplate(message.template, appUrl);
+      subject = rendered.subject;
+      html = rendered.html;
+      text = rendered.text;
+    } else {
+      subject = message.subject;
+      html = message.html;
+      text = message.text;
+    }
+
     const transporter = createTransport({ host, port, secure: false });
 
     await transporter.sendMail({
       from: "noreply@asksynk.local",
       to: message.to,
-      subject: message.subject,
-      text: message.text,
-      html: message.html,
+      subject,
+      text,
+      html,
     });
   }
 }

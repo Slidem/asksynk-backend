@@ -1,9 +1,10 @@
+import { and, asc, desc, eq, ilike } from "drizzle-orm";
+
 import { ContextLogger } from "nestjs-context-logger";
 import { Injectable } from "@nestjs/common";
 import { TagDto } from "@/api/dtos/tagDto";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { TxAdapter } from "../modules/tx.module";
-import { and, asc, desc, eq, ilike } from "drizzle-orm";
 import { tags } from "@/migrations/schema/tags";
 
 type TagRow = typeof tags.$inferSelect;
@@ -63,8 +64,6 @@ export class TagRepository {
   }
 
   async getTagById(tagId: string): Promise<TagDto | null> {
-    this.logger.info("Getting tag by id", { tagId });
-
     const tag = await this.txHost.tx
       .select()
       .from(tags)
@@ -89,8 +88,6 @@ export class TagRepository {
       offset?: number;
     },
   ): Promise<TagDto[]> {
-    this.logger.info("Querying tags with filters", { userId, options });
-
     const filters = [eq(tags.userId, userId)];
     if (options.answerMode) {
       filters.push(eq(tags.answerMode, options.answerMode));

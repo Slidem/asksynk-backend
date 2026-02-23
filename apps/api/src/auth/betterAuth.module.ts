@@ -34,17 +34,13 @@ export class BetterAuthModule {
               sendMagicLink: async ({ email, url }) => {
                 await emailService.send({
                   to: email,
-                  subject: "Sign in to AskSynk",
-                  text: `Click this link to sign in: ${url}`,
-                  html: `<p>Click <a href="${url}">here</a> to sign in to AskSynk.</p>`,
+                  template: { type: "magic-link", url },
                 });
               },
-              sendVerificationEmail: async ({ email, url }) => {
+              sendVerificationEmail: async ({ email, url, userName }) => {
                 await emailService.send({
                   to: email,
-                  subject: "Verify your email",
-                  text: `Click this link to verify your email: ${url}`,
-                  html: `<p>Click <a href="${url}">here</a> to verify your email.</p>`,
+                  template: { type: "verify-email", url, userName },
                 });
               },
             });
