@@ -10,11 +10,12 @@ import {
   Controller,
   Delete,
   Get,
-  Param,
   Patch,
   Post,
   Query,
 } from "@nestjs/common";
+import { IdParam } from "../decorators/id.docorators";
+import { EncodedResponseIds } from "@/api/decorators/id.docorators";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 
@@ -23,6 +24,7 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Post()
+  @EncodedResponseIds("id")
   createTag(
     @Body() createTag: CreateTagRequestDto,
     @AuthUser() user: AuthUserType,
@@ -39,6 +41,7 @@ export class TagsController {
   }
 
   @Get()
+  @EncodedResponseIds("id")
   listTags(
     @Query() query: ListTagsQueryDto,
     @AuthUser() user: AuthUserType,
@@ -74,8 +77,9 @@ export class TagsController {
   }
 
   @Patch(":id")
+  @EncodedResponseIds("id")
   updateTag(
-    @Param("id") tagId: string,
+    @IdParam("id") tagId: string,
     @Body() updateTag: UpdateTagRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagDto> {
@@ -87,8 +91,9 @@ export class TagsController {
   }
 
   @Delete(":id")
+  @EncodedResponseIds("id")
   deleteTag(
-    @Param("id") tagId: string,
+    @IdParam("id") tagId: string,
     @AuthUser() user: AuthUserType,
   ): Promise<TagDto> {
     return this.tagsService.deleteTag(user.id, tagId);
