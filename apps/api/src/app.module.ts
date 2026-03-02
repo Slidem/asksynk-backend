@@ -1,4 +1,6 @@
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+
+import { AllExceptionsFilter } from "@/api/common/errors/errors.filter";
 import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
 import { ConfigModule } from "@nestjs/config";
@@ -22,6 +24,9 @@ import { TxModule } from "@/api/common/db/tx.module";
     AuthGuardModule,
   ],
   controllers: [HealthController, AuthController],
-  providers: [{ provide: APP_INTERCEPTOR, useClass: EncodeIdsInterceptor }],
+  providers: [
+    { provide: APP_INTERCEPTOR, useClass: EncodeIdsInterceptor },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
 })
 export class AppModule {}

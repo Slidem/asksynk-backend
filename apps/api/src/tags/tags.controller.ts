@@ -4,9 +4,7 @@ import {
   EncodedResponseIds,
   IdParam,
 } from "@/api/common/decorators/id.decorators";
-import { TagResponseDto, toTagResponseDto } from "@/api/tags/tags.dto";
-import { ListTagsQueryDto } from "./tags.rest-dto";
-import { CreateTagRequestDto, UpdateTagRequestDto } from "./tags.rest-dto";
+import { AnswerMode } from "@/api/tags/tags.model";
 import { TagsService } from "@/api/tags/tags.service";
 import {
   Body,
@@ -17,6 +15,15 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { AsksynkError } from "../common/errors/errors.model";
+import { toTagResponseDto } from "./tags.mappers";
+import {
+  CreateTagRequestDto,
+  ListTagsQueryDto,
+  TagResponseDto,
+  UpdateTagRequestDto,
+} from "./tags.rest-dto";
+import { pick } from "lodash";
 
 @Controller("tags")
 export class TagsController {
@@ -28,15 +35,13 @@ export class TagsController {
     @Body() createTag: CreateTagRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagResponseDto> {
+    this.validateAnswerMode(createTag.answerMode);
+
     const tag = await this.tagsService.createTag({
       ...createTag,
-      answerMode:
-        createTag.answerMode === "timeblock" ||
-        createTag.answerMode === "immediately"
-          ? createTag.answerMode
-          : undefined,
       userId: user.id,
     });
+
     return toTagResponseDto(tag);
   }
 
@@ -46,32 +51,23 @@ export class TagsController {
     @Query() query: ListTagsQueryDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagResponseDto[]> {
-    const tags = await this.tagsService.listTags(user.id, {
-      answerMode:
-        query.answerMode === "timeblock" || query.answerMode === "immediately"
-          ? query.answerMode
-          : undefined,
-      orderBy:
-        query.orderBy === "createdAt" || query.orderBy === "updatedAt"
-          ? query.orderBy
-          : undefined,
-      orderDirection:
-        query.orderDirection === "asc" || query.orderDirection === "desc"
-          ? query.orderDirection
-          : undefined,
-      search:
-        query.search && query.search.trim().length >= 3
-          ? query.search.trim()
-          : undefined,
-      limit:
-        query.limit !== undefined && Number.isFinite(Number(query.limit))
-          ? Math.max(0, Number(query.limit))
-          : undefined,
-      offset:
-        query.offset !== undefined && Number.isFinite(Number(query.offset))
-          ? Math.max(0, Number(query.offset))
-          : undefined,
-    });
+    this.validateListTagsQuery(query);
+
+    const limit: number | undefined =
+      query.limit !== undefined ? Math.max(0, Number(query.limit)) : undefined;
+
+    const offset: number | undefined =
+      query.offset !== undefined
+        ? Math.max(0, Number(query.offset))
+        : undefined;
+
+    const listInput = {
+      ...pick(query, ["orderBy", "orderDirection", "search"]),
+      limit,
+      offset,
+    };
+
+    const tags = await this.tagsService.listTags(user.id, listInput);
     return tags.map(toTagResponseDto);
   }
 
@@ -82,11 +78,14 @@ export class TagsController {
     @Body() updateTag: UpdateTagRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagResponseDto> {
+    this.validateAnswerMode(updateTag.answerMode);
+
     const tag = await this.tagsService.updateTag({
       ...updateTag,
       userId: user.id,
       tagId,
     });
+
     return toTagResponseDto(tag);
   }
 
@@ -98,5 +97,60 @@ export class TagsController {
   ): Promise<TagResponseDto> {
     const tag = await this.tagsService.deleteTag(user.id, tagId);
     return toTagResponseDto(tag);
+  }
+
+  private validateAnswerMode(input: AnswerMode | undefined) {
+    if (!input) return undefined;
+
+    if (input.type !== "immediately" && input.type !== "timeblock") {
+      throw AsksynkError.badRequest("Invalid answer mode type");
+    }
+
+    if (
+      input.type === "immediately" &&
+      (!input.responseTimeMillis ||
+        typeof input.responseTimeMillis !== "number")
+    ) {
+      throw AsksynkError.badRequest(
+        "For 'immediately' answer mode, 'responseTimeMillis' must be a number",
+      );
+    }
+  }
+
+  private validateListTagsQuery(input: ListTagsQueryDto) {
+    if (input.answerMode) {
+      if (
+        input.answerMode !== "immediately" &&
+        input.answerMode !== "timeblock"
+      ) {
+        throw AsksynkError.badRequest("Invalid answer mode type");
+      }
+    }
+
+    if (input.orderBy) {
+      if (input.orderBy !== "createdAt" && input.orderBy !== "updatedAt") {
+        throw AsksynkError.badRequest("Invalid orderBy value");
+      }
+    }
+
+    if (input.orderDirection) {
+      if (input.orderDirection !== "asc" && input.orderDirection !== "desc") {
+        throw AsksynkError.badRequest("Invalid orderDirection value");
+      }
+    }
+
+    if (input.limit !== undefined) {
+      const limitNum = Number(input.limit);
+      if (!Number.isFinite(limitNum) || limitNum < 0) {
+        throw AsksynkError.badRequest("Limit must be a non-negative number");
+      }
+    }
+
+    if (input.offset !== undefined) {
+      const offsetNum = Number(input.offset);
+      if (!Number.isFinite(offsetNum) || offsetNum < 0) {
+        throw AsksynkError.badRequest("Offset must be a non-negative number");
+      }
+    }
   }
 }

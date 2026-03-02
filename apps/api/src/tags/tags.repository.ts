@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, ilike } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
 
+import { AnswerModeType } from "@/api/tags/tags.model";
 import { ContextLogger } from "nestjs-context-logger";
 import { Injectable } from "@nestjs/common";
 import { Tag } from "@/api/tags/tag.entity";
@@ -24,9 +25,7 @@ export class TagRepository {
 
     const [createdTag] = await this.txHost.tx
       .insert(tags)
-      .values({
-        ...createTag,
-      })
+      .values(createTag)
       .returning();
 
     return this.mapDbRowToTag(createdTag);
@@ -75,7 +74,7 @@ export class TagRepository {
   async listTagsByUserIdWithFilters(
     userId: string,
     options: {
-      answerMode?: TagRow["answerMode"];
+      answerMode?: AnswerModeType;
       orderBy?: "createdAt" | "updatedAt";
       orderDirection?: "asc" | "desc";
       search?: string;
@@ -84,15 +83,18 @@ export class TagRepository {
     },
   ): Promise<Tag[]> {
     const filters = [eq(tags.userId, userId)];
+
     if (options.answerMode) {
-      filters.push(eq(tags.answerMode, options.answerMode));
+      filters.push(sql`${tags.answerMode}->>'type' = ${options.answerMode}`);
     }
+
     if (options.search) {
       filters.push(ilike(tags.name, `%${options.search}%`));
     }
 
     const orderColumn =
       options.orderBy === "updatedAt" ? tags.updatedAt : tags.createdAt;
+
     const orderFn = options.orderDirection === "asc" ? asc : desc;
 
     const query = this.txHost.tx
@@ -122,7 +124,6 @@ export class TagRepository {
       description: dbTag.description ?? undefined,
       color: dbTag.color,
       answerMode: dbTag.answerMode,
-      responseTimeMillis: dbTag.responseTimeMillis,
       notificationsSettings: {
         browserNotificationEnabled:
           dbTag.notificationsSettings.browserNotificationEnabled,

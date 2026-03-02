@@ -1,25 +1,39 @@
-import { AnswerMode, TagOrderBy, TagOrderDirection } from "./tags.model";
+import {
+  AnswerMode,
+  AnswerModeType,
+  NotificationsSettings,
+  TagOrderBy,
+  TagOrderDirection,
+} from "@/api/tags/tags.model";
 
-import { NotificationsSettings } from "./tags.model";
-
-export interface TagRequestDto {
+export interface CreateTagRequestDto {
   name: string;
   description?: string;
   color?: string;
   answerMode?: AnswerMode;
-  responseTimeMillis: number;
   notificationsSettings?: NotificationsSettings;
 }
 
-export type CreateTagRequestDto = TagRequestDto;
-
-export type UpdateTagRequestDto = Partial<TagRequestDto>;
+export type UpdateTagRequestDto = Partial<CreateTagRequestDto>;
 
 export interface ListTagsQueryDto {
-  answerMode?: AnswerMode;
+  answerMode?: AnswerModeType;
   orderBy?: TagOrderBy;
   orderDirection?: TagOrderDirection;
   search?: string;
   limit?: string;
   offset?: string;
+}
+
+export interface TagResponseDto {
+  id: string;
+  name: string;
+  userId: string;
+  description?: string;
+  color: string;
+  answerMode: AnswerMode;
+  notificationsSettings: {
+    browserNotificationEnabled: boolean;
+    soundNotificationEnabled: boolean;
+  };
 }

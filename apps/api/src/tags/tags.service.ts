@@ -1,9 +1,9 @@
-import { CreateTagInput, UpdateTagInput } from "@/api/tags/tags-request.dto";
+import { CreateTagInput, UpdateTagInput } from "@/api/tags/tags.model";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { defaultsDeep, pick, pickBy } from "lodash";
 
 import { ContextLogger } from "nestjs-context-logger";
-import { ListTagsInput } from "./tags.model";
+import { ListTagsInput } from "@/api/tags/tags.model";
 import { Tag } from "@/api/tags/tag.entity";
 import { TagRepository } from "@/api/tags/tags.repository";
 import { Transactional } from "@nestjs-cls/transactional";
@@ -15,7 +15,7 @@ export class TagsService {
 
   @Transactional()
   async createTag(createTag: CreateTagInput): Promise<Tag> {
-    const payload: CreateTagInput = defaultsDeep(createTag, Tag.defaults());
+    const payload = defaultsDeep(createTag, Tag.defaults());
     return this.tagsRepository.createTag(payload);
   }
 
@@ -41,7 +41,12 @@ export class TagsService {
     });
 
     const existing = await this.tagsRepository.getTagById(updateTag.tagId);
+
     if (!existing || !existing.belongsTo(updateTag.userId)) {
+      throw new NotFoundException("Tag not found");
+    }
+
+    if (existing.userId !== updateTag.userId) {
       throw new NotFoundException("Tag not found");
     }
 
@@ -51,7 +56,6 @@ export class TagsService {
         "description",
         "color",
         "answerMode",
-        "responseTimeMillis",
         "notificationsSettings",
       ]),
       (v) => v !== undefined,

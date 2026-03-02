@@ -1,7 +1,5 @@
 import {
-  integer,
   jsonb,
-  pgEnum,
   pgTable,
   serial,
   text,
@@ -10,10 +8,9 @@ import {
 
 import { sql } from "drizzle-orm";
 
-export const answerModeEnum = pgEnum("answer_mode", [
-  "timeblock",
-  "immediately",
-]);
+type AnswerMode =
+  | { type: "immediately"; responseTimeMillis: number }
+  | { type: "timeblock" };
 
 export const tags = pgTable("tags", {
   id: serial("id").primaryKey(),
@@ -21,8 +18,12 @@ export const tags = pgTable("tags", {
   name: text("name").unique().notNull(),
   description: text("description"),
   color: text("color").notNull(),
-  answerMode: answerModeEnum("answer_mode").notNull(),
-  responseTimeMillis: integer("response_time_millis").notNull(),
+  answerMode: jsonb("answer_mode")
+    .notNull()
+    .$type<AnswerMode>()
+    .default(
+      sql`'{"type":"immediately","responseTimeMillis":0}'::jsonb`,
+    ),
   notificationsSettings: jsonb("notifications_settings")
     .notNull()
     .$type<{

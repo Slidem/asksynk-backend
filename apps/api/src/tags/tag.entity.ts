@@ -7,7 +7,6 @@ export interface TagProps {
   description?: string;
   color: string;
   answerMode: AnswerMode;
-  responseTimeMillis: number;
   notificationsSettings: NotificationsSettings;
   createdAt: Date;
   updatedAt: Date;
@@ -26,7 +25,6 @@ export class Tag {
   description?: string;
   color: string;
   answerMode: AnswerMode;
-  responseTimeMillis: number;
   notificationsSettings: NotificationsSettings;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -38,7 +36,6 @@ export class Tag {
     this.description = props.description;
     this.color = props.color;
     this.answerMode = props.answerMode;
-    this.responseTimeMillis = props.responseTimeMillis;
     this.notificationsSettings = props.notificationsSettings;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
@@ -51,7 +48,7 @@ export class Tag {
   static defaults(): DefaultTagSettings {
     return {
       color: "#6b7280",
-      answerMode: "immediately",
+      answerMode: { type: "immediately", responseTimeMillis: 0 },
       notificationsSettings: {
         browserNotificationEnabled: true,
         soundNotificationEnabled: true,

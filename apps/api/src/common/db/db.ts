@@ -1,9 +1,8 @@
-import { answerModeEnum, tags } from "@/migrations/schema/tags";
-import { users } from "@/migrations/schema/users";
-
 import { ConfigService } from "@nestjs/config";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { tags } from "@/migrations/schema/tags";
+import { users } from "@/migrations/schema/users";
 
 export type DB = ReturnType<typeof getDbInstance>;
 
@@ -14,5 +13,5 @@ export const getDbInstance = (config: ConfigService) => {
     min: config.get<number>("DB_POOL_MIN") ?? 2,
     max: config.get<number>("DB_POOL_MAX") ?? 10,
   });
-  return drizzle(pool, { schema: { answerModeEnum, tags, users } });
+  return drizzle(pool, { schema: { tags, users } });
 };
