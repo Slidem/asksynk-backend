@@ -1,12 +1,12 @@
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { EncodedResponseIds, IdParam } from "@/api/common/decorators/id.decorators";
-import { TagResponseDto, toTagResponseDto } from "@/api/tags/tags.dto";
 import {
-  CreateTagRequestDto,
-  ListTagsQueryDto,
-  UpdateTagRequestDto,
-} from "@/api/tags/tags-request.dto";
+  EncodedResponseIds,
+  IdParam,
+} from "@/api/common/decorators/id.decorators";
+import { TagResponseDto, toTagResponseDto } from "@/api/tags/tags.dto";
+import { ListTagsQueryDto } from "./tags.rest-dto";
+import { CreateTagRequestDto, UpdateTagRequestDto } from "./tags.rest-dto";
 import { TagsService } from "@/api/tags/tags.service";
 import {
   Body,

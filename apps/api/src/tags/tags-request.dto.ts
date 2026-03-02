@@ -1,50 +1,27 @@
-import { AnswerMode, NotificationsSettings } from "@/api/tags/tag.entity";
+import { AnswerMode, NotificationsSettings } from "./tags.model";
 
-export interface CreateTagRequestDto {
+interface TagInput {
   name: string;
   description?: string;
   color?: string;
-  answerMode?: AnswerMode;
-  responseTimeMillis?: number;
   notificationsSettings?: NotificationsSettings;
+  answerMode: AnswerMode;
 }
 
-export interface CreateTagInput extends CreateTagRequestDto {
+type ImmediateTagInput = TagInput & {
+  answerMode: "immediately";
+};
+
+type TimeblockTagInput = TagInput & {
+  answerMode: "timeblock";
+  responseTimeMillis: number;
+};
+
+export type CreateTagInput = {
   userId: string;
-}
+} & (ImmediateTagInput | TimeblockTagInput);
 
-export interface UpdateTagRequestDto {
-  name?: string;
-  description?: string;
-  color?: string;
-  answerMode?: AnswerMode;
-  responseTimeMillis?: number;
-  notificationsSettings?: NotificationsSettings;
-}
-
-export interface UpdateTagInput extends UpdateTagRequestDto {
+export type UpdateTagInput = {
   userId: string;
   tagId: string;
-}
-
-export type TagOrderBy = "createdAt" | "updatedAt";
-
-export type TagOrderDirection = "asc" | "desc";
-
-export interface ListTagsQueryDto {
-  answerMode?: AnswerMode;
-  orderBy?: TagOrderBy;
-  orderDirection?: TagOrderDirection;
-  search?: string;
-  limit?: string;
-  offset?: string;
-}
-
-export interface ListTagsInput {
-  answerMode?: AnswerMode;
-  orderBy?: TagOrderBy;
-  orderDirection?: TagOrderDirection;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}
+} & Partial<ImmediateTagInput | TimeblockTagInput>;

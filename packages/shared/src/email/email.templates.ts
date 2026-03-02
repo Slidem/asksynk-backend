@@ -1,4 +1,5 @@
 import { EmailTemplate, RenderedEmail } from "./email.types";
+
 import { magicLinkTemplate } from "./templates/magic-link.template";
 import { verifyEmailTemplate } from "./templates/verify-email.template";
 import { wrapHtml } from "./templates/layout";

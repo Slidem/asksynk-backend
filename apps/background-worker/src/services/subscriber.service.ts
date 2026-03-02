@@ -1,10 +1,10 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { JSONCodec, NatsConnection, connect } from "nats";
 import { TagEventPayload, TagEventSubject } from "@/shared/events";
-import { EmailService } from "@/shared/email/email.service";
 
 import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
+import { EmailService } from "@/shared/email/email.service";
 
 @Injectable()
 export class NatsSubscriberService implements OnModuleInit, OnModuleDestroy {

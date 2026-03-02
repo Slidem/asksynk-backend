@@ -9,9 +9,9 @@ export const styles = {
 
 function minifyHtml(html: string): string {
   return html
-    .replace(/\n\s*/g, "")
-    .replace(/>\s+</g, "><")
-    .replace(/\s{2,}/g, " ")
+    .replace(/\n\s*/g, "") // Remove newlines and leading/trailing whitespace
+    .replace(/>\s+</g, "><") // Remove whitespace between tags
+    .replace(/\s{2,}/g, " ") // Replace multiple spaces with a single space
     .trim();
 }
 

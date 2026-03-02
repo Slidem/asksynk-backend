@@ -1,9 +1,4 @@
-export type AnswerMode = "timeblock" | "immediately";
-
-export interface NotificationsSettings {
-  browserNotificationEnabled: boolean;
-  soundNotificationEnabled: boolean;
-}
+import { AnswerMode, NotificationsSettings } from "@/api/tags/tags.model";
 
 export interface TagProps {
   id: string;
@@ -21,7 +16,6 @@ export interface TagProps {
 export interface DefaultTagSettings {
   color: string;
   answerMode: AnswerMode;
-  responseTimeMillis: number;
   notificationsSettings: NotificationsSettings;
 }
 
@@ -58,7 +52,6 @@ export class Tag {
     return {
       color: "#6b7280",
       answerMode: "immediately",
-      responseTimeMillis: 0,
       notificationsSettings: {
         browserNotificationEnabled: true,
         soundNotificationEnabled: true,

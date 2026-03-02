@@ -9,11 +9,9 @@ import { tags } from "@/migrations/schema/tags";
 
 type TagRow = typeof tags.$inferSelect;
 
-type TagInsert = typeof tags.$inferInsert;
+type CreateTag = Omit<TagRow, "id" | "createdAt" | "updatedAt">;
 
-type CreateTagInput = Omit<TagInsert, "id" | "createdAt" | "updatedAt">;
-
-type UpdateTagInput = Partial<CreateTagInput>;
+type UpdateTag = Partial<CreateTag>;
 
 @Injectable()
 export class TagRepository {
@@ -21,7 +19,7 @@ export class TagRepository {
 
   constructor(private readonly txHost: TransactionHost<TxAdapter>) {}
 
-  async createTag(createTag: CreateTagInput): Promise<Tag> {
+  async createTag(createTag: CreateTag): Promise<Tag> {
     this.logger.info("Creating tag", { createTag });
 
     const [createdTag] = await this.txHost.tx
@@ -34,7 +32,7 @@ export class TagRepository {
     return this.mapDbRowToTag(createdTag);
   }
 
-  async updateTagById(tagId: string, updateTag: UpdateTagInput): Promise<Tag> {
+  async updateTagById(tagId: string, updateTag: UpdateTag): Promise<Tag> {
     this.logger.info("Updating tag by id", { tagId, updateTag });
 
     const [updatedTag] = await this.txHost.tx

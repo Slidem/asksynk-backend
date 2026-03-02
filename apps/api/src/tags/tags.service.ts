@@ -1,11 +1,9 @@
-import {
-  CreateTagInput,
-  ListTagsInput,
-  UpdateTagInput,
-} from "@/api/tags/tags-request.dto";
+import { CreateTagInput, UpdateTagInput } from "@/api/tags/tags-request.dto";
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { defaultsDeep, pick, pickBy } from "lodash";
 
 import { ContextLogger } from "nestjs-context-logger";
+import { ListTagsInput } from "./tags.model";
 import { Tag } from "@/api/tags/tag.entity";
 import { TagRepository } from "@/api/tags/tags.repository";
 import { Transactional } from "@nestjs-cls/transactional";
@@ -17,27 +15,8 @@ export class TagsService {
 
   @Transactional()
   async createTag(createTag: CreateTagInput): Promise<Tag> {
-    const defaults = Tag.defaults();
-
-    const notificationsSettings = createTag.notificationsSettings
-      ? {
-          ...defaults.notificationsSettings,
-          ...createTag.notificationsSettings,
-        }
-      : defaults.notificationsSettings;
-
-    const createdTag = await this.tagsRepository.createTag({
-      userId: createTag.userId,
-      name: createTag.name,
-      description: createTag.description,
-      color: createTag.color ?? defaults.color,
-      answerMode: createTag.answerMode ?? defaults.answerMode,
-      responseTimeMillis:
-        createTag.responseTimeMillis ?? defaults.responseTimeMillis,
-      notificationsSettings,
-    });
-
-    return createdTag;
+    const payload: CreateTagInput = defaultsDeep(createTag, Tag.defaults());
+    return this.tagsRepository.createTag(payload);
   }
 
   @Transactional()
@@ -66,45 +45,19 @@ export class TagsService {
       throw new NotFoundException("Tag not found");
     }
 
-    const updatePayload: Partial<{
-      name: string;
-      description?: string | null;
-      color: string;
-      answerMode: Tag["answerMode"];
-      responseTimeMillis: number;
-      notificationsSettings: Tag["notificationsSettings"];
-    }> = {};
-
-    if (updateTag.name !== undefined) {
-      updatePayload.name = updateTag.name;
-    }
-
-    if (updateTag.description !== undefined) {
-      updatePayload.description = updateTag.description;
-    }
-
-    if (updateTag.color !== undefined) {
-      updatePayload.color = updateTag.color;
-    }
-
-    if (updateTag.answerMode !== undefined) {
-      updatePayload.answerMode = updateTag.answerMode;
-    }
-
-    if (updateTag.responseTimeMillis !== undefined) {
-      updatePayload.responseTimeMillis = updateTag.responseTimeMillis;
-    }
-
-    if (updateTag.notificationsSettings !== undefined) {
-      updatePayload.notificationsSettings = updateTag.notificationsSettings;
-    }
-
-    const updatedTag = await this.tagsRepository.updateTagById(
-      updateTag.tagId,
-      updatePayload,
+    const updatePayload = pickBy(
+      pick(updateTag, [
+        "name",
+        "description",
+        "color",
+        "answerMode",
+        "responseTimeMillis",
+        "notificationsSettings",
+      ]),
+      (v) => v !== undefined,
     );
 
-    return updatedTag;
+    return this.tagsRepository.updateTagById(updateTag.tagId, updatePayload);
   }
 
   @Transactional()
@@ -115,9 +68,7 @@ export class TagsService {
     if (!existing || !existing.belongsTo(userId)) {
       throw new NotFoundException("Tag not found");
     }
-
     const deletedTag = await this.tagsRepository.deleteTagById(tagId);
-
     return deletedTag;
   }
 }
