@@ -1,12 +1,12 @@
-import { TagDto } from "@/api/dtos/tagDto";
+import { AnswerMode, NotificationsSettings } from "@/api/tags/tag.entity";
 
 export interface CreateTagRequestDto {
   name: string;
   description?: string;
   color?: string;
-  answerMode?: TagDto["answerMode"];
+  answerMode?: AnswerMode;
   responseTimeMillis?: number;
-  notificationsSettings?: TagDto["notificationsSettings"];
+  notificationsSettings?: NotificationsSettings;
 }
 
 export interface CreateTagInput extends CreateTagRequestDto {
@@ -17,9 +17,9 @@ export interface UpdateTagRequestDto {
   name?: string;
   description?: string;
   color?: string;
-  answerMode?: TagDto["answerMode"];
+  answerMode?: AnswerMode;
   responseTimeMillis?: number;
-  notificationsSettings?: TagDto["notificationsSettings"];
+  notificationsSettings?: NotificationsSettings;
 }
 
 export interface UpdateTagInput extends UpdateTagRequestDto {
@@ -32,7 +32,7 @@ export type TagOrderBy = "createdAt" | "updatedAt";
 export type TagOrderDirection = "asc" | "desc";
 
 export interface ListTagsQueryDto {
-  answerMode?: TagDto["answerMode"];
+  answerMode?: AnswerMode;
   orderBy?: TagOrderBy;
   orderDirection?: TagOrderDirection;
   search?: string;
@@ -41,7 +41,7 @@ export interface ListTagsQueryDto {
 }
 
 export interface ListTagsInput {
-  answerMode?: TagDto["answerMode"];
+  answerMode?: AnswerMode;
   orderBy?: TagOrderBy;
   orderDirection?: TagOrderDirection;
   search?: string;

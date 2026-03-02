@@ -11,5 +11,12 @@
     "typescript",
     "typescriptreact"
   ],
-  "cSpell.words": ["hashid", "hashids", "Millis", "responfications", "tmpl"]
+  "cSpell.words": [
+    "docorators",
+    "hashid",
+    "hashids",
+    "Millis",
+    "responfications",
+    "tmpl"
+  ]
 }

@@ -1,7 +1,7 @@
 import { ContextLogger } from "nestjs-context-logger";
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { TxAdapter } from "@/api/modules/tx.module";
+import { TxAdapter } from "@/api/common/db/tx.module";
 import { eq } from "drizzle-orm";
 import { users } from "@/migrations/schema/users";
 

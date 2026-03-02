@@ -1,0 +1,72 @@
+export type AnswerMode = "timeblock" | "immediately";
+
+export interface NotificationsSettings {
+  browserNotificationEnabled: boolean;
+  soundNotificationEnabled: boolean;
+}
+
+export interface TagProps {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  color: string;
+  answerMode: AnswerMode;
+  responseTimeMillis: number;
+  notificationsSettings: NotificationsSettings;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DefaultTagSettings {
+  color: string;
+  answerMode: AnswerMode;
+  responseTimeMillis: number;
+  notificationsSettings: NotificationsSettings;
+}
+
+export class Tag {
+  readonly id: string;
+  readonly userId: string;
+  name: string;
+  description?: string;
+  color: string;
+  answerMode: AnswerMode;
+  responseTimeMillis: number;
+  notificationsSettings: NotificationsSettings;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+
+  private constructor(props: TagProps) {
+    this.id = props.id;
+    this.userId = props.userId;
+    this.name = props.name;
+    this.description = props.description;
+    this.color = props.color;
+    this.answerMode = props.answerMode;
+    this.responseTimeMillis = props.responseTimeMillis;
+    this.notificationsSettings = props.notificationsSettings;
+    this.createdAt = props.createdAt;
+    this.updatedAt = props.updatedAt;
+  }
+
+  static create(props: TagProps): Tag {
+    return new Tag(props);
+  }
+
+  static defaults(): DefaultTagSettings {
+    return {
+      color: "#6b7280",
+      answerMode: "immediately",
+      responseTimeMillis: 0,
+      notificationsSettings: {
+        browserNotificationEnabled: true,
+        soundNotificationEnabled: true,
+      },
+    };
+  }
+
+  belongsTo(userId: string): boolean {
+    return this.userId === userId;
+  }
+}

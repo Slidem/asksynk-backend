@@ -2,53 +2,38 @@ import {
   CreateTagInput,
   ListTagsInput,
   UpdateTagInput,
-} from "@/api/dtos/tagRequestsDto";
+} from "@/api/tags/tags-request.dto";
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { ContextLogger } from "nestjs-context-logger";
-import { NatsService } from "@/api/services/nats.service";
-import { TagDto } from "@/api/dtos/tagDto";
-import { TagRepository } from "@/api/repository/tag.repository";
+import { Tag } from "@/api/tags/tag.entity";
+import { TagRepository } from "@/api/tags/tags.repository";
 import { Transactional } from "@nestjs-cls/transactional";
 
 @Injectable()
 export class TagsService {
-  private readonly DEFAULT_TAG_SETTINGS = {
-    color: "#6b7280",
-    answerMode: "immediately" as const,
-    responseTimeMillis: 0,
-    notificationsSettings: {
-      browserNotificationEnabled: true,
-      soundNotificationEnabled: true,
-    },
-  };
-
   private readonly logger = new ContextLogger(TagsService.name);
-
-  constructor(
-    private readonly tagsRepository: TagRepository,
-    private readonly natsService: NatsService,
-  ) {}
+  constructor(private readonly tagsRepository: TagRepository) {}
 
   @Transactional()
-  async createTag(createTag: CreateTagInput): Promise<TagDto> {
+  async createTag(createTag: CreateTagInput): Promise<Tag> {
+    const defaults = Tag.defaults();
+
     const notificationsSettings = createTag.notificationsSettings
       ? {
-          ...this.DEFAULT_TAG_SETTINGS.notificationsSettings,
+          ...defaults.notificationsSettings,
           ...createTag.notificationsSettings,
         }
-      : this.DEFAULT_TAG_SETTINGS.notificationsSettings;
+      : defaults.notificationsSettings;
 
     const createdTag = await this.tagsRepository.createTag({
-      ...this.DEFAULT_TAG_SETTINGS,
       userId: createTag.userId,
       name: createTag.name,
       description: createTag.description,
-      color: createTag.color ?? this.DEFAULT_TAG_SETTINGS.color,
-      answerMode: createTag.answerMode ?? this.DEFAULT_TAG_SETTINGS.answerMode,
+      color: createTag.color ?? defaults.color,
+      answerMode: createTag.answerMode ?? defaults.answerMode,
       responseTimeMillis:
-        createTag.responseTimeMillis ??
-        this.DEFAULT_TAG_SETTINGS.responseTimeMillis,
+        createTag.responseTimeMillis ?? defaults.responseTimeMillis,
       notificationsSettings,
     });
 
@@ -56,7 +41,7 @@ export class TagsService {
   }
 
   @Transactional()
-  async listTags(userId: string, listTags: ListTagsInput): Promise<TagDto[]> {
+  async listTags(userId: string, listTags: ListTagsInput): Promise<Tag[]> {
     this.logger.info("Listing tags", { userId, listTags });
 
     return this.tagsRepository.listTagsByUserIdWithFilters(userId, {
@@ -70,14 +55,14 @@ export class TagsService {
   }
 
   @Transactional()
-  async updateTag(updateTag: UpdateTagInput): Promise<TagDto> {
+  async updateTag(updateTag: UpdateTagInput): Promise<Tag> {
     this.logger.info("Updating tag", {
       userId: updateTag.userId,
       tagId: updateTag.tagId,
     });
 
     const existing = await this.tagsRepository.getTagById(updateTag.tagId);
-    if (!existing || existing.userId !== updateTag.userId) {
+    if (!existing || !existing.belongsTo(updateTag.userId)) {
       throw new NotFoundException("Tag not found");
     }
 
@@ -85,9 +70,9 @@ export class TagsService {
       name: string;
       description?: string | null;
       color: string;
-      answerMode: TagDto["answerMode"];
+      answerMode: Tag["answerMode"];
       responseTimeMillis: number;
-      notificationsSettings: TagDto["notificationsSettings"];
+      notificationsSettings: Tag["notificationsSettings"];
     }> = {};
 
     if (updateTag.name !== undefined) {
@@ -123,11 +108,11 @@ export class TagsService {
   }
 
   @Transactional()
-  async deleteTag(userId: string, tagId: string): Promise<TagDto> {
+  async deleteTag(userId: string, tagId: string): Promise<Tag> {
     this.logger.info("Deleting tag", { userId, tagId });
 
     const existing = await this.tagsRepository.getTagById(tagId);
-    if (!existing || existing.userId !== userId) {
+    if (!existing || !existing.belongsTo(userId)) {
       throw new NotFoundException("Tag not found");
     }
 

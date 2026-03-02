@@ -5,7 +5,7 @@ import {
   createParamDecorator,
 } from "@nestjs/common";
 
-import { decodeId } from "../utils/hashid";
+import { decodeId } from "@/api/common/utils/hashid";
 
 export const ENCODED_RESPONSE_IDS_KEY = "encodedResponseIds";
 

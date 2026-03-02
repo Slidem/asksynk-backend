@@ -2,9 +2,9 @@ import { and, asc, desc, eq, ilike } from "drizzle-orm";
 
 import { ContextLogger } from "nestjs-context-logger";
 import { Injectable } from "@nestjs/common";
-import { TagDto } from "@/api/dtos/tagDto";
+import { Tag } from "@/api/tags/tag.entity";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { TxAdapter } from "../modules/tx.module";
+import { TxAdapter } from "@/api/common/db/tx.module";
 import { tags } from "@/migrations/schema/tags";
 
 type TagRow = typeof tags.$inferSelect;
@@ -21,7 +21,7 @@ export class TagRepository {
 
   constructor(private readonly txHost: TransactionHost<TxAdapter>) {}
 
-  async createTag(createTag: CreateTagInput): Promise<TagDto> {
+  async createTag(createTag: CreateTagInput): Promise<Tag> {
     this.logger.info("Creating tag", { createTag });
 
     const [createdTag] = await this.txHost.tx
@@ -31,13 +31,10 @@ export class TagRepository {
       })
       .returning();
 
-    return this.mapDbTagToTagDto(createdTag);
+    return this.mapDbRowToTag(createdTag);
   }
 
-  async updateTagById(
-    tagId: string,
-    updateTag: UpdateTagInput,
-  ): Promise<TagDto> {
+  async updateTagById(tagId: string, updateTag: UpdateTagInput): Promise<Tag> {
     this.logger.info("Updating tag by id", { tagId, updateTag });
 
     const [updatedTag] = await this.txHost.tx
@@ -49,10 +46,10 @@ export class TagRepository {
       .where(eq(tags.id, Number(tagId)))
       .returning();
 
-    return this.mapDbTagToTagDto(updatedTag);
+    return this.mapDbRowToTag(updatedTag);
   }
 
-  async deleteTagById(tagId: string): Promise<TagDto> {
+  async deleteTagById(tagId: string): Promise<Tag> {
     this.logger.info("Deleting tag by id", { tagId });
 
     const [deletedTag] = await this.txHost.tx
@@ -60,10 +57,10 @@ export class TagRepository {
       .where(eq(tags.id, Number(tagId)))
       .returning();
 
-    return this.mapDbTagToTagDto(deletedTag);
+    return this.mapDbRowToTag(deletedTag);
   }
 
-  async getTagById(tagId: string): Promise<TagDto | null> {
+  async getTagById(tagId: string): Promise<Tag | null> {
     const tag = await this.txHost.tx
       .select()
       .from(tags)
@@ -74,7 +71,7 @@ export class TagRepository {
       return null;
     }
 
-    return this.mapDbTagToTagDto(tag);
+    return this.mapDbRowToTag(tag);
   }
 
   async listTagsByUserIdWithFilters(
@@ -87,7 +84,7 @@ export class TagRepository {
       limit?: number;
       offset?: number;
     },
-  ): Promise<TagDto[]> {
+  ): Promise<Tag[]> {
     const filters = [eq(tags.userId, userId)];
     if (options.answerMode) {
       filters.push(eq(tags.answerMode, options.answerMode));
@@ -116,11 +113,11 @@ export class TagRepository {
 
     const result = await query;
 
-    return result.map((tag) => this.mapDbTagToTagDto(tag));
+    return result.map((tag) => this.mapDbRowToTag(tag));
   }
 
-  private mapDbTagToTagDto(dbTag: TagRow): TagDto {
-    return {
+  private mapDbRowToTag(dbTag: TagRow): Tag {
+    return Tag.create({
       id: String(dbTag.id),
       name: dbTag.name,
       userId: dbTag.userId,
@@ -134,6 +131,8 @@ export class TagRepository {
         soundNotificationEnabled:
           dbTag.notificationsSettings.soundNotificationEnabled,
       },
-    };
+      createdAt: dbTag.createdAt,
+      updatedAt: dbTag.updatedAt,
+    });
   }
 }

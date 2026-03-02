@@ -1,10 +1,13 @@
-import { TagDto } from "@/api/dtos/tagDto";
+import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
+import { AuthUser } from "@/api/auth/authUser.decorator";
+import { EncodedResponseIds, IdParam } from "@/api/common/decorators/id.decorators";
+import { TagResponseDto, toTagResponseDto } from "@/api/tags/tags.dto";
 import {
   CreateTagRequestDto,
   ListTagsQueryDto,
   UpdateTagRequestDto,
-} from "@/api/dtos/tagRequestsDto";
-import { TagsService } from "@/api/services/tags.service";
+} from "@/api/tags/tags-request.dto";
+import { TagsService } from "@/api/tags/tags.service";
 import {
   Body,
   Controller,
@@ -14,10 +17,6 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
-import { IdParam } from "../decorators/id.docorators";
-import { EncodedResponseIds } from "@/api/decorators/id.docorators";
-import { AuthUser } from "@/api/auth/authUser.decorator";
-import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 
 @Controller("tags")
 export class TagsController {
@@ -25,11 +24,11 @@ export class TagsController {
 
   @Post()
   @EncodedResponseIds("id")
-  createTag(
+  async createTag(
     @Body() createTag: CreateTagRequestDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<TagDto> {
-    return this.tagsService.createTag({
+  ): Promise<TagResponseDto> {
+    const tag = await this.tagsService.createTag({
       ...createTag,
       answerMode:
         createTag.answerMode === "timeblock" ||
@@ -38,17 +37,16 @@ export class TagsController {
           : undefined,
       userId: user.id,
     });
+    return toTagResponseDto(tag);
   }
 
   @Get()
   @EncodedResponseIds("id")
-  listTags(
+  async listTags(
     @Query() query: ListTagsQueryDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<TagDto[]> {
-    console.info("Received listTags request", { user, query });
-
-    return this.tagsService.listTags(user.id, {
+  ): Promise<TagResponseDto[]> {
+    const tags = await this.tagsService.listTags(user.id, {
       answerMode:
         query.answerMode === "timeblock" || query.answerMode === "immediately"
           ? query.answerMode
@@ -74,28 +72,31 @@ export class TagsController {
           ? Math.max(0, Number(query.offset))
           : undefined,
     });
+    return tags.map(toTagResponseDto);
   }
 
   @Patch(":id")
   @EncodedResponseIds("id")
-  updateTag(
+  async updateTag(
     @IdParam("id") tagId: string,
     @Body() updateTag: UpdateTagRequestDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<TagDto> {
-    return this.tagsService.updateTag({
+  ): Promise<TagResponseDto> {
+    const tag = await this.tagsService.updateTag({
       ...updateTag,
       userId: user.id,
       tagId,
     });
+    return toTagResponseDto(tag);
   }
 
   @Delete(":id")
   @EncodedResponseIds("id")
-  deleteTag(
+  async deleteTag(
     @IdParam("id") tagId: string,
     @AuthUser() user: AuthUserType,
-  ): Promise<TagDto> {
-    return this.tagsService.deleteTag(user.id, tagId);
+  ): Promise<TagResponseDto> {
+    const tag = await this.tagsService.deleteTag(user.id, tagId);
+    return toTagResponseDto(tag);
   }
 }

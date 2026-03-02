@@ -6,16 +6,17 @@ import {
   NestInterceptor,
 } from "@nestjs/common";
 
-import { ENCODED_RESPONSE_IDS_KEY } from "@/api/decorators/id.docorators";
+import { ENCODED_RESPONSE_IDS_KEY } from "@/api/common/decorators/id.decorators";
 import { Observable } from "rxjs";
 import { Reflector } from "@nestjs/core";
-import { encodeId } from "@/api/utils/hashid";
+import { encodeId } from "@/api/common/utils/hashid";
 import { map } from "rxjs/operators";
 
 /**
  * Important: This interceptor should be used after all other interceptors that modify the response data.
  * It encodes specified ID fields in the response before they are sent to the client.
- * It does not recursively encode nested objects or arrays ! If this is something we want, we need to think of something explicit, maybe something on the response objects themselves
+ * Supports dot-path notation for nested fields (e.g. "questions.id", "questions.answers.id").
+ * Arrays encountered along the path are auto-traversed.
  */
 @Injectable()
 export class EncodeIdsInterceptor implements NestInterceptor {
@@ -41,10 +42,26 @@ export class EncodeIdsInterceptor implements NestInterceptor {
 
   private encodeFields(obj: any, fields: string[]): any {
     if (!obj || typeof obj !== "object") return obj;
-    const result = { ...obj };
+    const result = Array.isArray(obj) ? [...obj] : { ...obj };
     for (const field of fields) {
-      if (result[field] != null) result[field] = encodeId(result[field]);
+      this.encodeAtPath(result, field.split("."));
     }
     return result;
+  }
+
+  private encodeAtPath(obj: any, parts: string[]): void {
+    if (!obj || typeof obj !== "object") return;
+
+    if (Array.isArray(obj)) {
+      obj.forEach((item) => this.encodeAtPath(item, parts));
+      return;
+    }
+
+    const [head, ...rest] = parts;
+    if (rest.length === 0) {
+      if (obj[head] != null) obj[head] = encodeId(obj[head]);
+    } else {
+      this.encodeAtPath(obj[head], rest);
+    }
   }
 }
