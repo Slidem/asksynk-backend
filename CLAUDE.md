@@ -8,6 +8,11 @@
 - Don't implement things we are not using (use the YAGNI principle)
 - Don't design for backwards compatibility, as this project is in MVP state
 
+## Project overview
+
+Asksynk is a productivity app, that's aimed to give user's full control over their attention, their schedule, and how / when they decided to respond to incoming messages from various communication channels.
+By leveraging tags as a barrier between incoming communication channels and a user's schedule, users choose how tagged information will be answered. Incoming communication channels: in app message threads, integration with gmail, slack, whatsapp. Calendar integration: two way sync with different calendars (gcal), in app custom calendar. Asksynk will also provide public links for readonly views of a user's schedule (with possibility of directly addressing an issue on a user's timeblock) and also provides the ability to create "networks" of users, that have more access to someones calendar in their network (suggest timeblocks, suggest tasks etc).
+
 ## Development Notes
 
 - **Keep components focused and testable**
