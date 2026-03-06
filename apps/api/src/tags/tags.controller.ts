@@ -24,6 +24,7 @@ import {
   UpdateTagRequestDto,
 } from "./tags.rest-dto";
 import { pick } from "lodash";
+import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 
 @Controller("tags")
 export class TagsController {
@@ -53,13 +54,8 @@ export class TagsController {
   ): Promise<TagResponseDto[]> {
     this.validateListTagsQuery(query);
 
-    const limit: number | undefined =
-      query.limit !== undefined ? Math.max(0, Number(query.limit)) : undefined;
-
-    const offset: number | undefined =
-      query.offset !== undefined
-        ? Math.max(0, Number(query.offset))
-        : undefined;
+    const limit = toNonNegativeNumberOptional(query.limit);
+    const offset = toNonNegativeNumberOptional(query.offset);
 
     const listInput = {
       ...pick(query, ["orderBy", "orderDirection", "search"]),

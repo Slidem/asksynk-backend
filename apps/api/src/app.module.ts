@@ -6,6 +6,7 @@ import { AuthGuardModule } from "@/api/auth/authGuard.module";
 import { ConfigModule } from "@nestjs/config";
 import { DbModule } from "@/api/common/db/db.module";
 import { EncodeIdsInterceptor } from "@/api/common/interceptors/encodeIds.interceptor";
+import { EventsModule } from "@/api/events/events.module";
 import { HealthController } from "@/api/health/health.controller";
 import { LoggerConfigModule } from "@/api/common/logger/logger.config";
 import { Module } from "@nestjs/common";
@@ -21,6 +22,7 @@ import { TxModule } from "@/api/common/db/tx.module";
     NatsModule,
     TxModule,
     TagsModule,
+    EventsModule,
     AuthGuardModule,
   ],
   controllers: [HealthController, AuthController],

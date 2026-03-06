@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 
 import { AnswerModeType } from "@/api/tags/tags.model";
 import { ContextLogger } from "nestjs-context-logger";
@@ -69,6 +69,24 @@ export class TagRepository {
     }
 
     return this.mapDbRowToTag(tag);
+  }
+
+  async getTagsByIds(tagIds: string[]): Promise<Tag[]> {
+    if (tagIds.length === 0) {
+      return [];
+    }
+
+    const tagsList = await this.txHost.tx
+      .select()
+      .from(tags)
+      .where(
+        inArray(
+          tags.id,
+          tagIds.map((id) => Number(id)),
+        ),
+      );
+
+    return tagsList.map((tag) => this.mapDbRowToTag(tag));
   }
 
   async listTagsByUserIdWithFilters(
