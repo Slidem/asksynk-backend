@@ -13,6 +13,7 @@ export function toEventResponseDto(event: Event): EventResponseDto {
     start: event.start.toISOString(),
     end: event.end.toISOString(),
     recurrenceId: event.recurrenceId,
+    tags: event.tags,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };

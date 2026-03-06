@@ -1,3 +1,8 @@
+export interface TagSummary {
+  id: string;
+  name: string;
+}
+
 export interface EventProps {
   id: string;
   userId: string;
@@ -5,6 +10,7 @@ export interface EventProps {
   start: Date;
   end: Date;
   recurrenceId?: string;
+  tags: TagSummary[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,6 +22,7 @@ export class Event {
   start: Date;
   end: Date;
   recurrenceId?: string;
+  tags: TagSummary[];
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -26,6 +33,7 @@ export class Event {
     this.start = props.start;
     this.end = props.end;
     this.recurrenceId = props.recurrenceId;
+    this.tags = props.tags;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }

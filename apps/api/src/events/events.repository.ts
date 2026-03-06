@@ -18,6 +18,7 @@ import { Recurrence } from "@/api/events/recurrence.entity";
 import { RecurrenceType } from "@/api/events/events.model";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { TxAdapter } from "@/api/common/db/tx.module";
+import { tags } from "@/migrations/schema/tags";
 
 type EventRow = typeof events.$inferSelect;
 type RecurrenceRow = typeof recurrences.$inferSelect;
@@ -78,7 +79,7 @@ export class EventsRepository {
       .insert(events)
       .values(data)
       .returning();
-    return this.mapDbRowToEvent(created);
+    return this.mapDbRowToEvent(created, []);
   }
 
   async createEvents(data: CreateEvent[]): Promise<Event[]> {
@@ -88,7 +89,7 @@ export class EventsRepository {
       .insert(events)
       .values(data)
       .returning();
-    return created.map((row) => this.mapDbRowToEvent(row));
+    return created.map((row) => this.mapDbRowToEvent(row, []));
   }
 
   async getEventById(eventId: string): Promise<Event | null> {
@@ -98,7 +99,9 @@ export class EventsRepository {
       .where(eq(events.id, Number(eventId)))
       .then((r) => r[0]);
 
-    return result ? this.mapDbRowToEvent(result) : null;
+    if (!result) return null;
+    const tagsMap = await this.getTagsForEvents([String(result.id)]);
+    return this.mapDbRowToEvent(result, tagsMap.get(String(result.id)) ?? []);
   }
 
   async updateEventById(eventId: string, data: UpdateEvent): Promise<Event> {
@@ -108,7 +111,7 @@ export class EventsRepository {
       .set({ ...data, updatedAt: new Date() })
       .where(eq(events.id, Number(eventId)))
       .returning();
-    return this.mapDbRowToEvent(updated);
+    return this.mapDbRowToEvent(updated, []);
   }
 
   async deleteEventById(eventId: string): Promise<Event> {
@@ -117,7 +120,7 @@ export class EventsRepository {
       .delete(events)
       .where(eq(events.id, Number(eventId)))
       .returning();
-    return this.mapDbRowToEvent(deleted);
+    return this.mapDbRowToEvent(deleted, []);
   }
 
   async listEventsByUserIdWithFilters(
@@ -156,9 +159,11 @@ export class EventsRepository {
       options.orderBy === "createdAt" ? events.createdAt : events.start;
     const orderFn = options.orderDirection === "asc" ? asc : desc;
 
+    let rows: (typeof events.$inferSelect)[];
+
     if (options.tagIds && options.tagIds.length > 0) {
       const numericTagIds = options.tagIds.map(Number);
-      const rows = await this.txHost.tx
+      const joined = await this.txHost.tx
         .selectDistinctOn([events.id])
         .from(events)
         .innerJoin(eventTags, eq(events.id, eventTags.eventId))
@@ -167,33 +172,39 @@ export class EventsRepository {
         .limit(options.limit ?? 100)
         .offset(options.offset ?? 0);
 
-      return rows.map((r) => this.mapDbRowToEvent(r.events));
+      rows = joined.map((r) => r.events);
+    } else {
+      const query = this.txHost.tx
+        .select()
+        .from(events)
+        .where(and(...filters))
+        .orderBy(orderFn(orderColumn));
+
+      if (options.limit !== undefined) query.limit(options.limit);
+      if (options.offset !== undefined) query.offset(options.offset);
+
+      rows = await query;
     }
 
-    const query = this.txHost.tx
-      .select()
-      .from(events)
-      .where(and(...filters))
-      .orderBy(orderFn(orderColumn));
-
-    if (options.limit !== undefined) {
-      query.limit(options.limit);
-    }
-    if (options.offset !== undefined) {
-      query.offset(options.offset);
-    }
-
-    const result = await query;
-    return result.map((row) => this.mapDbRowToEvent(row));
+    const eventIds = rows.map((r) => String(r.id));
+    const tagsMap = await this.getTagsForEvents(eventIds);
+    return rows.map((row) =>
+      this.mapDbRowToEvent(row, tagsMap.get(String(row.id)) ?? []),
+    );
   }
 
   async getEventsByRecurrenceId(recurrenceId: string): Promise<Event[]> {
-    const results = await this.txHost.tx
+    const rows = await this.txHost.tx
       .select()
       .from(events)
       .where(eq(events.recurrenceId, Number(recurrenceId)))
       .orderBy(asc(events.start));
-    return results.map((row) => this.mapDbRowToEvent(row));
+
+    const eventIds = rows.map((r) => String(r.id));
+    const tagsMap = await this.getTagsForEvents(eventIds);
+    return rows.map((row) =>
+      this.mapDbRowToEvent(row, tagsMap.get(String(row.id)) ?? []),
+    );
   }
 
   async deleteEventsByRecurrenceId(recurrenceId: string): Promise<void> {
@@ -260,43 +271,35 @@ export class EventsRepository {
     );
   }
 
-  async removeTagFromEvent(eventId: string, tagId: string): Promise<void> {
-    this.logger.info("Removing tag from event", { eventId, tagId });
-    await this.txHost.tx
-      .delete(eventTags)
-      .where(
-        and(
-          eq(eventTags.eventId, Number(eventId)),
-          eq(eventTags.tagId, Number(tagId)),
-        ),
-      );
-  }
-
-  async getEventTagIds(eventId: string): Promise<string[]> {
-    const results = await this.txHost.tx
-      .select({ tagId: eventTags.tagId })
+  private async getTagsForEvents(
+    eventIds: string[],
+  ): Promise<Map<string, { id: string; name: string }[]>> {
+    if (eventIds.length === 0) return new Map();
+    const rows = await this.txHost.tx
+      .select({
+        eventId: eventTags.eventId,
+        tagId: tags.id,
+        tagName: tags.name,
+      })
       .from(eventTags)
-      .where(eq(eventTags.eventId, Number(eventId)));
-    return results.map((r) => String(r.tagId));
-  }
+      .innerJoin(tags, eq(eventTags.tagId, tags.id))
+      .where(inArray(eventTags.eventId, eventIds.map(Number)));
 
-  async eventHasTag(eventId: string, tagId: string): Promise<boolean> {
-    const result = await this.txHost.tx
-      .select()
-      .from(eventTags)
-      .where(
-        and(
-          eq(eventTags.eventId, Number(eventId)),
-          eq(eventTags.tagId, Number(tagId)),
-        ),
-      )
-      .then((r) => r[0]);
-    return !!result;
+    const result = new Map<string, { id: string; name: string }[]>();
+    for (const row of rows) {
+      const key = String(row.eventId);
+      if (!result.has(key)) result.set(key, []);
+      result.get(key)!.push({ id: String(row.tagId), name: row.tagName });
+    }
+    return result;
   }
 
   // --- Mappers ---
 
-  private mapDbRowToEvent(row: EventRow): Event {
+  private mapDbRowToEvent(
+    row: EventRow,
+    tagSummaries: { id: string; name: string }[],
+  ): Event {
     return Event.create({
       id: String(row.id),
       userId: row.userId,
@@ -304,6 +307,7 @@ export class EventsRepository {
       start: row.start,
       end: row.end,
       recurrenceId: row.recurrenceId ? String(row.recurrenceId) : undefined,
+      tags: tagSummaries,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });

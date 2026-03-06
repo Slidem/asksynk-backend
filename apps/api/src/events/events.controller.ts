@@ -5,13 +5,18 @@ import {
   IdParam,
 } from "@/api/common/decorators/id.decorators";
 import { AsksynkError } from "@/api/common/errors/errors.model";
-import { RecurrenceType } from "@/api/events/events.model";
+import {
+  toNonNegativeNumberOptional,
+  toOptionalBoolean,
+  toOptionalDate,
+  toOptionalStringArray,
+} from "@/api/common/utils/inputs";
 import {
   toEventResponseDto,
   toRecurrenceWithEventsResponseDto,
 } from "@/api/events/events.mappers";
+import { RecurrenceType } from "@/api/events/events.model";
 import {
-  AddEventTagRequestDto,
   CreateEventRequestDto,
   CreateRecurringEventsRequestDto,
   EventResponseDto,
@@ -31,12 +36,6 @@ import {
   Query,
 } from "@nestjs/common";
 import { includes, isEmpty, toNumber, trim } from "lodash";
-import {
-  toNonNegativeNumberOptional,
-  toOptionalBoolean,
-  toOptionalDate,
-  toOptionalStringArray,
-} from "@/api/common/utils/inputs";
 
 const VALID_RECURRENCE_TYPES: RecurrenceType[] = [
   "daily",
@@ -198,46 +197,6 @@ export class EventsController {
   ): Promise<{ success: boolean }> {
     await this.eventsService.deleteRecurrenceEvents(user.id, recurrenceId);
     return { success: true };
-  }
-
-  // --- Event tag endpoints ---
-
-  @Post(":id/tags")
-  async addTagToEvent(
-    @IdParam("id") eventId: string,
-    @Body() dto: AddEventTagRequestDto,
-    @AuthUser() user: AuthUserType,
-  ): Promise<{ success: boolean }> {
-    await this.eventsService.addTagToEvent({
-      userId: user.id,
-      eventId,
-      tagId: dto.tagId,
-    });
-    return { success: true };
-  }
-
-  @Delete(":id/tags/:tagId")
-  async removeTagFromEvent(
-    @IdParam("id") eventId: string,
-    @IdParam("tagId") tagId: string,
-    @AuthUser() user: AuthUserType,
-  ): Promise<{ success: boolean }> {
-    await this.eventsService.removeTagFromEvent({
-      userId: user.id,
-      eventId,
-      tagId,
-    });
-    return { success: true };
-  }
-
-  @Get(":id/tags")
-  @EncodedResponseIds("tagIds")
-  async getEventTags(
-    @IdParam("id") eventId: string,
-    @AuthUser() user: AuthUserType,
-  ): Promise<{ tagIds: string[] }> {
-    const tagIds = await this.eventsService.getEventTags(user.id, eventId);
-    return { tagIds };
   }
 
   // --- Validation ---

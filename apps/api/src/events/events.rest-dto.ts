@@ -44,8 +44,9 @@ export interface ListEventsQueryDto {
   offset?: string;
 }
 
-export interface AddEventTagRequestDto {
-  tagId: string;
+export interface TagSummaryDto {
+  id: string;
+  name: string;
 }
 
 export interface EventResponseDto {
@@ -54,6 +55,7 @@ export interface EventResponseDto {
   start: string;
   end: string;
   recurrenceId?: string;
+  tags: TagSummaryDto[];
   createdAt: string;
   updatedAt: string;
 }

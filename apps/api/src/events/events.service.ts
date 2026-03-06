@@ -280,55 +280,6 @@ export class EventsService {
     await this.eventsRepository.deleteRecurrenceById(recurrenceId);
   }
 
-  // --- Tag ops ---
-
-  @Transactional()
-  async addTagToEvent(input: EventTagInput): Promise<void> {
-    const event = await this.eventsRepository.getEventById(input.eventId);
-    if (!event || !event.belongsTo(input.userId)) {
-      throw new NotFoundException("Event not found");
-    }
-
-    await this.validateTimeblockTags([input.tagId], input.userId);
-
-    const hasTag = await this.eventsRepository.eventHasTag(
-      input.eventId,
-      input.tagId,
-    );
-    if (hasTag) {
-      throw AsksynkError.badRequest("Tag already associated with event");
-    }
-
-    await this.eventsRepository.addTagToEvent(input.eventId, input.tagId);
-  }
-
-  @Transactional()
-  async removeTagFromEvent(input: EventTagInput): Promise<void> {
-    const event = await this.eventsRepository.getEventById(input.eventId);
-    if (!event || !event.belongsTo(input.userId)) {
-      throw new NotFoundException("Event not found");
-    }
-
-    const hasTag = await this.eventsRepository.eventHasTag(
-      input.eventId,
-      input.tagId,
-    );
-    if (!hasTag) {
-      throw new NotFoundException("Tag not associated with event");
-    }
-
-    await this.eventsRepository.removeTagFromEvent(input.eventId, input.tagId);
-  }
-
-  @Transactional()
-  async getEventTags(userId: string, eventId: string): Promise<string[]> {
-    const event = await this.eventsRepository.getEventById(eventId);
-    if (!event || !event.belongsTo(userId)) {
-      throw new NotFoundException("Event not found");
-    }
-    return this.eventsRepository.getEventTagIds(eventId);
-  }
-
   // --- Private helpers ---
   private validateEventDates(start: Date, end: Date): void {
     if (start >= end) {
