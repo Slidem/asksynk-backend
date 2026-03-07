@@ -25,12 +25,14 @@ export interface UpdateEventRequestDto {
   start?: string;
   end?: string;
   removeRecurrence?: boolean;
+  tagIds?: string[];
 }
 
 export interface UpdateRecurrenceEventsRequestDto {
   name?: string;
   start?: string;
   end?: string;
+  tagIds?: string[];
 }
 
 export interface ListEventsQueryDto {

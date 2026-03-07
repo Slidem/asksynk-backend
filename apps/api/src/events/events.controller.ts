@@ -120,6 +120,7 @@ export class EventsController {
       start: toOptionalDate(dto.start),
       end: toOptionalDate(dto.end),
       removeRecurrence: dto.removeRecurrence,
+      tagIds: dto.tagIds,
     });
 
     return toEventResponseDto(event);
@@ -185,6 +186,7 @@ export class EventsController {
       name: dto.name,
       start: toOptionalDate(dto.start),
       end: toOptionalDate(dto.end),
+      tagIds: dto.tagIds,
     });
 
     return toRecurrenceWithEventsResponseDto(result.recurrence, result.events);
@@ -278,6 +280,7 @@ export class EventsController {
         throw AsksynkError.badRequest("Limit must be non-negative number");
       }
     }
+
     if (query.offset !== undefined) {
       const offsetNum = toNumber(query.offset);
       if (!Number.isFinite(offsetNum) || offsetNum < 0) {

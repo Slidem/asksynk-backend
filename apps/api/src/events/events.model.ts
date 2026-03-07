@@ -24,6 +24,7 @@ export interface UpdateEventInput {
   start?: Date;
   end?: Date;
   removeRecurrence?: boolean;
+  tagIds?: string[];
 }
 
 export interface ListEventsInput {
@@ -53,6 +54,7 @@ export interface UpdateRecurrenceEventsInput {
   name?: string;
   start?: Date;
   end?: Date;
+  tagIds?: string[];
 }
 
 export interface EventTagInput {

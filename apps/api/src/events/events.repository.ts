@@ -253,22 +253,39 @@ export class EventsRepository {
 
   // --- EventTag methods ---
 
-  async addTagToEvent(eventId: string, tagId: string): Promise<void> {
-    this.logger.info("Adding tag to event", { eventId, tagId });
-    await this.txHost.tx.insert(eventTags).values({
-      eventId: Number(eventId),
-      tagId: Number(tagId),
-    });
-  }
-
-  async addTagToEvents(eventIds: string[], tagId: string): Promise<void> {
-    if (eventIds.length === 0) return;
+  async addTagsToEvent(eventId: string, tagIds: string[]): Promise<void> {
+    if (tagIds.length === 0) return;
     await this.txHost.tx.insert(eventTags).values(
-      eventIds.map((eventId) => ({
+      tagIds.map((tagId) => ({
         eventId: Number(eventId),
         tagId: Number(tagId),
       })),
     );
+  }
+
+  async addTagsToEvents(eventIds: string[], tagIds: string[]): Promise<void> {
+    if (eventIds.length === 0 || tagIds.length === 0) return;
+    await this.txHost.tx.insert(eventTags).values(
+      eventIds.flatMap((eventId) =>
+        tagIds.map((tagId) => ({
+          eventId: Number(eventId),
+          tagId: Number(tagId),
+        })),
+      ),
+    );
+  }
+
+  async deleteTagsForEvent(eventId: string): Promise<void> {
+    await this.txHost.tx
+      .delete(eventTags)
+      .where(eq(eventTags.eventId, Number(eventId)));
+  }
+
+  async deleteTagsForEvents(eventIds: string[]): Promise<void> {
+    if (eventIds.length === 0) return;
+    await this.txHost.tx
+      .delete(eventTags)
+      .where(inArray(eventTags.eventId, eventIds.map(Number)));
   }
 
   private async getTagsForEvents(

@@ -1,7 +1,6 @@
 import {
   CreateEventInput,
   CreateRecurringEventsInput,
-  EventTagInput,
   ListEventsInput,
   UpdateEventInput,
   UpdateRecurrenceEventsInput,
@@ -48,9 +47,7 @@ export class EventsService {
     });
 
     if (input.tagIds?.length) {
-      for (const tagId of input.tagIds) {
-        await this.eventsRepository.addTagToEvent(event.id, tagId);
-      }
+      await this.eventsRepository.addTagsToEvent(event.id, input.tagIds);
     }
 
     return event;
@@ -103,9 +100,7 @@ export class EventsService {
 
     if (input.tagIds?.length) {
       const eventIds = createdEvents.map((e) => e.id);
-      for (const tagId of input.tagIds) {
-        await this.eventsRepository.addTagToEvents(eventIds, tagId);
-      }
+      await this.eventsRepository.addTagsToEvents(eventIds, input.tagIds);
     }
 
     return { recurrence, events: createdEvents };
@@ -126,13 +121,27 @@ export class EventsService {
       this.validateEventDates(start, end);
     }
 
+    if (input.tagIds !== undefined) {
+      await this.validateTimeblockTags(input.tagIds, input.userId);
+    }
+
     const updateData: Record<string, unknown> = {};
     if (input.name !== undefined) updateData.name = input.name;
     if (input.start !== undefined) updateData.start = input.start;
     if (input.end !== undefined) updateData.end = input.end;
     if (input.removeRecurrence) updateData.recurrenceId = null;
 
-    return this.eventsRepository.updateEventById(input.eventId, updateData);
+    const updated = await this.eventsRepository.updateEventById(
+      input.eventId,
+      updateData,
+    );
+
+    if (input.tagIds !== undefined) {
+      await this.eventsRepository.deleteTagsForEvent(input.eventId);
+      await this.eventsRepository.addTagsToEvent(input.eventId, input.tagIds);
+    }
+
+    return updated;
   }
 
   @Transactional()
@@ -204,6 +213,10 @@ export class EventsService {
       throw new NotFoundException("Recurrence not found");
     }
 
+    if (input.tagIds !== undefined) {
+      await this.validateTimeblockTags(input.tagIds, input.userId);
+    }
+
     const now = new Date();
     const hasDateChanges = input.start !== undefined || input.end !== undefined;
 
@@ -236,7 +249,7 @@ export class EventsService {
         const eventName =
           input.name ?? (await this.getRecurrenceEventName(input.recurrenceId));
 
-        await this.eventsRepository.createEvents(
+        const newEvents = await this.eventsRepository.createEvents(
           occurrences.map((occ) => ({
             userId: input.userId,
             name: eventName,
@@ -245,6 +258,13 @@ export class EventsService {
             recurrenceId: Number(input.recurrenceId),
           })),
         );
+
+        if (input.tagIds?.length) {
+          await this.eventsRepository.addTagsToEvents(
+            newEvents.map((e) => e.id),
+            input.tagIds,
+          );
+        }
       }
 
       // Update recurrence metadata
@@ -258,6 +278,22 @@ export class EventsService {
         now,
         { name: input.name },
       );
+    }
+
+    if (input.tagIds !== undefined && !hasDateChanges) {
+      const futureEvents = await this.eventsRepository.getEventsByRecurrenceId(
+        input.recurrenceId,
+      );
+      const futureEventIds = futureEvents
+        .filter((e) => e.start >= now)
+        .map((e) => e.id);
+      if (futureEventIds.length > 0) {
+        await this.eventsRepository.deleteTagsForEvents(futureEventIds);
+        await this.eventsRepository.addTagsToEvents(
+          futureEventIds,
+          input.tagIds,
+        );
+      }
     }
 
     return this.getRecurrenceWithEvents(input.userId, input.recurrenceId);
