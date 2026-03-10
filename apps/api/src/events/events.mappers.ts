@@ -1,10 +1,5 @@
 import { Event } from "@/api/events/event.entity";
-import {
-  EventResponseDto,
-  RecurrenceResponseDto,
-  RecurrenceWithEventsResponseDto,
-} from "@/api/events/events.rest-dto";
-import { Recurrence } from "@/api/events/recurrence.entity";
+import { EventResponseDto } from "@/api/events/events.rest-dto";
 
 export function toEventResponseDto(event: Event): EventResponseDto {
   return {
@@ -12,30 +7,9 @@ export function toEventResponseDto(event: Event): EventResponseDto {
     name: event.name,
     start: event.start.toISOString(),
     end: event.end.toISOString(),
-    recurrenceId: event.recurrenceId,
+    recurrence: event.recurrence,
     tags: event.tags,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
-  };
-}
-
-export function toRecurrenceResponseDto(
-  recurrence: Recurrence,
-): RecurrenceResponseDto {
-  return {
-    id: recurrence.id,
-    type: recurrence.type,
-    until: recurrence.until.toISOString(),
-    createdAt: recurrence.createdAt.toISOString(),
-  };
-}
-
-export function toRecurrenceWithEventsResponseDto(
-  recurrence: Recurrence,
-  events: Event[],
-): RecurrenceWithEventsResponseDto {
-  return {
-    recurrence: toRecurrenceResponseDto(recurrence),
-    events: events.map(toEventResponseDto),
   };
 }

@@ -9,30 +9,18 @@ export interface CreateEventRequestDto {
   start: string;
   end: string;
   tagIds?: string[];
-}
-
-export interface CreateRecurringEventsRequestDto {
-  name: string;
-  recurrenceType: RecurrenceType;
-  start: string;
-  end: string;
+  recurrenceType?: RecurrenceType;
   until?: string;
-  tagIds?: string[];
 }
 
 export interface UpdateEventRequestDto {
   name?: string;
   start?: string;
   end?: string;
-  removeRecurrence?: boolean;
   tagIds?: string[];
-}
-
-export interface UpdateRecurrenceEventsRequestDto {
-  name?: string;
-  start?: string;
-  end?: string;
-  tagIds?: string[];
+  recurrenceType?: RecurrenceType;
+  until?: string;
+  recurrence?: null;
 }
 
 export interface ListEventsQueryDto {
@@ -51,25 +39,18 @@ export interface TagSummaryDto {
   name: string;
 }
 
+export interface RecurrenceDto {
+  id: string;
+  type: RecurrenceType;
+}
+
 export interface EventResponseDto {
   id: string;
   name: string;
   start: string;
   end: string;
-  recurrenceId?: string;
+  recurrence: RecurrenceDto | null;
   tags: TagSummaryDto[];
   createdAt: string;
   updatedAt: string;
-}
-
-export interface RecurrenceResponseDto {
-  id: string;
-  type: RecurrenceType;
-  until: string;
-  createdAt: string;
-}
-
-export interface RecurrenceWithEventsResponseDto {
-  recurrence: RecurrenceResponseDto;
-  events: EventResponseDto[];
 }

@@ -1,11 +1,10 @@
 import {
   index,
-  integer,
   pgTable,
   primaryKey,
-  serial,
   text,
   timestamp,
+  integer,
 } from "drizzle-orm/pg-core";
 
 import { tags } from "./tags";
@@ -18,7 +17,7 @@ export type RecurrenceType =
   | "monthly";
 
 export const recurrences = pgTable("recurrences", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   type: text("type").notNull().$type<RecurrenceType>(),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
@@ -35,12 +34,12 @@ export const recurrences = pgTable("recurrences", {
 export const events = pgTable(
   "events",
   {
-    id: serial("id").primaryKey(),
+    id: text("id").primaryKey(),
     userId: text("user_id").notNull(),
     name: text("name").notNull(),
     start: timestamp("start", { withTimezone: true }).notNull(),
     end: timestamp("end", { withTimezone: true }).notNull(),
-    recurrenceId: integer("recurrence_id").references(() => recurrences.id, {
+    recurrenceId: text("recurrence_id").references(() => recurrences.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -56,10 +55,10 @@ export const events = pgTable(
 export const eventTags = pgTable(
   "event_tags",
   {
-    eventId: integer("event_id")
+    eventId: text("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
-    tagId: integer("tag_id")
+    tagId: text("tag_id")
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })

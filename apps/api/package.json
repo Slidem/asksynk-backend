@@ -22,7 +22,6 @@
     "better-auth": "^1.2.5",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.44.4",
-    "hashids": "^2.3.0",
     "lodash": "^4.17.23",
     "nats": "^2.29.1",
     "nestjs-cls": "^6.2.0",

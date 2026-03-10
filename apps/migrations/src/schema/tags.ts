@@ -1,10 +1,4 @@
-import {
-  jsonb,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { sql } from "drizzle-orm";
 
@@ -13,7 +7,7 @@ type AnswerMode =
   | { type: "timeblock" };
 
 export const tags = pgTable("tags", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   name: text("name").unique().notNull(),
   description: text("description"),
@@ -21,9 +15,7 @@ export const tags = pgTable("tags", {
   answerMode: jsonb("answer_mode")
     .notNull()
     .$type<AnswerMode>()
-    .default(
-      sql`'{"type":"immediately","responseTimeMillis":0}'::jsonb`,
-    ),
+    .default(sql`'{"type":"immediately","responseTimeMillis":0}'::jsonb`),
   notificationsSettings: jsonb("notifications_settings")
     .notNull()
     .$type<{

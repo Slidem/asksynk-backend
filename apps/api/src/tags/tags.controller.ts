@@ -1,9 +1,6 @@
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import {
-  EncodedResponseIds,
-  IdParam,
-} from "@/api/common/decorators/id.decorators";
+import { UlidParam } from "@/api/common/decorators/id.decorators";
 import { AnswerMode } from "@/api/tags/tags.model";
 import { TagsService } from "@/api/tags/tags.service";
 import {
@@ -31,7 +28,6 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Post()
-  @EncodedResponseIds("id")
   async createTag(
     @Body() createTag: CreateTagRequestDto,
     @AuthUser() user: AuthUserType,
@@ -47,7 +43,6 @@ export class TagsController {
   }
 
   @Get()
-  @EncodedResponseIds("id")
   async listTags(
     @Query() query: ListTagsQueryDto,
     @AuthUser() user: AuthUserType,
@@ -68,9 +63,8 @@ export class TagsController {
   }
 
   @Patch(":id")
-  @EncodedResponseIds("id")
   async updateTag(
-    @IdParam("id") tagId: string,
+    @UlidParam("id") tagId: string,
     @Body() updateTag: UpdateTagRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<TagResponseDto> {
@@ -86,9 +80,8 @@ export class TagsController {
   }
 
   @Delete(":id")
-  @EncodedResponseIds("id")
   async deleteTag(
-    @IdParam("id") tagId: string,
+    @UlidParam("id") tagId: string,
     @AuthUser() user: AuthUserType,
   ): Promise<TagResponseDto> {
     const tag = await this.tagsService.deleteTag(user.id, tagId);

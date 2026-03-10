@@ -7,6 +7,7 @@ import { ListTagsInput } from "@/api/tags/tags.model";
 import { Tag } from "@/api/tags/tag.entity";
 import { TagRepository } from "@/api/tags/tags.repository";
 import { Transactional } from "@nestjs-cls/transactional";
+import { generateId } from "@asksynk/shared/src/id";
 
 @Injectable()
 export class TagsService {
@@ -16,14 +17,25 @@ export class TagsService {
   @Transactional()
   async createTag(createTag: CreateTagInput): Promise<Tag> {
     const payload = defaultsDeep(createTag, Tag.defaults());
-    return this.tagsRepository.createTag(payload);
+    const tag = Tag.create({
+      id: generateId(),
+      userId: payload.userId,
+      name: payload.name,
+      description: payload.description,
+      color: payload.color,
+      answerMode: payload.answerMode,
+      notificationsSettings: payload.notificationsSettings,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return this.tagsRepository.add(tag);
   }
 
   @Transactional()
   async listTags(userId: string, listTags: ListTagsInput): Promise<Tag[]> {
     this.logger.info("Listing tags", { userId, listTags });
 
-    return this.tagsRepository.listTagsByUserIdWithFilters(userId, {
+    return this.tagsRepository.listByUserIdWithFilters(userId, {
       answerMode: listTags.answerMode,
       orderBy: listTags.orderBy ?? "createdAt",
       orderDirection: listTags.orderDirection ?? "desc",
@@ -40,17 +52,13 @@ export class TagsService {
       tagId: updateTag.tagId,
     });
 
-    const existing = await this.tagsRepository.getTagById(updateTag.tagId);
+    const existing = await this.tagsRepository.getById(updateTag.tagId);
 
     if (!existing || !existing.belongsTo(updateTag.userId)) {
       throw new NotFoundException("Tag not found");
     }
 
-    if (existing.userId !== updateTag.userId) {
-      throw new NotFoundException("Tag not found");
-    }
-
-    const updatePayload = pickBy(
+    const updates = pickBy(
       pick(updateTag, [
         "name",
         "description",
@@ -61,18 +69,19 @@ export class TagsService {
       (v) => v !== undefined,
     );
 
-    return this.tagsRepository.updateTagById(updateTag.tagId, updatePayload);
+    Object.assign(existing, updates);
+
+    return this.tagsRepository.update(existing);
   }
 
   @Transactional()
   async deleteTag(userId: string, tagId: string): Promise<Tag> {
     this.logger.info("Deleting tag", { userId, tagId });
 
-    const existing = await this.tagsRepository.getTagById(tagId);
+    const existing = await this.tagsRepository.getById(tagId);
     if (!existing || !existing.belongsTo(userId)) {
       throw new NotFoundException("Tag not found");
     }
-    const deletedTag = await this.tagsRepository.deleteTagById(tagId);
-    return deletedTag;
+    return this.tagsRepository.delete(tagId);
   }
 }

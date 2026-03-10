@@ -1,3 +1,5 @@
+import { Recurrence } from "./recurrence.entity";
+
 export interface TagSummary {
   id: string;
   name: string;
@@ -9,7 +11,7 @@ export interface EventProps {
   name: string;
   start: Date;
   end: Date;
-  recurrenceId?: string;
+  recurrence: Recurrence | null;
   tags: TagSummary[];
   createdAt: Date;
   updatedAt: Date;
@@ -21,7 +23,7 @@ export class Event {
   name: string;
   start: Date;
   end: Date;
-  recurrenceId?: string;
+  recurrence: Recurrence | null;
   tags: TagSummary[];
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -32,7 +34,7 @@ export class Event {
     this.name = props.name;
     this.start = props.start;
     this.end = props.end;
-    this.recurrenceId = props.recurrenceId;
+    this.recurrence = props.recurrence;
     this.tags = props.tags;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
@@ -42,11 +44,15 @@ export class Event {
     return new Event(props);
   }
 
+  setTags(tags: TagSummary[]): void {
+    this.tags = [...tags];
+  }
+
   belongsTo(userId: string): boolean {
     return this.userId === userId;
   }
 
   isRecurring(): boolean {
-    return this.recurrenceId !== undefined;
+    return this.recurrence !== undefined;
   }
 }

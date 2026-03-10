@@ -15,6 +15,8 @@ export interface CreateEventInput {
   start: Date;
   end: Date;
   tagIds?: string[];
+  recurrenceType?: RecurrenceType;
+  until?: Date;
 }
 
 export interface UpdateEventInput {
@@ -23,8 +25,10 @@ export interface UpdateEventInput {
   name?: string;
   start?: Date;
   end?: Date;
-  removeRecurrence?: boolean;
   tagIds?: string[];
+  recurrenceType?: RecurrenceType;
+  until?: Date;
+  detachRecurrence?: boolean;
 }
 
 export interface ListEventsInput {
@@ -38,27 +42,10 @@ export interface ListEventsInput {
   offset?: number;
 }
 
-export interface CreateRecurringEventsInput {
-  userId: string;
-  name: string;
-  recurrenceType: RecurrenceType;
-  start: Date;
-  end: Date;
-  until?: Date;
-  tagIds?: string[];
-}
-
-export interface UpdateRecurrenceEventsInput {
-  userId: string;
-  recurrenceId: string;
-  name?: string;
-  start?: Date;
-  end?: Date;
-  tagIds?: string[];
-}
-
-export interface EventTagInput {
-  userId: string;
-  eventId: string;
-  tagId: string;
+export enum UpdateScenario {
+  NonRecurrentEventUpdate = "NonRecurrentEventUpdate",
+  NonRecurrentToRecurrent = "NonRecurrentToRecurrent",
+  DetachRecurrence = "DetachRecurrence",
+  RecurrentEventUpdate = "RecurrentEventUpdate",
+  RecomputeRecurrence = "RecomputeRecurrence",
 }
