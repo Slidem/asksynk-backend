@@ -6,7 +6,7 @@ services:
       - "4222:4222"
       - "8222:8222"
   postgres:
-    image: "pgvector/pgvector:pg17"
+    image: "pgvector/pgvector:pg18"
     container_name: asksynk-postgres
     environment:
       POSTGRES_DB: asksynk

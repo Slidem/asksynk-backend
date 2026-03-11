@@ -4,9 +4,9 @@ import { AnswerModeType } from "@/api/tags/tags.model";
 import { ContextLogger } from "nestjs-context-logger";
 import { Injectable } from "@nestjs/common";
 import { Tag } from "@/api/tags/tag.entity";
-import { TagSummary } from "../events/event.entity";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { TxAdapter } from "@/api/common/db/tx.module";
+import { UUID } from "uuidv7";
 import { tags } from "@/migrations/schema/tags";
 
 type TagRow = typeof tags.$inferSelect;
@@ -23,7 +23,7 @@ export class TagRepository {
     const [created] = await this.txHost.tx
       .insert(tags)
       .values({
-        id: tag.id,
+        id: tag.id.toString(),
         userId: tag.userId,
         name: tag.name,
         description: tag.description,
@@ -49,7 +49,7 @@ export class TagRepository {
         notificationsSettings: tag.notificationsSettings,
         updatedAt: new Date(),
       })
-      .where(eq(tags.id, tag.id))
+      .where(eq(tags.id, tag.id.toString()))
       .returning();
 
     return this.mapDbRowToTag(updated);
@@ -91,25 +91,6 @@ export class TagRepository {
       .where(inArray(tags.id, ids));
 
     return tagsList.map((tag) => this.mapDbRowToTag(tag));
-  }
-
-  async getTagsSummaryByIdsAndUserId(
-    tagIds: string[],
-    userId: string,
-  ): Promise<TagSummary[]> {
-    if (tagIds.length === 0) {
-      return [];
-    }
-
-    const tagsList = await this.txHost.tx
-      .select({ id: tags.id, name: tags.name, userId: tags.userId })
-      .from(tags)
-      .where(and(inArray(tags.id, tagIds), eq(tags.userId, userId)));
-
-    return tagsList.map((tag) => ({
-      id: tag.id,
-      name: tag.name,
-    }));
   }
 
   async listByUserIdWithFilters(
@@ -159,7 +140,7 @@ export class TagRepository {
 
   private mapDbRowToTag(dbTag: TagRow): Tag {
     return Tag.create({
-      id: dbTag.id,
+      id: UUID.parse(dbTag.id),
       name: dbTag.name,
       userId: dbTag.userId,
       description: dbTag.description ?? undefined,

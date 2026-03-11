@@ -7,7 +7,7 @@ import { ListTagsInput } from "@/api/tags/tags.model";
 import { Tag } from "@/api/tags/tag.entity";
 import { TagRepository } from "@/api/tags/tags.repository";
 import { Transactional } from "@nestjs-cls/transactional";
-import { generateId } from "@asksynk/shared/src/id";
+import { UUID } from "uuidv7";
 
 @Injectable()
 export class TagsService {
@@ -18,7 +18,7 @@ export class TagsService {
   async createTag(createTag: CreateTagInput): Promise<Tag> {
     const payload = defaultsDeep(createTag, Tag.defaults());
     const tag = Tag.create({
-      id: generateId(),
+      id: UUID.parse(createTag.id)!,
       userId: payload.userId,
       name: payload.name,
       description: payload.description,

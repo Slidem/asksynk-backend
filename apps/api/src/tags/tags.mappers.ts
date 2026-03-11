@@ -3,7 +3,7 @@ import { TagResponseDto } from "@/api/tags/tags.rest-dto";
 
 export function toTagResponseDto(tag: Tag): TagResponseDto {
   return {
-    id: tag.id,
+    id: tag.id.toString(),
     name: tag.name,
     userId: tag.userId,
     description: tag.description,

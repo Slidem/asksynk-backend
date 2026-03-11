@@ -5,7 +5,8 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate-custom": "drizzle-kit generate --custom"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

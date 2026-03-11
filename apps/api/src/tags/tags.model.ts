@@ -21,6 +21,7 @@ export interface NotificationsSettings {
 }
 
 export interface CreateTagInput {
+  id: string;
   userId: string;
   name: string;
   description?: string;

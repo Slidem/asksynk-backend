@@ -1,13 +1,16 @@
 import { jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { sql } from "drizzle-orm";
+import { uuid } from "drizzle-orm/pg-core";
 
 type AnswerMode =
   | { type: "immediately"; responseTimeMillis: number }
   | { type: "timeblock" };
 
 export const tags = pgTable("tags", {
-  id: text("id").primaryKey(),
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`uuidv7()`),
   userId: text("user_id").notNull(),
   name: text("name").unique().notNull(),
   description: text("description"),

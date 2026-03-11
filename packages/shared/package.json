@@ -10,7 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "ulidx": "^2.4.1",
+    "uuidv7": "^1.1.0",
     "@nestjs/common": "^10.3.10",
     "@nestjs/config": "^4.0.3",
     "nestjs-context-logger": "^1.9.1",

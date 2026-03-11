@@ -1,7 +1,9 @@
 import { AnswerMode, NotificationsSettings } from "@/api/tags/tags.model";
 
+import { UUID } from "uuidv7";
+
 export interface TagProps {
-  id: string;
+  id: UUID;
   userId: string;
   name: string;
   description?: string;
@@ -19,7 +21,7 @@ export interface DefaultTagSettings {
 }
 
 export class Tag {
-  readonly id: string;
+  readonly id: UUID;
   readonly userId: string;
   name: string;
   description?: string;

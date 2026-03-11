@@ -18,6 +18,7 @@
     "hashids",
     "Millis",
     "responfications",
+    "rrule",
     "tmpl"
   ]
 }
