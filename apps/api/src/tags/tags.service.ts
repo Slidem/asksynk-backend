@@ -1,8 +1,9 @@
 import { CreateTagInput, UpdateTagInput } from "@/api/tags/tags.model";
-import { Injectable, NotFoundException } from "@nestjs/common";
 import { defaultsDeep, pick, pickBy } from "lodash";
 
+import { AsksynkError } from "../common/errors/errors.model";
 import { ContextLogger } from "nestjs-context-logger";
+import { Injectable } from "@nestjs/common";
 import { ListTagsInput } from "@/api/tags/tags.model";
 import { Tag } from "@/api/tags/tag.entity";
 import { TagRepository } from "@/api/tags/tags.repository";
@@ -47,15 +48,10 @@ export class TagsService {
 
   @Transactional()
   async updateTag(updateTag: UpdateTagInput): Promise<Tag> {
-    this.logger.info("Updating tag", {
-      userId: updateTag.userId,
-      tagId: updateTag.tagId,
-    });
-
     const existing = await this.tagsRepository.getById(updateTag.tagId);
 
     if (!existing || !existing.belongsTo(updateTag.userId)) {
-      throw new NotFoundException("Tag not found");
+      throw AsksynkError.notFound("Tag not found");
     }
 
     const updates = pickBy(
@@ -68,19 +64,15 @@ export class TagsService {
       ]),
       (v) => v !== undefined,
     );
-
     Object.assign(existing, updates);
-
     return this.tagsRepository.update(existing);
   }
 
   @Transactional()
   async deleteTag(userId: string, tagId: string): Promise<Tag> {
-    this.logger.info("Deleting tag", { userId, tagId });
-
     const existing = await this.tagsRepository.getById(tagId);
     if (!existing || !existing.belongsTo(userId)) {
-      throw new NotFoundException("Tag not found");
+      throw AsksynkError.notFound("Tag not found");
     }
     return this.tagsRepository.delete(tagId);
   }

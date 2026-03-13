@@ -1,3 +1,4 @@
+import { CalendarRepository } from "@/api/events/calendar.repository";
 import { EventsController } from "@/api/events/events.controller";
 import { EventsRepository } from "@/api/events/events.repository";
 import { EventsService } from "@/api/events/events.service";
@@ -7,7 +8,7 @@ import { TagRepository } from "@/api/tags/tags.repository";
 
 @Module({
   imports: [NatsModule],
-  providers: [EventsRepository, EventsService, TagRepository],
+  providers: [CalendarRepository, EventsRepository, EventsService, TagRepository],
   controllers: [EventsController],
   exports: [EventsService],
 })

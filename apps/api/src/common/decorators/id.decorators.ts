@@ -4,7 +4,7 @@ import {
   createParamDecorator,
 } from "@nestjs/common";
 
-import { isValidId } from "@asksynk/shared/src/id";
+import { isValidId } from "@/shared/id";
 
 /**
  * Extracts a route param and validates it is a valid UUIDv7.

@@ -19,7 +19,7 @@ import {
 } from "class-validator";
 
 import { Type } from "class-transformer";
-import { isValidId } from "@asksynk/shared/src/id";
+import { isValidId } from "@/shared/id";
 
 function IsUuidV7(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
