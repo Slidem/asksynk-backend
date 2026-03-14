@@ -15,18 +15,34 @@ export function parseIsoWallClockInTimezone(
     throw AsksynkError.badRequest(`Invalid ISO 8601 date: ${iso}`);
   }
   const [, year, month, day, hour, minute, second] = match.map(Number);
-  return wallClockPartsToUtc(year, month, day, hour, minute, second, timezone);
+  return wallClockPartsToUtc({
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    timezone,
+  });
 }
 
-function wallClockPartsToUtc(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-  second: number,
-  timezone: string,
-): Date {
+function wallClockPartsToUtc({
+  year,
+  month,
+  day,
+  hour,
+  minute,
+  second,
+  timezone,
+}: {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  timezone: string;
+}): Date {
   // Estimate UTC by treating digits as UTC, then correct using the actual offset.
   const estimatedUtc = new Date(
     Date.UTC(year, month - 1, day, hour, minute, second),
@@ -136,7 +152,7 @@ function pad(n: number, width: number): string {
 }
 
 /**
- * Validates an rrule string:
+ * Validates an rrule string (example: "FREQ=WEEKLY;BYDAY=MO;UNTIL=20260315T100000Z") against these rules:
  * - Must not use COUNT
  * - Must have UNTIL
  * - UNTIL must be ≤ maxMonths from start
@@ -187,7 +203,9 @@ function parseRruleUntil(untilStr: string): Date | null {
   const match = untilStr
     .trim()
     .match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const [, year, month, day, hour, minute, second] = match.map(Number);
   return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 }
