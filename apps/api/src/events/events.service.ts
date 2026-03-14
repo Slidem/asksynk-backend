@@ -7,8 +7,7 @@ import {
   UpdateEventInput,
 } from "@/api/events/events.model";
 import {
-  isValidIanaTimezone,
-  parseIsoCompact,
+  parseIsoWallClockInTimezone,
   replaceRruleUntil,
   validateAndNormalizeRrule,
 } from "@/api/events/recurrence.utils";
@@ -49,10 +48,6 @@ export class EventsService {
   @Transactional()
   async createEvent(userId: string, input: CreateEventInput): Promise<Event> {
     const calendar = await this.ensureCalendar(userId);
-
-    if (!isValidIanaTimezone(input.timezone)) {
-      throw AsksynkError.badRequest(`Invalid timezone: ${input.timezone}`);
-    }
 
     const rrule = input.rrule
       ? validateAndNormalizeRrule(input.rrule, input.timezone, input.start)
@@ -126,10 +121,6 @@ export class EventsService {
   async updateEvent(userId: string, input: UpdateEventInput): Promise<Event> {
     const event = await this.getEvent(userId, input.eventId);
 
-    if (input.timezone && !isValidIanaTimezone(input.timezone)) {
-      throw AsksynkError.badRequest(`Invalid timezone: ${input.timezone}`);
-    }
-
     const updates = pickBy(
       pick(input, [
         "title",
@@ -183,7 +174,10 @@ export class EventsService {
     if (!event.isRecurring) {
       throw AsksynkError.badRequest("Event is not recurring");
     }
-    const occStart = parseIsoCompact(occurrenceStart);
+    const occStart = parseIsoWallClockInTimezone(
+      occurrenceStart,
+      event.timezone,
+    );
     await this.eventsRepository.addException(eventId, occStart);
   }
 
@@ -199,13 +193,9 @@ export class EventsService {
       throw AsksynkError.badRequest("Event is not recurring");
     }
 
-    const occStart = parseIsoCompact(instanceStart);
+    const occStart = parseIsoWallClockInTimezone(instanceStart, event.timezone);
     const timezone = input.timezone ?? event.timezone;
     const start = input.start ?? occStart;
-
-    if (input.timezone && !isValidIanaTimezone(input.timezone)) {
-      throw AsksynkError.badRequest(`Invalid timezone: ${input.timezone}`);
-    }
 
     if (input.tagIds && input.tagIds.length > 0) {
       const foundTags = await this.tagRepository.getByIds(input.tagIds);
@@ -258,12 +248,8 @@ export class EventsService {
       throw AsksynkError.badRequest("Event is not recurring");
     }
 
-    const splitDate = parseIsoCompact(splitStart);
+    const splitDate = parseIsoWallClockInTimezone(splitStart, event.timezone);
     const timezone = input.timezone ?? event.timezone;
-
-    if (input.timezone && !isValidIanaTimezone(input.timezone)) {
-      throw AsksynkError.badRequest(`Invalid timezone: ${input.timezone}`);
-    }
 
     const newUntil = new Date(splitDate.getTime() - 1000);
     const truncatedRrule = replaceRruleUntil(event.rrule!, newUntil);

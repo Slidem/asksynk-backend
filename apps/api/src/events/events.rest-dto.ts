@@ -9,6 +9,10 @@ import {
   ValidationOptions,
   registerDecorator,
 } from "class-validator";
+import {
+  isIsoDateWithOffset,
+  isValidIanaTimezone,
+} from "@/api/events/recurrence.utils";
 
 import { isValidId } from "@/shared/id";
 
@@ -26,6 +30,46 @@ function IsUuidV7(validationOptions?: ValidationOptions) {
         },
         defaultMessage(): string {
           return "$property must be a valid UUIDv7";
+        },
+      },
+    });
+  };
+}
+
+function IsIanaTimezone(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: "isIanaTimezone",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      target: (object as any).constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown) {
+          return typeof value === "string" && isValidIanaTimezone(value);
+        },
+        defaultMessage(): string {
+          return "$property must be a valid IANA timezone (e.g. Europe/Bucharest)";
+        },
+      },
+    });
+  };
+}
+
+function IsIsoDateWithOffset(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: "isIsoDateWithOffset",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      target: (object as any).constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown) {
+          return typeof value === "string" && isIsoDateWithOffset(value);
+        },
+        defaultMessage(): string {
+          return "$property must be an ISO 8601 date with offset (e.g. 2026-03-15T10:00:00+02:00)";
         },
       },
     });
@@ -53,8 +97,7 @@ export class CreateEventRequestDto {
   link?: string;
 
   /** ISO 8601 with offset: "2026-03-15T10:00:00+02:00" */
-  @IsString()
-  @IsNotEmpty()
+  @IsIsoDateWithOffset()
   start!: string;
 
   @IsInt()
@@ -66,8 +109,7 @@ export class CreateEventRequestDto {
   allDay?: boolean;
 
   /** IANA timezone: "Europe/Bucharest" */
-  @IsString()
-  @IsNotEmpty()
+  @IsIanaTimezone()
   timezone!: string;
 
   @IsOptional()
@@ -102,9 +144,8 @@ export class UpdateEventRequestDto {
   @IsString()
   link?: string;
 
-  // maybe validation here so we are sure have iso string ?
   @IsOptional()
-  @IsString()
+  @IsIsoDateWithOffset()
   start?: string;
 
   @IsOptional()
@@ -116,9 +157,8 @@ export class UpdateEventRequestDto {
   @IsBoolean()
   allDay?: boolean;
 
-  // TODO: any way to actually use a "IANA" timezone type here .. either custom or something from let's say date-fns or something...
   @IsOptional()
-  @IsString()
+  @IsIanaTimezone()
   timezone?: string;
 
   @IsOptional()
@@ -136,22 +176,22 @@ export class UpdateEventRequestDto {
 }
 
 export class ListEventsQueryDto {
-  /** ISO 8601 window start */
-  // TODO: shouldn't this actually be compacted iso ??????
-  @IsString()
-  @IsNotEmpty()
+  /** ISO 8601 with offset window start: "2026-03-15T00:00:00+02:00" */
+  @IsIsoDateWithOffset()
   start!: string;
 
-  /** ISO 8601 window end */
-  @IsString()
-  @IsNotEmpty()
+  /** ISO 8601 with offset window end: "2026-03-16T00:00:00+02:00" */
+  @IsIsoDateWithOffset()
   end!: string;
+
+  /** IANA timezone — source of truth for interpreting start/end wall-clock: "Europe/Bucharest" */
+  @IsIanaTimezone()
+  timezone!: string;
 }
 
 export class AddExceptionRequestDto {
-  /** ISO 8601 of the occurrence to cancel */
-  @IsString()
-  @IsNotEmpty()
+  /** ISO 8601 with offset of the occurrence to cancel: "2026-03-15T10:00:00+02:00" */
+  @IsIsoDateWithOffset()
   occurrenceStart!: string;
 }
 
@@ -174,7 +214,7 @@ export class UpdateInstanceRequestDto {
   link?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIsoDateWithOffset()
   start?: string;
 
   @IsOptional()
@@ -183,7 +223,7 @@ export class UpdateInstanceRequestDto {
   durationSeconds?: number;
 
   @IsOptional()
-  @IsString()
+  @IsIanaTimezone()
   timezone?: string;
 
   @IsOptional()
@@ -220,7 +260,7 @@ export class SplitSeriesRequestDto {
   durationSeconds?: number;
 
   @IsOptional()
-  @IsString()
+  @IsIanaTimezone()
   timezone?: string;
 
   @IsOptional()

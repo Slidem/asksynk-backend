@@ -1,30 +1,63 @@
 import { AsksynkError } from "@/api/common/errors/errors.model";
 
+
 /**
- * Parses an ISO 8601 string with offset (e.g. "2026-03-15T10:00:00+02:00")
- * and returns a Date whose UTC value encodes the wall-clock digits verbatim.
- * e.g. 10:00 +02:00 → stored as 2026-03-15T10:00:00Z (not 08:00Z).
- * This is the correct representation for TIMESTAMP WITHOUT TIME ZONE in Postgres.
+ * Extracts wall-clock digits from an ISO 8601 string (ignores offset),
+ * interprets them in the given IANA timezone, returns the true UTC instant.
+ * Timezone is the source of truth — offset in the ISO string is ignored.
+ * e.g. "2026-03-15T10:00:00+05:30" + "Europe/Bucharest" → 2026-03-15T08:00:00Z
  */
-export function parseIsoToWallClock(iso: string): Date {
+export function parseIsoWallClockInTimezone(
+  iso: string,
+  timezone: string,
+): Date {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
   if (!match) {
     throw AsksynkError.badRequest(`Invalid ISO 8601 date: ${iso}`);
   }
   const [, year, month, day, hour, minute, second] = match.map(Number);
-  return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return wallClockPartsToUtc(year, month, day, hour, minute, second, timezone);
 }
 
-/**
- * Parses compact ISO format used in URL params: "20260315T100000"
- */
-export function parseIsoCompact(compact: string): Date {
-  const match = compact.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
-  if (!match) {
-    throw AsksynkError.badRequest(`Invalid compact date: ${compact}`);
+function wallClockPartsToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  timezone: string,
+): Date {
+  // Estimate UTC by treating digits as UTC, then correct using the actual offset.
+  const estimatedUtc = new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second),
+  );
+  const offsetMs = getUtcOffsetMs(estimatedUtc, timezone);
+  const corrected = new Date(estimatedUtc.getTime() - offsetMs);
+  // Re-check offset at corrected time to handle DST edges
+  const offsetMs2 = getUtcOffsetMs(corrected, timezone);
+  if (offsetMs !== offsetMs2) {
+    return new Date(estimatedUtc.getTime() - offsetMs2);
   }
-  const [, year, month, day, hour, minute, second] = match.map(Number);
-  return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return corrected;
+}
+
+function getUtcOffsetMs(utc: Date, timezone: string): number {
+  const offsetPart =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "shortOffset",
+    })
+      .formatToParts(utc)
+      .find((p) => p.type === "timeZoneName")?.value ?? "";
+  return parseOffsetString(offsetPart) * 60 * 1000;
+}
+
+export function isIsoDateWithOffset(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$/.test(value)) {
+    return false;
+  }
+  return !isNaN(new Date(value).getTime());
 }
 
 export function isValidIanaTimezone(tz: string): boolean {
@@ -37,23 +70,13 @@ export function isValidIanaTimezone(tz: string): boolean {
 }
 
 /**
- * Converts a wall-clock Date (UTC digits = wall-clock digits) + IANA timezone
- * to an ISO 8601 string with offset, e.g. "2026-03-15T10:00:00+02:00".
+ * Converts a true UTC Date + IANA timezone to an ISO 8601 string with offset,
+ * e.g. "2026-03-15T10:00:00+02:00".
  */
-export function wallClockToIso(wallClock: Date, timezone: string): string {
-  const year = wallClock.getUTCFullYear();
-  const month = wallClock.getUTCMonth() + 1;
-  const day = wallClock.getUTCDate();
-  const hour = wallClock.getUTCHours();
-  const minute = wallClock.getUTCMinutes();
-  const second = wallClock.getUTCSeconds();
-
-  // Get the UTC offset for this wall-clock time in the given timezone.
-  // We use Intl to format the approximate UTC instant (which has same digits as UTC)
-  // and extract the timezone offset.
-  const formatter = new Intl.DateTimeFormat("en-US", {
+export function utcToIso(utc: Date, timezone: string): string {
+  // Get local date parts in the given timezone
+  const dateParts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
-    timeZoneName: "shortOffset",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -61,24 +84,32 @@ export function wallClockToIso(wallClock: Date, timezone: string): string {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-  });
+  }).formatToParts(utc);
 
-  const parts = formatter.formatToParts(wallClock);
-  const offsetPart = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  const get = (type: string) =>
+    dateParts.find((p) => p.type === type)?.value ?? "00";
+
+  const offsetPart =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "shortOffset",
+    })
+      .formatToParts(utc)
+      .find((p) => p.type === "timeZoneName")?.value ?? "";
   const offset = parseOffsetString(offsetPart);
 
   return (
-    pad(year, 4) +
+    get("year") +
     "-" +
-    pad(month, 2) +
+    get("month") +
     "-" +
-    pad(day, 2) +
+    get("day") +
     "T" +
-    pad(hour, 2) +
+    get("hour") +
     ":" +
-    pad(minute, 2) +
+    get("minute") +
     ":" +
-    pad(second, 2) +
+    get("second") +
     formatOffset(offset)
   );
 }

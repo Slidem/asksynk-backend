@@ -18,7 +18,7 @@ import {
   UpdateInstanceRequestDto,
 } from "@/api/events/events.rest-dto";
 import { EventsService } from "@/api/events/events.service";
-import { parseIsoToWallClock } from "@/api/events/recurrence.utils";
+import { parseIsoWallClockInTimezone } from "@/api/events/recurrence.utils";
 import {
   Body,
   Controller,
@@ -62,7 +62,7 @@ export class EventsController {
       description: dto.description,
       location: dto.location,
       link: dto.link,
-      start: parseIsoToWallClock(dto.start),
+      start: parseIsoWallClockInTimezone(dto.start, dto.timezone),
       durationSeconds: dto.durationSeconds,
       allDay: dto.allDay,
       timezone: dto.timezone,
@@ -79,8 +79,8 @@ export class EventsController {
     @AuthUser() user: AuthUserType,
   ): Promise<EventInstanceResponseDto[]> {
     const instances = await this.eventsService.listEvents(user.id, {
-      windowStart: parseIsoToWallClock(query.start),
-      windowEnd: parseIsoToWallClock(query.end),
+      windowStart: parseIsoWallClockInTimezone(query.start, query.timezone),
+      windowEnd: parseIsoWallClockInTimezone(query.end, query.timezone),
     });
     return instances.map(toEventInstanceResponseDto);
   }
@@ -106,12 +106,10 @@ export class EventsController {
       description: dto.description,
       location: dto.location,
       link: dto.link,
-      // TODO: double check ?? are we sure we want this behavior ?
-      // wall clock stripping the timezone is wrong; what we would want
-      // is actually convert and save to UTC timestamp, but also store timezone
-      // for later expanding rrule
-      // regardless what iso with timestamp we get , we always consider the timezone provided in the request as the source of truth, and convert the start to utc
-      start: dto.start ? parseIsoToWallClock(dto.start) : undefined,
+      start:
+        dto.start && dto.timezone
+          ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
+          : undefined,
       durationSeconds: dto.durationSeconds,
       allDay: dto.allDay,
       timezone: dto.timezone,
@@ -144,7 +142,7 @@ export class EventsController {
   @Put("events/:id/instances/:start")
   async updateInstance(
     @UuidV7Param("id") id: string,
-    @Param("start") start: string, // TODO: We need to create a custom type to "compact iso" in and directly serialize this here instead of passing strings
+    @Param("start") start: string,
     @Body() dto: UpdateInstanceRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<EventResponseDto> {
@@ -153,7 +151,10 @@ export class EventsController {
       description: dto.description,
       location: dto.location,
       link: dto.link,
-      start: dto.start ? parseIsoToWallClock(dto.start) : undefined,
+      start:
+        dto.start && dto.timezone
+          ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
+          : undefined,
       durationSeconds: dto.durationSeconds,
       timezone: dto.timezone,
       color: dto.color,

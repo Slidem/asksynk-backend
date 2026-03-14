@@ -7,7 +7,7 @@ import {
 import { Calendar } from "@/api/events/calendar.entity";
 import { Event } from "@/api/events/event.entity";
 import { EventInstance } from "@/api/events/events.model";
-import { wallClockToIso } from "@/api/events/recurrence.utils";
+import { utcToIso } from "@/api/events/recurrence.utils";
 
 export function toCalendarResponseDto(calendar: Calendar): CalendarResponseDto {
   return {
@@ -19,9 +19,9 @@ export function toCalendarResponseDto(calendar: Calendar): CalendarResponseDto {
 }
 
 export function toEventResponseDto(event: Event): EventResponseDto {
-  const start = wallClockToIso(event.start, event.timezone);
+  const start = utcToIso(event.start, event.timezone);
   const endMs = event.start.getTime() + event.durationSeconds * 1000;
-  const end = wallClockToIso(new Date(endMs), event.timezone);
+  const end = utcToIso(new Date(endMs), event.timezone);
 
   return {
     id: event.id,
@@ -45,13 +45,10 @@ export function toEventResponseDto(event: Event): EventResponseDto {
 export function toEventInstanceResponseDto(
   instance: EventInstance,
 ): EventInstanceResponseDto {
-  const instanceStart = wallClockToIso(
-    instance.instanceStart,
-    instance.timezone,
-  );
+  const instanceStart = utcToIso(instance.instanceStart, instance.timezone);
   const endMs =
     instance.instanceStart.getTime() + instance.durationSeconds * 1000;
-  const instanceEnd = wallClockToIso(new Date(endMs), instance.timezone);
+  const instanceEnd = utcToIso(new Date(endMs), instance.timezone);
 
   return {
     eventId: instance.eventId,
