@@ -23,6 +23,13 @@ import { TagRepository } from "@/api/tags/tags.repository";
 import { Transactional } from "@nestjs-cls/transactional";
 import { generateId } from "@/shared/id";
 
+function mergeNullable<T>(
+  input: T | null | undefined,
+  fallback: T | null,
+): T | null {
+  return input !== undefined ? (input ?? null) : fallback;
+}
+
 @Injectable()
 export class EventsService {
   constructor(
@@ -53,33 +60,22 @@ export class EventsService {
       ? validateAndNormalizeRrule(input.rrule, input.timezone, input.start)
       : null;
 
-    if (input.tagIds && input.tagIds.length > 0) {
-      const foundTags = await this.tagRepository.getByIds(input.tagIds);
-      const allBelongToUser = foundTags.every((t) => t.belongsTo(userId));
-      if (foundTags.length !== input.tagIds.length || !allBelongToUser) {
-        throw AsksynkError.badRequest("One or more tags not found");
-      }
-    }
+    await this.validateTagIds(input.tagIds ?? [], userId);
 
-    // TODO: we should try and add defaults directly inside the event; Also there has to be a cleaner way... we can't always have the x ?? y everytime we create an event.
-    //  Simply having defaults for undefined values should work
     const event = Event.create({
       id: input.id,
       calendarId: calendar.id,
       title: input.title,
-      description: input.description ?? null,
-      location: input.location ?? null,
-      link: input.link ?? null,
+      description: input.description,
+      location: input.location,
+      link: input.link,
       start: input.start,
       durationSeconds: input.durationSeconds,
-      allDay: input.allDay ?? false,
+      allDay: input.allDay,
       timezone: input.timezone,
       rrule,
-      color: input.color ?? null,
-      originalEventId: null,
-      originalStart: null,
-      recurrenceEnd: null,
-      tagIds: input.tagIds ?? [],
+      color: input.color,
+      tagIds: input.tagIds,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -143,15 +139,8 @@ export class EventsService {
         : null;
     }
 
-    // TODO: extract extract fetching and validating tags into a function, maybe even extracting this into the tags service and just reusing the tags service.. this is kind o repeating
     if (input.tagIds !== undefined) {
-      if (input.tagIds.length > 0) {
-        const foundTags = await this.tagRepository.getByIds(input.tagIds);
-        const allBelongToUser = foundTags.every((t) => t.belongsTo(userId));
-        if (foundTags.length !== input.tagIds.length || !allBelongToUser) {
-          throw AsksynkError.badRequest("One or more tags not found");
-        }
-      }
+      await this.validateTagIds(input.tagIds, userId);
       event.tagIds = input.tagIds;
     }
 
@@ -197,37 +186,23 @@ export class EventsService {
     const timezone = input.timezone ?? event.timezone;
     const start = input.start ?? occStart;
 
-    if (input.tagIds && input.tagIds.length > 0) {
-      const foundTags = await this.tagRepository.getByIds(input.tagIds);
-      const allBelongToUser = foundTags.every((t) => t.belongsTo(userId));
-      if (foundTags.length !== input.tagIds.length || !allBelongToUser) {
-        throw AsksynkError.badRequest("One or more tags not found");
-      }
-    }
+    await this.validateTagIds(input.tagIds ?? [], userId);
 
     const newEvent = Event.create({
       id: generateId(),
       calendarId: event.calendarId,
       title: input.title ?? event.title,
-      // TODO: very ugly stuff here, can't we make it cleaner ?
-      description:
-        input.description !== undefined
-          ? (input.description ?? null)
-          : event.description,
-      location:
-        input.location !== undefined
-          ? (input.location ?? null)
-          : event.location,
-      link: input.link !== undefined ? (input.link ?? null) : event.link,
+      description: mergeNullable(input.description, event.description),
+      location: mergeNullable(input.location, event.location),
+      link: mergeNullable(input.link, event.link),
       start,
       durationSeconds: input.durationSeconds ?? event.durationSeconds,
       allDay: event.allDay,
       timezone,
       rrule: null,
-      color: input.color !== undefined ? (input.color ?? null) : event.color,
+      color: mergeNullable(input.color, event.color),
       originalEventId: event.id,
       originalStart: occStart,
-      recurrenceEnd: null,
       tagIds: input.tagIds ?? event.tagIds,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -261,41 +236,40 @@ export class EventsService {
       splitDate,
     );
 
-    if (input.tagIds && input.tagIds.length > 0) {
-      const foundTags = await this.tagRepository.getByIds(input.tagIds);
-      const allBelongToUser = foundTags.every((t) => t.belongsTo(userId));
-      if (foundTags.length !== input.tagIds.length || !allBelongToUser) {
-        throw AsksynkError.badRequest("One or more tags not found");
-      }
-    }
+    await this.validateTagIds(input.tagIds ?? [], userId);
 
     const newEvent = Event.create({
       id: generateId(),
       calendarId: event.calendarId,
       title: input.title ?? event.title,
-      description:
-        input.description !== undefined
-          ? (input.description ?? null)
-          : event.description,
-      location:
-        input.location !== undefined
-          ? (input.location ?? null)
-          : event.location,
-      link: input.link !== undefined ? (input.link ?? null) : event.link,
+      description: mergeNullable(input.description, event.description),
+      location: mergeNullable(input.location, event.location),
+      link: mergeNullable(input.link, event.link),
       start: splitDate,
       durationSeconds: input.durationSeconds ?? event.durationSeconds,
       allDay: event.allDay,
       timezone,
       rrule: newRrule,
-      color: input.color !== undefined ? (input.color ?? null) : event.color,
+      color: mergeNullable(input.color, event.color),
       originalEventId: event.id,
       originalStart: splitDate,
-      recurrenceEnd: null,
       tagIds: input.tagIds ?? event.tagIds,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
     return this.eventsRepository.splitSeries(eventId, truncatedRrule, newEvent);
+  }
+
+  private async validateTagIds(
+    tagIds: string[],
+    userId: string,
+  ): Promise<void> {
+    if (!tagIds || tagIds.length === 0) return;
+    const foundTags = await this.tagRepository.getByIds(tagIds);
+    const allBelongToUser = foundTags.every((t) => t.belongsTo(userId));
+    if (foundTags.length !== tagIds.length || !allBelongToUser) {
+      throw AsksynkError.badRequest("One or more tags not found");
+    }
   }
 }

@@ -1,6 +1,5 @@
 import { AsksynkError } from "@/api/common/errors/errors.model";
 
-
 /**
  * Extracts wall-clock digits from an ISO 8601 string (ignores offset),
  * interprets them in the given IANA timezone, returns the true UTC instant.
@@ -137,9 +136,6 @@ function pad(n: number, width: number): string {
 }
 
 /**
- * TODO: maybe we should use actual library for validations ??? like rrule.js or something like that,
- * to be sure we cover all edge cases and also support more complex rules in the future if needed ?
- *
  * Validates an rrule string:
  * - Must not use COUNT
  * - Must have UNTIL

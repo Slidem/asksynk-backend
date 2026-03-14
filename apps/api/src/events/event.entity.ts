@@ -2,25 +2,24 @@ export interface EventProps {
   id: string;
   calendarId: string;
   title: string;
-  description: string | null;
-  location: string | null;
-  link: string | null;
+  description?: string | null;
+  location?: string | null;
+  link?: string | null;
   start: Date;
   durationSeconds: number;
-  allDay: boolean;
+  allDay?: boolean;
   timezone: string;
-  rrule: string | null;
-  color: string | null;
-  originalEventId: string | null;
-  originalStart: Date | null;
-  recurrenceEnd: Date | null;
-  tagIds: string[];
+  rrule?: string | null;
+  color?: string | null;
+  originalEventId?: string | null;
+  originalStart?: Date | null;
+  recurrenceEnd?: Date | null;
+  tagIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
 
 export class Event {
-  // TODO: we should use UUID type similar to tags...
   readonly id: string;
   readonly calendarId: string;
   title: string;
@@ -40,7 +39,7 @@ export class Event {
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
-  private constructor(props: EventProps) {
+  private constructor(props: Required<EventProps>) {
     this.id = props.id;
     this.calendarId = props.calendarId;
     this.title = props.title;
@@ -62,7 +61,19 @@ export class Event {
   }
 
   static create(props: EventProps): Event {
-    return new Event(props);
+    return new Event({
+      description: null,
+      location: null,
+      link: null,
+      allDay: false,
+      rrule: null,
+      color: null,
+      originalEventId: null,
+      originalStart: null,
+      recurrenceEnd: null,
+      tagIds: [],
+      ...props,
+    });
   }
 
   get isRecurring(): boolean {
