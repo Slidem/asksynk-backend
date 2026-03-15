@@ -1,0 +1,17 @@
+services:
+  postgres-test:
+    image: "pgvector/pgvector:pg18"
+    container_name: asksynk-postgres-test
+    environment:
+      POSTGRES_DB: asksynk_test
+      POSTGRES_USER: asksynk
+      POSTGRES_PASSWORD: asksynk
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asksynk -d asksynk_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

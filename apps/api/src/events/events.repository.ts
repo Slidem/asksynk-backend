@@ -39,7 +39,7 @@ export class EventsRepository {
       recurrenceEnd: event.recurrenceEnd,
     });
 
-    if (event.tagIds.length > 0) {
+    if (event.tagIds?.length > 0) {
       await this.txHost.tx
         .insert(eventTags)
         .values(event.tagIds.map((tagId) => ({ eventId: event.id, tagId })));
