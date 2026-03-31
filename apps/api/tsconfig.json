@@ -11,13 +11,16 @@
     "paths": {
       "@/api/*": ["src/*"],
       "@/migrations/*": ["../migrations/src/*"],
-      "@/shared/*": ["../../packages/shared/src/*"]
+      "@/shared/*": ["../../packages/shared/src/*"],
+      "@/test/*": ["test/*"]
     }
   },
   "include": [
     "src/**/*.ts",
+    "test/**/*.ts",
     "../migrations/src/**/*.ts",
-    "../../packages/shared/src/**/*.ts"
+    "../../packages/shared/src/**/*.ts",
+    "jest.config.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

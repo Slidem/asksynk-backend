@@ -1,17 +1,17 @@
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER } from "@nestjs/core";
 
-import { AllExceptionsFilter } from "@/api/common/errors/errors.filter";
 import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
-import { ConfigModule } from "@nestjs/config";
-import { DbModule } from "@/api/common/db/db.module";
+import { AllExceptionsFilter } from "@/api/common/errors/errors.filter";
+import { LoggerConfigModule } from "@/api/common/logger/logger.config";
 import { EventsModule } from "@/api/events/events.module";
 import { HealthController } from "@/api/health/health.controller";
-import { LoggerConfigModule } from "@/api/common/logger/logger.config";
-import { Module } from "@nestjs/common";
-import { NatsModule } from "@/api/common/nats/nats.module";
+import { DbModule } from "@/api/infrastructure/db/db.module";
+import { TxModule } from "@/api/infrastructure/db/tx.module";
+import { NatsModule } from "@/api/infrastructure/nats/nats.module";
 import { TagsModule } from "@/api/tags/tags.module";
-import { TxModule } from "@/api/common/db/tx.module";
 
 @Module({
   imports: [

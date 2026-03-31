@@ -1,4 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";
+
 import { AsksynkError, ErrorType } from "@/api/common/errors/errors.model";
 
 @Catch()

@@ -1,11 +1,11 @@
-import * as authSchema from "@/migrations/schema/auth";
-
-import { Pool } from "pg";
-import { bearer } from "better-auth/plugins/bearer";
 import { betterAuth } from "better-auth";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { bearer } from "better-auth/plugins/bearer";
 import { magicLink } from "better-auth/plugins/magic-link";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+
+import * as authSchema from "@/migrations/schema/auth";
 import { users } from "@/migrations/schema/users";
 
 const FIVE_MINUTES_IN_SECONDS = 60 * 5;

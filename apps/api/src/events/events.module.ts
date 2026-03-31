@@ -1,14 +1,20 @@
-import { CalendarRepository } from "@/api/events/calendar.repository";
-import { EventsController } from "@/api/events/events.controller";
-import { EventsRepository } from "@/api/events/events.repository";
-import { EventsService } from "@/api/events/events.service";
 import { Module } from "@nestjs/common";
-import { NatsModule } from "@/api/common/nats/nats.module";
-import { TagRepository } from "@/api/tags/tags.repository";
+
+import { CalendarRepository } from "@/api/events/repositories/calendar.repository";
+import { EventsRepository } from "@/api/events/repositories/events.repository";
+import { EventsController } from "@/api/events/rest/events.controller";
+import { EventsService } from "@/api/events/services/events.service";
+import { NatsModule } from "@/api/infrastructure/nats/nats.module";
+import { TagRepository } from "@/api/tags/repositories/tags.repository";
 
 @Module({
   imports: [NatsModule],
-  providers: [CalendarRepository, EventsRepository, EventsService, TagRepository],
+  providers: [
+    CalendarRepository,
+    EventsRepository,
+    EventsService,
+    TagRepository,
+  ],
   controllers: [EventsController],
   exports: [EventsService],
 })

@@ -2,8 +2,10 @@
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "always"
+    "source.fixAll.eslint": "always",
+    "source.organizeImports": "never"
   },
+  "sort-imports.on-save": false,
   "eslint.useFlatConfig": true,
   "eslint.validate": [
     "javascript",

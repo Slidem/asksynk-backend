@@ -1,8 +1,7 @@
 import { EmailTemplate, RenderedEmail } from "./email.types";
-
+import { wrapHtml } from "./templates/layout";
 import { magicLinkTemplate } from "./templates/magic-link.template";
 import { verifyEmailTemplate } from "./templates/verify-email.template";
-import { wrapHtml } from "./templates/layout";
 
 export function renderTemplate(
   template: EmailTemplate,

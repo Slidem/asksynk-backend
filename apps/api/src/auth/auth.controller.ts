@@ -1,9 +1,10 @@
-import { All, Controller, Req, Res, Inject } from "@nestjs/common";
-import { Request, Response } from "express";
-import { BETTER_AUTH } from "@/api/auth/betterAuth.module";
-import { Auth } from "@/api/auth/betterAuth";
-import { Public } from "@/api/auth/public.decorator";
+import { All, Controller, Inject,Req, Res } from "@nestjs/common";
 import { toNodeHandler } from "better-auth/node";
+import { Request, Response } from "express";
+
+import { Auth } from "@/api/auth/betterAuth";
+import { BETTER_AUTH } from "@/api/auth/betterAuth.module";
+import { Public } from "@/api/auth/public.decorator";
 
 @Controller("api/auth")
 export class AuthController {

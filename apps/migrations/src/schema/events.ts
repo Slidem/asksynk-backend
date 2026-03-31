@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -9,7 +10,6 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { calendars } from "@/migrations/schema/calendars";
-import { sql } from "drizzle-orm";
 
 export const events = pgTable(
   "events",

@@ -1,4 +1,6 @@
 import js from "@eslint/js";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
+import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
 export default [
@@ -27,6 +29,18 @@ export default [
         // eslint-disable-next-line no-undef
         tsconfigRootDir: new URL(".", import.meta.url).pathname,
       },
+    },
+  },
+  {
+    files: ["**/*.ts"],
+    plugins: {
+      "unused-imports": unusedImports,
+      "simple-import-sort": simpleImportSort,
+    },
+    rules: {
+      "unused-imports/no-unused-imports": "error",
+      "simple-import-sort/imports": "warn",
+      "simple-import-sort/exports": "warn",
     },
   },
 ];

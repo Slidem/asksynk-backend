@@ -1,10 +1,11 @@
 import "dotenv/config";
 import "reflect-metadata";
 
-import { AppModule } from "@/api/app.module";
+import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+
+import { AppModule } from "@/api/app.module";
 import { getCorsOptions } from "@/api/common/config/cors.config";
 
 async function bootstrap() {

@@ -1,8 +1,9 @@
-import { ConfigService } from "@nestjs/config";
-import { EmailMessage } from "./email.types";
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { createTransport } from "nodemailer";
+
 import { renderTemplate } from "./email.templates";
+import { EmailMessage } from "./email.types";
 
 @Injectable()
 export class EmailService {

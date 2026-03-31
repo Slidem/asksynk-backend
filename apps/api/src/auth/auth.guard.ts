@@ -4,11 +4,11 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 
 import { AuthService } from "@/api/auth/auth.service";
-import { IS_PUBLIC_KEY } from "@/api/auth/public.decorator";
-import { Reflector } from "@nestjs/core";
 import { RequestWithUser } from "@/api/auth/auth.types";
+import { IS_PUBLIC_KEY } from "@/api/auth/public.decorator";
 
 /**
  * AuthGuard is a NestJS guard that checks if the incoming request has a valid JWT token in the Authorization header.

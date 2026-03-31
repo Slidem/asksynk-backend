@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   pgTable,
@@ -7,7 +8,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { sql } from "drizzle-orm";
 import { users } from "@/migrations/schema/users";
 
 export const calendars = pgTable(
