@@ -25,6 +25,7 @@ export default [
           "./apps/background-worker/tsconfig.json",
           "./apps/migrations/tsconfig.json",
           "./packages/shared/tsconfig.json",
+          "./scripts/tsconfig.json",
         ],
         // eslint-disable-next-line no-undef
         tsconfigRootDir: new URL(".", import.meta.url).pathname,

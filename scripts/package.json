@@ -7,6 +7,7 @@
     "generate-secret": "tsx src/generate-better-auth-secret.ts"
   },
   "devDependencies": {
+    "@types/node": "^20.19.30",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3"
   }
