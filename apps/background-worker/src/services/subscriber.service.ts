@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { connect,JSONCodec, NatsConnection } from "nats";
+import { connect, JSONCodec, NatsConnection } from "nats";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { EmailService } from "@/shared/email/email.service";

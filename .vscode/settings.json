@@ -11,6 +11,10 @@
     "typescript",
     "typescriptreact"
   ],
+  "jest.jestCommandLine": "node_modules/jest/bin/jest.js --config jest.config.ts",
+  "jest.rootPath": "apps/api",
+  "jest.runMode": "on-demand",
+  "jest.testPathPattern": ".*\\.integration\\.test\\.ts$",
   "cSpell.words": [
     "Asksynk",
     "docorators",
