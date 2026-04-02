@@ -1,3 +1,6 @@
+import { Transform } from "class-transformer";
+import { IsOptional, IsUUID } from "class-validator";
+
 import { IsIanaTimezone, IsIsoDateWithOffset } from "@/api/common/decorators/validators";
 
 export class ListEventsQueryDto {
@@ -12,4 +15,9 @@ export class ListEventsQueryDto {
   /** IANA timezone — source of truth for interpreting start/end wall-clock: "Europe/Bucharest" */
   @IsIanaTimezone()
   timezone!: string;
+
+  @IsOptional()
+  @IsUUID("all", { each: true })
+  @Transform(({ value }) => (typeof value === "string" ? [value] : value))
+  tagIds?: string[];
 }

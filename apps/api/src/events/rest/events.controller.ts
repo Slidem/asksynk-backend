@@ -78,6 +78,7 @@ export class EventsController {
     const instances = await this.eventsService.listEvents(user.id, {
       windowStart: parseIsoWallClockInTimezone(query.start, query.timezone),
       windowEnd: parseIsoWallClockInTimezone(query.end, query.timezone),
+      tagIds: query.tagIds,
     });
     return instances.map(toEventInstanceResponseDto);
   }

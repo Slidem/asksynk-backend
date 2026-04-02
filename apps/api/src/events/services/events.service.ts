@@ -108,6 +108,7 @@ export class EventsService {
       calendar.id,
       input.windowStart,
       input.windowEnd,
+      input.tagIds,
     );
   }
 

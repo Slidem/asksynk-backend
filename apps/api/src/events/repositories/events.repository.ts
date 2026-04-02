@@ -106,7 +106,18 @@ export class EventsRepository {
     calendarId: string,
     windowStart: Date,
     windowEnd: Date,
+    tagIds?: string[],
   ): Promise<EventInstance[]> {
+    const windowStartIso = windowStart.toISOString();
+    const windowEndIso = windowEnd.toISOString();
+
+    const tagFilterFragment = tagIds?.length
+      ? sql`AND EXISTS (
+            SELECT 1 FROM event_tags et2
+            WHERE et2.event_id = c.id AND et2.tag_id = ANY(${tagIds}::uuid[])
+          )`
+      : sql``;
+
     const result = await this.txHost.tx.execute(sql`
       WITH oneoff AS (
         SELECT
@@ -123,8 +134,8 @@ export class EventsRepository {
         FROM events e
         WHERE e.calendar_id = ${calendarId}
           AND e.rrule IS NULL
-          AND e.start < ${windowEnd}::timestamp
-          AND e.start + (e.duration_seconds * INTERVAL '1 second') > ${windowStart}::timestamp
+          AND e.start < ${windowEndIso}::timestamp
+          AND e.start + (e.duration_seconds * INTERVAL '1 second') > ${windowStartIso}::timestamp
       ),
       recurring AS (
         SELECT
@@ -139,7 +150,7 @@ export class EventsRepository {
           e.color,
           occurrence AS occ_start
         FROM events e
-        CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${windowStart}::timestamp, ${windowEnd}::timestamp) AS occurrence
+        CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${windowStartIso}::timestamp, ${windowEndIso}::timestamp) AS occurrence
         WHERE e.calendar_id = ${calendarId}
           AND e.rrule IS NOT NULL
           AND NOT EXISTS (
@@ -165,10 +176,11 @@ export class EventsRepository {
         c.occ_start AS instance_start,
         COALESCE(
           array_agg(et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
-          ARRAY[]::text[]
+          ARRAY[]::uuid[]
         ) AS tag_ids
       FROM combined c
       LEFT JOIN event_tags et ON et.event_id = c.id
+      WHERE TRUE ${tagFilterFragment}
       GROUP BY c.id, c.title, c.description, c.location, c.link, c.duration_seconds, c.all_day, c.timezone, c.color, c.occ_start
       ORDER BY c.occ_start
     `);
