@@ -1,6 +1,9 @@
-import { registerDecorator,ValidationOptions } from "class-validator";
+import { registerDecorator, ValidationOptions } from "class-validator";
 
-import { isIsoDateWithOffset, isValidIanaTimezone } from "@/api/events/utils/recurrence.utils";
+import {
+  isIsoDateWithOffset,
+  isValidIanaTimezone,
+} from "@/api/calendar-events/utils/recurrence.utils";
 import { isValidId } from "@/shared/id";
 
 export function IsUuidV7(validationOptions?: ValidationOptions) {

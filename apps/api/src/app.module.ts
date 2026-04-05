@@ -6,7 +6,7 @@ import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
 import { AllExceptionsFilter } from "@/api/common/errors/errors.filter";
 import { LoggerConfigModule } from "@/api/common/logger/logger.config";
-import { EventsModule } from "@/api/events/events.module";
+import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import { HealthController } from "@/api/health/health.controller";
 import { DbModule } from "@/api/infrastructure/db/db.module";
 import { TxModule } from "@/api/infrastructure/db/tx.module";
@@ -21,7 +21,7 @@ import { TagsModule } from "@/api/tags/tags.module";
     NatsModule,
     TxModule,
     TagsModule,
-    EventsModule,
+    CalendarEventsModule,
     AuthGuardModule,
   ],
   controllers: [HealthController, AuthController],

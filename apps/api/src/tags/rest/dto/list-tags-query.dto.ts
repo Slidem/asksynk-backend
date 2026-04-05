@@ -1,11 +1,10 @@
-import {
-  IsIn,
-  IsNumberString,
-  IsOptional,
-  IsString,
-} from "class-validator";
+import { IsIn, IsNumberString, IsOptional, IsString } from "class-validator";
 
-import { AnswerModeType, TagOrderBy, TagOrderDirection } from "@/api/tags/models/tag.model";
+import {
+  TagOrderBy,
+  TagOrderDirection,
+} from "@/api/tags/models/list-tags.model";
+import { AnswerModeType } from "@/api/tags/models/tag.model";
 
 export class ListTagsQueryDto {
   @IsOptional()

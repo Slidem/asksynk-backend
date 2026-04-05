@@ -27,6 +27,7 @@ export class BetterAuthModule {
               .split(",")
               .map((origin) => origin.trim())
               .filter(Boolean);
+
             return createAuth({
               databaseUrl: config.getOrThrow<string>("DATABASE_URL"),
               secret: config.getOrThrow<string>("AUTH_SECRET"),
@@ -38,6 +39,7 @@ export class BetterAuthModule {
                   template: { type: "magic-link", url },
                 });
               },
+
               sendVerificationEmail: async ({ email, url, userName }) => {
                 await emailService.send({
                   to: email,
