@@ -16,8 +16,8 @@ import {
 } from "@/api/infrastructure/db/db.module";
 import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { NatsService } from "@/api/infrastructure/nats/nats.service";
-import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
+import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { users } from "@/migrations/schema/users";
 import { generateId } from "@/shared/id";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";

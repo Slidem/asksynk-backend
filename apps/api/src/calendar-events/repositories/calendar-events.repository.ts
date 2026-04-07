@@ -6,9 +6,11 @@ import { ContextLogger } from "nestjs-context-logger";
 import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
 import { CalendarEventInstance } from "@/api/calendar-events/models/calendar-event-instance.model";
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
+import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";
-import { calendarEvents } from "@/migrations/schema/calendarEvents";
+
+import { getInstanceId } from "../utils/instanceId.utils";
 
 type CalendarEventRow = typeof calendarEvents.$inferSelect;
 
@@ -135,6 +137,7 @@ export class CalendarEventsRepository {
           e.all_day,
           e.timezone,
           e.color,
+          e.rrule,
           e.start AS occ_start
         FROM calendar_events e
         WHERE e.calendar_id = ${calendarId}
@@ -153,6 +156,7 @@ export class CalendarEventsRepository {
           e.all_day,
           e.timezone,
           e.color,
+          e.rrule,
           occurrence AS occ_start
         FROM calendar_events e
         CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${windowStartIso}::timestamp, ${windowEndIso}::timestamp) AS occurrence
@@ -178,6 +182,7 @@ export class CalendarEventsRepository {
         c.all_day,
         c.timezone,
         c.color,
+        c.rrule,
         c.occ_start AS instance_start,
         COALESCE(
           array_agg(et.tag_id) FILTER (WHERE et.tag_id IS NOT NULL),
@@ -186,23 +191,29 @@ export class CalendarEventsRepository {
       FROM combined c
       LEFT JOIN calendar_event_tags et ON et.event_id = c.id
       WHERE TRUE ${tagFilterFragment}
-      GROUP BY c.id, c.title, c.description, c.location, c.link, c.duration_seconds, c.all_day, c.timezone, c.color, c.occ_start
+      GROUP BY c.id, c.title, c.description, c.location, c.link, c.duration_seconds, c.all_day, c.timezone, c.color, c.occ_start, c.rrule
       ORDER BY c.occ_start
     `);
 
-    return (result.rows as Record<string, unknown>[]).map((row) => ({
-      eventId: row.event_id as string,
-      title: row.title as string,
-      description: (row.description as string | null) ?? null,
-      location: (row.location as string | null) ?? null,
-      link: (row.link as string | null) ?? null,
-      instanceStart: new Date(row.instance_start as string),
-      durationSeconds: Number(row.duration_seconds),
-      allDay: Boolean(row.all_day),
-      timezone: row.timezone as string,
-      color: (row.color as string | null) ?? null,
-      tagIds: (row.tag_ids as string[]) ?? [],
-    }));
+    return (result.rows as Record<string, unknown>[]).map((row) => {
+      const instanceStart = new Date((row.instance_start as string) + "Z");
+
+      return {
+        eventId: row.event_id as string,
+        instanceId: getInstanceId(row.event_id as string, instanceStart),
+        title: row.title as string,
+        description: (row.description as string | null) ?? null,
+        location: (row.location as string | null) ?? null,
+        link: (row.link as string | null) ?? null,
+        instanceStart: instanceStart,
+        durationSeconds: Number(row.duration_seconds),
+        allDay: Boolean(row.all_day),
+        timezone: row.timezone as string,
+        color: (row.color as string | null) ?? null,
+        rrule: (row.rrule as string | null) ?? null,
+        tagIds: (row.tag_ids as string[]) ?? [],
+      };
+    });
   }
 
   async addException(eventId: string, occurrenceStart: Date): Promise<void> {
