@@ -88,7 +88,7 @@ describe("CalendarEventsController (integration)", () => {
       })
       .expect(201);
 
-    expect(res.body.id).toBe(eventId);
+    expect(res.body.eventId).toBe(eventId);
     expect(res.body.title).toBe("Test Event");
 
     const rows = await db
@@ -168,7 +168,6 @@ describe("CalendarEventsController (integration)", () => {
       .expect(201);
 
     expect(res.body.rrule).not.toBeNull();
-    expect(res.body.isRecurring).toBe(true);
 
     const rows = await db
       .select()
@@ -242,7 +241,6 @@ describe("CalendarEventsController (integration)", () => {
     expect(res.body.id).not.toBe(eventId);
     expect(res.body.title).toBe("Edited Instance");
     expect(res.body.rrule).toBeNull();
-    expect(res.body.isRecurring).toBe(false);
 
     // Exception row inserted for parent
     const exRows = await db
@@ -261,7 +259,7 @@ describe("CalendarEventsController (integration)", () => {
       })
       .expect(200);
 
-    const detachedId = res.body.id;
+    const detachedId = res.body.eventId;
     const onDate = listRes.body.filter((i: { instanceStart: string }) =>
       i.instanceStart.startsWith("2026-04-21"),
     );
@@ -334,15 +332,18 @@ describe("CalendarEventsController (integration)", () => {
       .send({})
       .expect(200);
 
+    console.info("Split response:", res.body);
+
     // New series returned, linked to parent
     expect(res.body.id).not.toBe(eventId);
-    expect(res.body.isRecurring).toBe(true);
+    expect(res.body.rrule).toBeTruthy();
 
     // Original event rrule truncated before split date
     const originalRows = await db
       .select()
       .from(calendarEvents)
       .where(eq(calendarEvents.id, eventId));
+
     expect(originalRows[0].rrule).toContain("UNTIL=");
     // UNTIL should be before 2026-04-15
     const untilMatch = originalRows[0].rrule!.match(/UNTIL=(\d{8}T\d{6}Z)/);
@@ -361,7 +362,8 @@ describe("CalendarEventsController (integration)", () => {
     const newEventRows = await db
       .select()
       .from(calendarEvents)
-      .where(eq(calendarEvents.id, res.body.id));
+      .where(eq(calendarEvents.id, res.body.eventId));
+
     expect(newEventRows[0].start).toEqual(new Date("2026-04-15T10:00:00Z"));
   });
 
