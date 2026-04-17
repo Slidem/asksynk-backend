@@ -154,7 +154,7 @@ function pad(n: number, width: number): string {
 /**
  * Validates an rrule string (example: "FREQ=WEEKLY;BYDAY=MO;UNTIL=20260315T100000Z") against these rules:
  * - Must not use COUNT
- * - Must have UNTIL
+ * - If UNTIL is missing, defaults to start + 1 year
  * - UNTIL must be ≤ maxMonths from start
  * - Embeds TZID=<timezone> if not present
  * Returns the normalized rrule string.
@@ -163,20 +163,25 @@ export function validateAndNormalizeRrule(
   rrule: string,
   timezone: string,
   start: Date,
-  maxMonths = 6,
+  maxMonths = 12,
 ): string {
   if (/COUNT=/i.test(rrule)) {
     throw AsksynkError.badRequest("rrule must use UNTIL, not COUNT");
   }
 
   const untilMatch = rrule.match(/UNTIL=([^;]+)/i);
+  let until: Date;
   if (!untilMatch) {
-    throw AsksynkError.badRequest("rrule must include UNTIL");
-  }
-
-  const until = parseRruleUntil(untilMatch[1]);
-  if (!until) {
-    throw AsksynkError.badRequest("rrule UNTIL is not a valid date");
+    const defaultUntil = new Date(start);
+    defaultUntil.setUTCFullYear(defaultUntil.getUTCFullYear() + 1);
+    until = defaultUntil;
+    rrule = `${rrule};UNTIL=${formatRruleUntil(defaultUntil)}`;
+  } else {
+    const parsed = parseRruleUntil(untilMatch[1]);
+    if (!parsed) {
+      throw AsksynkError.badRequest("rrule UNTIL is not a valid date");
+    }
+    until = parsed;
   }
 
   const maxUntil = new Date(start);

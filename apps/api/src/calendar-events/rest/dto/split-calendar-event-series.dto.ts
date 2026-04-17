@@ -7,7 +7,10 @@ import {
   Min,
 } from "class-validator";
 
-import { IsIanaTimezone } from "@/api/common/decorators/validators";
+import {
+  IsIanaTimezone,
+  IsIsoDateWithOffset,
+} from "@/api/common/decorators/validators";
 
 export class SplitCalendarEventSeriesRequestDto {
   @IsOptional()
@@ -27,12 +30,16 @@ export class SplitCalendarEventSeriesRequestDto {
   @IsString()
   link?: string;
 
+  @IsString()
+  @IsNotEmpty()
+  @IsIsoDateWithOffset()
+  start?: string;
+
   @IsOptional()
   @IsInt()
   @Min(0)
   durationSeconds?: number;
 
-  @IsOptional()
   @IsIanaTimezone()
   timezone?: string;
 

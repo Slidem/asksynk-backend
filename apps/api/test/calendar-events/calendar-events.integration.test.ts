@@ -367,6 +367,43 @@ describe("CalendarEventsController (integration)", () => {
     expect(newEventRows[0].start).toEqual(new Date("2026-04-15T10:00:00Z"));
   });
 
+  it("PUT /events/:id/split/:start at recurrence start updates in-place", async () => {
+    const eventId = generateId();
+
+    await request(app.getHttpServer())
+      .post("/calendar-events")
+      .send({
+        id: eventId,
+        title: "Daily Standup",
+        start: RECURRING_START,
+        durationSeconds: 1800,
+        timezone: TIMEZONE,
+        rrule: RECURRING_RRULE,
+      })
+      .expect(201);
+
+    // Split at the same date as recurrence start — should update, not create new
+    const res = await request(app.getHttpServer())
+      .put(`/calendar-events/${eventId}/split/${RECURRING_START}`)
+      .send({ title: "Renamed Standup" })
+      .expect(200);
+
+    // Same event returned (no new event created)
+    expect(res.body.eventId).toBe(eventId);
+    expect(res.body.title).toBe("Renamed Standup");
+    expect(res.body.rrule).toBeTruthy();
+
+    // DB: rrule unchanged, title updated, no extra event row
+    const rows = await db
+      .select()
+      .from(calendarEvents)
+      .where(eq(calendarEvents.id, eventId));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].title).toBe("Renamed Standup");
+    expect(rows[0].rrule).toContain("UNTIL=");
+  });
+
   it("DELETE /events/:id removes all recurring instances", async () => {
     const eventId = generateId();
 

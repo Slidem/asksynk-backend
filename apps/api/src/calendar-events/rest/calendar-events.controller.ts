@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  Param,
   Post,
   Put,
   Query,
@@ -22,7 +21,10 @@ import { UpdateCalendarEventInstanceRequestDto } from "@/api/calendar-events/res
 import { CalendarResponseDto } from "@/api/calendar-events/rest/responses/calendar.response";
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
 import { parseIsoWallClockInTimezone } from "@/api/calendar-events/utils/recurrence.utils";
-import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import {
+  IsoDateWithOffsetParam,
+  UuidV7Param,
+} from "@/api/common/decorators/id.decorators";
 
 import { toCalendarEventInstance } from "../mappers/calendar-event-instance.mapper";
 import { CalendarEventInstance } from "../models/calendar-event-instance.model";
@@ -151,7 +153,7 @@ export class CalendarEventsController {
   @Put("calendar-events/:id/instances/:start")
   async updateCalendarEventInstance(
     @UuidV7Param("id") id: string,
-    @Param("start") start: string,
+    @IsoDateWithOffsetParam("start") start: string,
     @Body() dto: UpdateCalendarEventInstanceRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
@@ -180,7 +182,7 @@ export class CalendarEventsController {
   @Put("calendar-events/:id/split/:start")
   async splitSeries(
     @UuidV7Param("id") id: string,
-    @Param("start") start: string,
+    @IsoDateWithOffsetParam("start") start: string,
     @Body() dto: SplitCalendarEventSeriesRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
@@ -193,6 +195,7 @@ export class CalendarEventsController {
         description: dto.description,
         location: dto.location,
         link: dto.link,
+        start: dto.start,
         durationSeconds: dto.durationSeconds,
         timezone: dto.timezone,
         rrule: dto.rrule,

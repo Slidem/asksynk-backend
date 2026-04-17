@@ -231,7 +231,7 @@ export class CalendarEventsService {
     userId: string,
     eventId: string,
     splitStart: string,
-    input: Omit<SplitCalendarEventSeriesInput, "eventId" | "splitStart">,
+    input: Omit<SplitCalendarEventSeriesInput, "eventId">,
   ): Promise<CalendarEvent> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
@@ -241,7 +241,37 @@ export class CalendarEventsService {
     const splitDate = parseIsoWallClockInTimezone(splitStart, event.timezone);
     const timezone = input.timezone ?? event.timezone;
 
-    const newUntil = new Date(splitDate.getTime() - 1000);
+    // Split at recurrence start — no actual split, just update in-place
+    if (splitDate.getTime() === event.start.getTime()) {
+      event.title = input.title ?? event.title;
+      event.description = mergeNullable(input.description, event.description);
+      event.location = mergeNullable(input.location, event.location);
+      event.link = mergeNullable(input.link, event.link);
+      event.start = input.start
+        ? parseIsoWallClockInTimezone(input.start, timezone)
+        : event.start;
+      event.durationSeconds = input.durationSeconds ?? event.durationSeconds;
+      event.timezone = timezone;
+      event.color = mergeNullable(input.color, event.color);
+
+      if (input.rrule) {
+        event.rrule = validateAndNormalizeRrule(
+          input.rrule,
+          timezone,
+          event.start,
+        );
+      }
+
+      if (input.tagIds !== undefined) {
+        await this.validateTagIds(input.tagIds, userId);
+        event.tagIds = input.tagIds;
+      }
+
+      return this.calendarEventsRepository.update(event);
+    }
+
+    // UNTIL = splitDate - 1 day + 1 second (just after previous occurrence)
+    const newUntil = new Date(splitDate.getTime() - 86400000 + 1000);
     const truncatedRrule = replaceRruleUntil(event.rrule!, newUntil);
 
     const newRruleBase = input.rrule ?? event.rrule!;
@@ -260,7 +290,9 @@ export class CalendarEventsService {
       description: mergeNullable(input.description, event.description),
       location: mergeNullable(input.location, event.location),
       link: mergeNullable(input.link, event.link),
-      start: splitDate,
+      start: input.start
+        ? parseIsoWallClockInTimezone(input.start, timezone)
+        : splitDate,
       durationSeconds: input.durationSeconds ?? event.durationSeconds,
       allDay: event.allDay,
       timezone,
