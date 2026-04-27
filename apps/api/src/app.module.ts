@@ -4,13 +4,16 @@ import { APP_FILTER } from "@nestjs/core";
 
 import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
+import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import { AllExceptionsFilter } from "@/api/common/errors/errors.filter";
 import { LoggerConfigModule } from "@/api/common/logger/logger.config";
-import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import { HealthController } from "@/api/health/health.controller";
 import { DbModule } from "@/api/infrastructure/db/db.module";
 import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { NatsModule } from "@/api/infrastructure/nats/nats.module";
+import { MessagingModule } from "@/api/messaging/messaging.module";
+import { NetworksModule } from "@/api/networks/networks.module";
+import { PublicViewsModule } from "@/api/public-views/public-views.module";
 import { TagsModule } from "@/api/tags/tags.module";
 
 @Module({
@@ -22,6 +25,9 @@ import { TagsModule } from "@/api/tags/tags.module";
     TxModule,
     TagsModule,
     CalendarEventsModule,
+    NetworksModule,
+    PublicViewsModule,
+    MessagingModule,
     AuthGuardModule,
   ],
   controllers: [HealthController, AuthController],

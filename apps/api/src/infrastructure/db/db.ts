@@ -2,11 +2,21 @@ import { ConfigService } from "@nestjs/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";
-import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendars } from "@/migrations/schema/calendars";
+import {
+  messages,
+  messageThreads,
+  threadParticipants,
+} from "@/migrations/schema/messaging";
+import {
+  publicViewGuests,
+  publicViews,
+} from "@/migrations/schema/publicViews";
 import { tags } from "@/migrations/schema/tags";
+import { userInvites, userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
 
 export type DB = ReturnType<typeof getDbInstance>;
@@ -30,6 +40,13 @@ export const getDbInstance = (config: ConfigService) => {
       calendarEvents,
       calendarEventExceptions,
       calendarEventTags,
+      userInvites,
+      userNetwork,
+      publicViews,
+      publicViewGuests,
+      messageThreads,
+      threadParticipants,
+      messages,
     },
     logger: isDev,
   });

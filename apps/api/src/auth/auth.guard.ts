@@ -5,22 +5,25 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { ContextLogger } from "nestjs-context-logger";
 
+import { ALLOW_GUEST_KEY } from "@/api/auth/allowGuest.decorator";
 import { AuthService } from "@/api/auth/auth.service";
-import { RequestWithUser } from "@/api/auth/auth.types";
+import { RequestHeaders, RequestWithAuth } from "@/api/auth/auth.types";
+import { GuestAuthService } from "@/api/auth/guest-auth.service";
 import { IS_PUBLIC_KEY } from "@/api/auth/public.decorator";
 
-/**
- * AuthGuard is a NestJS guard that checks if the incoming request has a valid JWT token in the Authorization header.
- * It uses the AuthService to verify the token and extract the user information, which is then **attached to the request object**.
- * If the token is invalid or missing, it throws an UnauthorizedException.
- * The guard also checks for a custom decorator @Public() to allow unauthenticated access to specific routes.
- */
+import { CalendarEventsRepository } from "../calendar-events/repositories/calendar-events.repository";
+import { extractBearerToken } from "../common/utils/token";
+
 @Injectable()
 export class AuthGuard implements CanActivate {
+  private readonly logger = new ContextLogger(CalendarEventsRepository.name);
+
   constructor(
     private readonly reflector: Reflector,
     private readonly authService: AuthService,
+    private readonly guestAuthService: GuestAuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,21 +36,54 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<RequestWithUser>();
+    const request = context.switchToHttp().getRequest<RequestWithAuth>();
+    const headers = request.headers as RequestHeaders;
 
     try {
-      const authSession = await this.authService.validateRequest(
-        request.headers as Record<string, string | string[] | undefined>,
-      );
-      request.user = authSession.user;
-      request.session = authSession;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
+      return await this.isValidAuthenticatedUser(headers, request);
+    } catch (userAuthError) {
+      if (this.methodAllowsGuests(context)) {
+        return await this.isValidGuestUser(headers, request);
       }
+
+      if (userAuthError instanceof UnauthorizedException) {
+        throw userAuthError;
+      }
+
+      this.logger.info("Error validating authenticated user", {
+        error: userAuthError,
+      });
+
       throw new UnauthorizedException("Authentication failed");
     }
+  }
 
+  private methodAllowsGuests(context: ExecutionContext) {
+    return this.reflector.getAllAndOverride<boolean>(ALLOW_GUEST_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+  }
+
+  private async isValidAuthenticatedUser(
+    headers: Record<string, string | string[] | undefined>,
+    request: RequestWithAuth,
+  ) {
+    const authSession = await this.authService.validateRequest(headers);
+    request.user = authSession.user;
+    request.session = authSession;
+    return true;
+  }
+
+  private async isValidGuestUser(
+    headers: Record<string, string | string[] | undefined>,
+    request: RequestWithAuth,
+  ) {
+    const token = extractBearerToken(headers);
+    if (!token) throw new UnauthorizedException("Missing bearer token");
+
+    // NOTE: rate-limit hook — invoke RateLimiter here before token lookup when added.
+    request.guest = await this.guestAuthService.validateToken(token);
     return true;
   }
 }
