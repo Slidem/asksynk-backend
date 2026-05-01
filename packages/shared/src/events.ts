@@ -4,10 +4,11 @@ export type TagEventPayload = {
   name: string;
 };
 
-export const TagEventSubject = {
-  Created: "tags.created",
-  Updated: "tags.updated",
+export const TagEvent = {
+  Created: "tag.created",
+  Updated: "tag.updated",
 } as const;
 
-export type TagEventSubject =
-  (typeof TagEventSubject)[keyof typeof TagEventSubject];
+export type TagEvent = (typeof TagEvent)[keyof typeof TagEvent];
+
+export const TAG_EVENTS_EMAIL_QUEUE = "tag-events.email";

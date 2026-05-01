@@ -30,6 +30,6 @@ By leveraging tags as a barrier between incoming communication channels and a us
 - Node `24.13.0`, pnpm `10.15.0` (root package.json engines)
 - Root scripts: `dev:api`, `dev:worker`, `dev:migrate`, `localdev:{up,down,reset}`, `secret:better-auth`
 - Env examples: `apps/api/.env.example`, `apps/background-worker/.env.example`, `apps/migrations/.env.example`
-- Tech: TypeScript, NestJS (api/worker), Drizzle ORM + drizzle-kit, Postgres + pgvector, NATS, better-auth
+- Tech: TypeScript, NestJS (api/worker), Drizzle ORM + drizzle-kit, Postgres + pgvector, pg-boss, better-auth
 - Tooling: pnpm, ESLint, Prettier, Jest, ts-jest, tsx
 - Structure: `apps/api`, `apps/background-worker`, `apps/migrations`, `apps/cron`, `packages/shared`, `scripts`

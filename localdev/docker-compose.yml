@@ -1,10 +1,4 @@
 services:
-  nats:
-    image: "nats:2.10-alpine"
-    container_name: asksynk-nats
-    ports:
-      - "4222:4222"
-      - "8222:8222"
   postgres:
     image: "pgvector/pgvector:pg18"
     container_name: asksynk-postgres
@@ -22,6 +16,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  pgboss-dashboard:
+    image: node:20-alpine
+    container_name: asksynk-pgboss-dashboard
+    command: ["npx", "-y", "pg-boss-admin-dashboard@latest", "--no-browser"]
+    ports:
+      - "8671:8671"
+    environment:
+      PGBOSS_DATABASE_URL: postgres://asksynk:asksynk@postgres:5432/asksynk
+      PGBOSS_NO_BROWSER: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
   mailpit:
     image: "axllent/mailpit:latest"
     container_name: asksynk-mailpit

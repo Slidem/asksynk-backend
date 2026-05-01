@@ -15,7 +15,6 @@ import {
   DbModule,
 } from "@/api/infrastructure/db/db.module";
 import { TxModule } from "@/api/infrastructure/db/tx.module";
-import { NatsService } from "@/api/infrastructure/nats/nats.service";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { users } from "@/migrations/schema/users";
@@ -46,10 +45,7 @@ describe("CalendarEventsController (integration)", () => {
         CalendarEventsModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: MockAuthGuard }],
-    })
-      .overrideProvider(NatsService)
-      .useValue({ publishTagEvent: () => {} })
-      .compile();
+    }).compile();
 
     app = module.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
