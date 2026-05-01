@@ -38,6 +38,14 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     this.boss = null;
   }
 
+  /**
+   * Sends a message to the specified queue. If the queue does not exist, it will be created automatically. The message will be retried according to the options specified in `opts` in case of failure.
+   *
+   * @param queue
+   * @param data
+   * @param opts
+   * @returns
+   */
   async enqueue<T extends object>(
     queue: string,
     data: T,
@@ -48,23 +56,43 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     return boss.send(queue, data, opts);
   }
 
+  /**
+   *
+   * Listens for messages on the specified queue and processes them using the provided handler. If the queue does not exist, it will be created automatically. The handler will be retried according to the options specified in `opts` in case of failure.
+   *
+   * @param queue
+   * @param handler
+   * @param opts
+   */
   async work<T extends object>(
     queue: string,
     handler: MessageHandler<T>,
     opts: WorkOptions = {},
   ): Promise<void> {
     const boss = this.requireBoss();
+
+    // idempotent operation; ensures the queue exists before we start working on it
+    // we should keep track of created queues in memory to avoid unnecessary calls to pg-boss, but can be done later;
+    // TODO: keep track of created queues in memory to avoid unnecessary calls to pg-boss
     await boss.createQueue(queue);
     await boss.work<T>(queue, opts, async ([job]) => {
       await handler(job.data);
     });
   }
 
+  /**
+   * Publishes an event to all subscribers of the specified event. The event will be retried according to the options specified in `opts` in case of failure.
+   *
+   * @param event
+   * @param data
+   */
   async publish<T extends object>(event: string, data: T): Promise<void> {
-    const boss = this.requireBoss();
-    await boss.publish(event, data);
+    await this.requireBoss().publish(event, data);
   }
 
+  /**
+   * Subscribes to the specified event and processes incoming messages using the provided handler. The handler will be retried according to the options specified in `opts` in case of failure.
+   */
   async subscribe<T extends object>(
     event: string,
     queue: string,
@@ -72,6 +100,10 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     opts: WorkOptions = {},
   ): Promise<void> {
     const boss = this.requireBoss();
+
+    // idempotent operation; ensures the queue exists before we start working on it
+    // we should keep track of created queues in memory to avoid unnecessary calls to pg-boss, but can be done later;
+    // TODO: keep track of created queues in memory to avoid unnecessary calls to pg-boss
     await boss.createQueue(queue);
     await boss.subscribe(event, queue);
     await boss.work<T>(queue, opts, async ([job]) => {
