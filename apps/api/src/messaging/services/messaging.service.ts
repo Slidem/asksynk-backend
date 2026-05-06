@@ -8,9 +8,14 @@ import { Thread } from "@/api/messaging/entities/thread.entity";
 import {
   MessagingRepository,
   ThreadListItem,
+  ThreadParticipantRow,
 } from "@/api/messaging/repositories/messaging.repository";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
+import { WsIdentity } from "@/api/realtime/services/ws-auth.service";
+import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
+import { MessageCreated } from "@/shared/event-registry/events.registry";
+import { EventOf } from "@/shared/event-registry/events.types";
 import { generateId } from "@/shared/id";
 
 const MAX_MESSAGE_LIMIT = 100;
@@ -21,6 +26,7 @@ export class MessagingService {
     private readonly messagingRepository: MessagingRepository,
     private readonly networksService: NetworksService,
     private readonly publicViewsRepository: PublicViewsRepository,
+    private readonly eventsPublisher: EventsPublisher,
   ) {}
 
   async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
@@ -48,11 +54,32 @@ export class MessagingService {
     options: { before?: Date; limit?: number },
   ): Promise<Message[]> {
     const thread = await this.messagingRepository.findGuestThread(guest.id);
-    if (!thread) return [];
+
+    if (!thread) {
+      return [];
+    }
+
     return this.messagingRepository.listMessages(thread.id, {
       before: options.before,
       limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
     });
+  }
+
+  async canAccessThread(
+    identity: WsIdentity,
+    threadId: string,
+  ): Promise<boolean> {
+    if (identity.kind === "user") {
+      return this.messagingRepository.isUserParticipant(
+        threadId,
+        identity.user.id,
+      );
+    }
+
+    const guestThread = await this.messagingRepository.findGuestThread(
+      identity.guest.id,
+    );
+    return guestThread?.id === threadId;
   }
 
   @Transactional()
@@ -67,6 +94,7 @@ export class MessagingService {
       userId,
       recipientUserId,
     );
+
     if (!connected) {
       throw AsksynkError.forbidden("Recipient is not in your network");
     }
@@ -75,7 +103,10 @@ export class MessagingService {
       userId,
       recipientUserId,
     );
-    if (existing) return existing;
+
+    if (existing) {
+      return existing;
+    }
 
     const thread = await this.messagingRepository.insertThread({
       id: generateId(),
@@ -95,22 +126,34 @@ export class MessagingService {
     body: string,
   ): Promise<Message> {
     const thread = await this.messagingRepository.getThread(threadId);
-    if (!thread) throw AsksynkError.notFound("Thread not found");
+
+    if (!thread) {
+      throw AsksynkError.notFound("Thread not found");
+    }
 
     const isParticipant = await this.messagingRepository.isUserParticipant(
       threadId,
       senderUserId,
     );
-    if (!isParticipant) throw AsksynkError.notFound("Thread not found");
+    if (!isParticipant) {
+      throw AsksynkError.notFound("Thread not found");
+    }
 
     await this.assertNotFrozen(thread, senderUserId);
 
-    return this.messagingRepository.insertMessage({
+    const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId,
       sender: { kind: "user", userId: senderUserId },
       body,
     });
+
+    const participants =
+      await this.messagingRepository.getParticipants(threadId);
+
+    await this.notifyMessageCreated(message, participants);
+
+    return message;
   }
 
   @Transactional()
@@ -127,12 +170,54 @@ export class MessagingService {
       ]);
     }
 
-    return this.messagingRepository.insertMessage({
+    const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId: thread.id,
       sender: { kind: "guest", guestId: guest.id },
       body,
     });
+
+    const participants = await this.messagingRepository.getParticipants(
+      thread.id,
+    );
+
+    await this.notifyMessageCreated(message, participants);
+
+    return message;
+  }
+
+  private async notifyMessageCreated(
+    message: Message,
+    participants: ThreadParticipantRow[],
+  ): Promise<void> {
+    const senderId =
+      message.sender.kind === "user"
+        ? message.sender.userId
+        : message.sender.guestId;
+
+    const participantUserIds = participants
+      .map((p) => p.userId)
+      .filter((id): id is string => !!id);
+
+    const participantGuestIds = participants
+      .map((p) => p.guestId)
+      .filter((id): id is string => !!id);
+
+    const payload: EventOf<typeof MessageCreated> = {
+      threadId: message.threadId,
+      message: {
+        id: message.id,
+        threadId: message.threadId,
+        senderKind: message.sender.kind,
+        senderId: senderId,
+        body: message.body,
+        createdAt: message.createdAt.toISOString(),
+      },
+      participantUserIds,
+      participantGuestIds,
+    };
+
+    await this.eventsPublisher.publish(MessageCreated, payload);
   }
 
   private async assertNotFrozen(

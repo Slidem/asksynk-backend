@@ -13,6 +13,7 @@ import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { MessagingModule } from "@/api/messaging/messaging.module";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { RealtimeModule } from "@/api/realtime/ws.module";
 import { TagsModule } from "@/api/tags/tags.module";
 import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
 
@@ -28,6 +29,7 @@ import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
     NetworksModule,
     PublicViewsModule,
     MessagingModule,
+    RealtimeModule,
     AuthGuardModule,
   ],
   controllers: [HealthController, AuthController],

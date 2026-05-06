@@ -80,7 +80,10 @@ export class MessagingRepository {
   }
 
   async insertParticipants(rows: ThreadParticipantRow[]): Promise<void> {
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      return;
+    }
+
     await this.txHost.tx.insert(threadParticipants).values(rows);
   }
 
@@ -258,7 +261,7 @@ export class MessagingRepository {
     const thread = Thread.create({
       id: r.thread_id as string,
       publicViewId: (r.public_view_id as string | null) ?? null,
-      createdAt: r.thread_created_at as Date,
+      createdAt: new Date(r.thread_created_at as string),
     });
 
     let other: OtherParticipantView;
@@ -293,7 +296,7 @@ export class MessagingRepository {
     const lastMessage = r.last_created_at
       ? {
           body: r.last_body as string,
-          createdAt: r.last_created_at as Date,
+          createdAt: new Date(r.last_created_at as string),
           senderKind: (r.last_sender_user_id ? "user" : "guest") as
             | "user"
             | "guest",

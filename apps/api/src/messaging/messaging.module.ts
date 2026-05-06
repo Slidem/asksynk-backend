@@ -6,11 +6,12 @@ import { ThreadsController } from "@/api/messaging/rest/threads.controller";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher.module";
 
 @Module({
-  imports: [NetworksModule, PublicViewsModule],
+  imports: [NetworksModule, PublicViewsModule, EventsPublisherModule],
   providers: [MessagingRepository, MessagingService],
   controllers: [ThreadsController, GuestMessagingController],
-  exports: [MessagingService],
+  exports: [MessagingService, MessagingRepository],
 })
 export class MessagingModule {}

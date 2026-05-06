@@ -1,4 +1,9 @@
-export type MessageHandler<T> = (data: T) => Promise<void>;
+import type PgBoss from "pg-boss";
+
+export type MessageHandler<T> = (
+  data: T,
+  job: PgBoss.JobWithMetadata<T>,
+) => Promise<void>;
 
 export type SendOptions = {
   retryLimit?: number;

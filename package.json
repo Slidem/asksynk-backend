@@ -9,7 +9,7 @@
   "scripts": {
     "dev:api": "pnpm --filter @asksynk/api dev",
     "dev:worker": "pnpm --filter @asksynk/background-worker dev",
-    "dev:migrate": "pnpm --filter @asksynk/migrations db:push",
+    "dev:migrate": "pnpm --filter @asksynk/migrations db:migrate",
     "dev:generate-migrations": "pnpm --filter @asksynk/migrations db:generate",
     "dev:new-custom-migration": "pnpm --filter @asksynk/migrations db:generate-custom",
     "localdev:up": "bash localdev/up.sh",

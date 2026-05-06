@@ -5,7 +5,6 @@ import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/id.decorators";
 import { CreateThreadRequestDto } from "@/api/messaging/rest/dto/create-thread.dto";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
-import { SendMessageRequestDto } from "@/api/messaging/rest/dto/send-message.dto";
 import {
   toMessageResponseDto,
   toThreadListItemResponseDto,
@@ -56,19 +55,5 @@ export class ThreadsController {
       },
     );
     return messages.map(toMessageResponseDto);
-  }
-
-  @Post(":id/messages")
-  async sendMessage(
-    @UuidV7Param("id") threadId: string,
-    @Body() dto: SendMessageRequestDto,
-    @AuthUser() user: AuthUserType,
-  ): Promise<MessageResponseDto> {
-    const message = await this.messagingService.sendAsUser(
-      user.id,
-      threadId,
-      dto.body,
-    );
-    return toMessageResponseDto(message);
   }
 }

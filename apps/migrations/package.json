@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:generate-custom": "drizzle-kit generate --custom",
     "db:add-rrule-to-migration": "npx ts-node src/scripts/installRrulePlpgSql.ts"

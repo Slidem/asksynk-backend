@@ -57,6 +57,18 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Batch-insert pre-built jobs. Ensures referenced queues exist (createQueue
+   * is idempotent) before inserting, since pg-boss `insert` does not.
+   */
+  async insertJobs(jobs: PgBoss.JobInsert[]): Promise<void> {
+    if (jobs.length === 0) return;
+    const boss = this.requireBoss();
+    const queues = new Set(jobs.map((j) => j.name));
+    await Promise.all([...queues].map((q) => boss.createQueue(q)));
+    await boss.insert(jobs);
+  }
+
+  /**
    *
    * Listens for messages on the specified queue and processes them using the provided handler. If the queue does not exist, it will be created automatically. The handler will be retried according to the options specified in `opts` in case of failure.
    *
@@ -75,9 +87,13 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     // we should keep track of created queues in memory to avoid unnecessary calls to pg-boss, but can be done later;
     // TODO: keep track of created queues in memory to avoid unnecessary calls to pg-boss
     await boss.createQueue(queue);
-    await boss.work<T>(queue, opts, async ([job]) => {
-      await handler(job.data);
-    });
+    await boss.work<T>(
+      queue,
+      { ...opts, includeMetadata: true },
+      async ([job]) => {
+        await handler(job.data, job);
+      },
+    );
   }
 
   /**
@@ -106,9 +122,13 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     // TODO: keep track of created queues in memory to avoid unnecessary calls to pg-boss
     await boss.createQueue(queue);
     await boss.subscribe(event, queue);
-    await boss.work<T>(queue, opts, async ([job]) => {
-      await handler(job.data);
-    });
+    await boss.work<T>(
+      queue,
+      { ...opts, includeMetadata: true },
+      async ([job]) => {
+        await handler(job.data, job);
+      },
+    );
   }
 
   private requireBoss(): PgBoss {

@@ -10,11 +10,15 @@ import { CreateTagInput } from "@/api/tags/models/create-tag.model";
 import { ListTagsInput } from "@/api/tags/models/list-tags.model";
 import { UpdateTagInput } from "@/api/tags/models/update-tag.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
+import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 
 @Injectable()
 export class TagsService {
   private readonly logger = new ContextLogger(TagsService.name);
-  constructor(private readonly tagsRepository: TagRepository) {}
+  constructor(
+    private readonly tagsRepository: TagRepository,
+    private readonly eventsPublisher: EventsPublisher,
+  ) {}
 
   @Transactional()
   async createTag(createTag: CreateTagInput): Promise<Tag> {
@@ -30,6 +34,7 @@ export class TagsService {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
     return this.tagsRepository.add(tag);
   }
 

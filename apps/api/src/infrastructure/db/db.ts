@@ -11,10 +11,8 @@ import {
   messageThreads,
   threadParticipants,
 } from "@/migrations/schema/messaging";
-import {
-  publicViewGuests,
-  publicViews,
-} from "@/migrations/schema/publicViews";
+import { eventsOutbox } from "@/migrations/schema/outbox";
+import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { tags } from "@/migrations/schema/tags";
 import { userInvites, userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
@@ -47,6 +45,7 @@ export const getDbInstance = (config: ConfigService) => {
       messageThreads,
       threadParticipants,
       messages,
+      eventsOutbox,
     },
     logger: isDev,
   });

@@ -1,3 +1,4 @@
+CREATE TYPE "public"."outbox_delivery_mode" AS ENUM('realtime', 'durable', 'dual');--> statement-breakpoint
 CREATE TABLE "accounts" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -99,6 +100,16 @@ CREATE TABLE "thread_participants" (
 	CONSTRAINT "chk_thread_participant_one_of" CHECK ((user_id IS NOT NULL) <> (guest_id IS NOT NULL))
 );
 --> statement-breakpoint
+CREATE TABLE "events_outbox" (
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
+	"event_type" text NOT NULL,
+	"delivery_mode" "outbox_delivery_mode" NOT NULL,
+	"groups" text NOT NULL,
+	"payload" text NOT NULL,
+	"dispatched_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "public_view_guests" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"public_view_id" uuid NOT NULL,
@@ -197,6 +208,7 @@ CREATE UNIQUE INDEX "uq_thread_participants_guest_per_thread" ON "thread_partici
 CREATE UNIQUE INDEX "uq_thread_participants_guest_single_thread" ON "thread_participants" USING btree ("guest_id") WHERE guest_id IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "idx_thread_participants_user" ON "thread_participants" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_thread_participants_guest" ON "thread_participants" USING btree ("guest_id");--> statement-breakpoint
+CREATE INDEX "idx_events_outbox_event_type" ON "events_outbox" USING btree ("event_type");--> statement-breakpoint
 CREATE INDEX "idx_public_view_guests_view" ON "public_view_guests" USING btree ("public_view_id");--> statement-breakpoint
 CREATE INDEX "idx_public_views_owner" ON "public_views" USING btree ("owner_user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_user_invites_inviter_email_pending" ON "user_invites" USING btree ("inviter_user_id","invitee_email") WHERE status = 'pending';--> statement-breakpoint
