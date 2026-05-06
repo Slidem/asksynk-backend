@@ -1,5 +1,5 @@
 {
-  "id": "2393751a-6ae5-4fc3-87b5-4c189807490c",
+  "id": "bcedf403-de22-4640-8683-12f1af8c6415",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1019,13 +1019,25 @@
         },
         "payload": {
           "name": "payload",
-          "type": "text",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
         "dispatched_at": {
           "name": "dispatched_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

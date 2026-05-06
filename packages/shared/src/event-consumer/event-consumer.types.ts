@@ -5,12 +5,18 @@ export interface EventHandlerContext {
   attempt: number;
 }
 
-export interface EventConsumerHandler<T extends EventDef> {
-  handle(payload: EventOf<T>, ctx: EventHandlerContext): Promise<void>;
-}
+export type EventHandlerFn<T extends EventDef> = (
+  payload: EventOf<T>,
+  ctx: EventHandlerContext,
+) => Promise<void>;
 
-export type EventConsumerOptions<T extends EventDef = EventDef> = {
-  event: T;
+export type EventHandlerOptions = {
   group?: string;
   concurrency?: number;
+};
+
+export type EventHandlerMeta = {
+  propertyKey: string;
+  event: EventDef;
+  options?: EventHandlerOptions;
 };

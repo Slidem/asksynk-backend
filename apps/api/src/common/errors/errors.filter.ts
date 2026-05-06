@@ -26,12 +26,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: exception.message,
       });
     } else {
+      this.logger.error("Unexpected error occurred", {
+        error: exception.message,
+        stack: exception.stack,
+      });
       response.status(500).json({
         error: ErrorType.INTERNAL_SERVER_ERROR,
         statusCode: 500,
         message: "An unexpected error occurred",
       });
-      throw exception; // Re-throw the exception to let NestJS handle logging and other processing
     }
   }
 }

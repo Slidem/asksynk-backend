@@ -1,1 +1,1 @@
-export const EVENT_CONSUMER_METADATA = Symbol("event-consumer-metadata");
+export const EVENT_HANDLERS_METADATA = Symbol("event-handlers-metadata");

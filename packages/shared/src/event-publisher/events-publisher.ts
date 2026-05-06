@@ -45,7 +45,7 @@ export class EventsPublisherImpl extends EventsPublisher {
       eventType: def.name,
       deliveryMode: def.delivery,
       groups: def.groups.join(","),
-      payload: JSON.stringify(validated),
+      payload: validated,
     });
   }
 }

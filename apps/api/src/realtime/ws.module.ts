@@ -1,22 +1,28 @@
 import { Module } from "@nestjs/common";
 
 import { AuthModule } from "@/api/auth/auth.module";
+import { DB_CLIENT_PROVIDER } from "@/api/infrastructure/db/db.module";
 import { MessagingModule } from "@/api/messaging/messaging.module";
-import { MessageCreatedBroadcastHandler } from "@/api/realtime/handlers/message-created.handler";
 import { EventConsumerModule } from "@/shared/event-consumer/event-consumer.module";
+import { EventsConsumerDb } from "@/shared/event-consumer/realtime-listener.service";
 import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
 
 import { WsAuthService } from "./services/ws-auth.service";
-import { WsBroadcaster } from "./services/ws-broadcaster.service";
 import { WsGateway } from "./ws.gateway";
 
 @Module({
-  imports: [AuthModule, MessageBusModule, EventConsumerModule, MessagingModule],
+  imports: [
+    AuthModule,
+    MessageBusModule,
+    EventConsumerModule.forRootAsync({
+      inject: [DB_CLIENT_PROVIDER],
+      useFactory: (db: EventsConsumerDb) => db,
+    }),
+    MessagingModule,
+  ],
   providers: [
     WsAuthService,
     WsGateway,
-    MessageCreatedBroadcastHandler,
-    WsBroadcaster,
   ],
   exports: [],
 })

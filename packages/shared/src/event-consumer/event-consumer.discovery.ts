@@ -1,21 +1,21 @@
 import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
-import { DiscoveryService, ModuleRef } from "@nestjs/core";
+import { DiscoveryService, MetadataScanner } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
 
 import type { EventDef } from "../event-registry/events.types";
 import { DeliveryMode } from "../event-registry/events.types";
 import { DurableConsumerRuntime } from "./durable-consumer-runtime.service";
-import { EVENT_CONSUMER_METADATA } from "./event-consumer.constants";
+import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
 import {
-  EventConsumerHandler,
-  EventConsumerOptions,
+  EventHandlerFn,
+  EventHandlerMeta,
 } from "./event-consumer.types";
 import { RealtimeListenerService } from "./realtime-listener.service";
 
-interface DiscoveredConsumer {
-  instance: EventConsumerHandler<EventDef>;
-  options: EventConsumerOptions<EventDef>;
+interface DiscoveredHandler {
   className: string;
+  meta: EventHandlerMeta;
+  handler: EventHandlerFn<EventDef>;
 }
 
 @Injectable()
@@ -24,80 +24,89 @@ export class EventConsumerDiscovery implements OnApplicationBootstrap {
 
   constructor(
     private readonly discovery: DiscoveryService,
-    private readonly moduleRef: ModuleRef,
+    private readonly metadataScanner: MetadataScanner,
     private readonly realtime: RealtimeListenerService,
     private readonly durable: DurableConsumerRuntime,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    const consumers = this.discoverConsumers();
+    const handlers = this.discoverHandlers();
 
     let realtimeCount = 0;
     let durableCount = 0;
 
-    for (const c of consumers) {
-      const delivery = c.options.event.delivery;
+    for (const h of handlers) {
+      const { event, options } = h.meta;
+      const delivery = event.delivery;
+      const id = `${h.className}.${h.meta.propertyKey}`;
 
       if (
-        delivery === DeliveryMode.Realtime ||
-        delivery === DeliveryMode.Dual
+        (delivery === DeliveryMode.Realtime || delivery === DeliveryMode.Dual) &&
+        options?.group === undefined
       ) {
-        if (c.options.group === undefined) {
-          this.realtime.subscribe(c.options.event, c.instance);
-          realtimeCount += 1;
-          continue;
-        }
+        this.realtime.subscribe(event, h.handler);
+        realtimeCount += 1;
+        this.logger.info("bound realtime handler", { event: event.name, handler: id });
+        continue;
       }
 
-      if (delivery === DeliveryMode.Durable || delivery === DeliveryMode.Dual) {
-        if (c.options.group !== undefined) {
-          await this.durable.bind(
-            c.options.event,
-            c.options.group,
-            c.instance,
-            c.options.concurrency,
-          );
-          durableCount += 1;
-          continue;
-        }
+      if (
+        (delivery === DeliveryMode.Durable || delivery === DeliveryMode.Dual) &&
+        options?.group !== undefined
+      ) {
+        await this.durable.bind(event, options.group, h.handler, options.concurrency);
+        durableCount += 1;
+        continue;
       }
 
       throw new Error(
-        `@EventConsumer ${c.className} has invalid options for event "${c.options.event.name}" (delivery=${delivery}).`,
+        `@EventHandler ${id} has invalid options for event "${event.name}" (delivery=${delivery}).`,
       );
     }
 
     await this.realtime.start();
 
-    this.logger.info("event consumers bound", {
+    this.logger.info("event handlers bound", {
       realtime: realtimeCount,
       durable: durableCount,
     });
   }
 
-  private discoverConsumers(): DiscoveredConsumer[] {
-    const result: DiscoveredConsumer[] = [];
+  private discoverHandlers(): DiscoveredHandler[] {
+    const result: DiscoveredHandler[] = [];
 
     for (const wrapper of this.discovery.getProviders()) {
-      const metatype = wrapper.metatype;
-      if (!metatype) continue;
+      const { instance, metatype } = wrapper;
+      if (!instance || !metatype) continue;
 
-      const options = Reflect.getMetadata(EVENT_CONSUMER_METADATA, metatype) as
-        | EventConsumerOptions<EventDef>
+      const list = Reflect.getOwnMetadata(EVENT_HANDLERS_METADATA, metatype) as
+        | EventHandlerMeta[]
         | undefined;
-      if (!options) continue;
+      if (!list || list.length === 0) continue;
 
-      const instance = this.moduleRef.get(metatype, { strict: false }) as
-        | EventConsumerHandler<EventDef>
-        | undefined;
+      const className = metatype.name;
+      const prototype = Object.getPrototypeOf(instance) as object;
+      const methodNames = new Set(
+        this.metadataScanner.getAllMethodNames(prototype),
+      );
 
-      if (!instance) {
-        throw new Error(
-          `@EventConsumer ${metatype.name} is not registered as a provider in any imported module.`,
-        );
+      for (const meta of list) {
+        if (!methodNames.has(meta.propertyKey)) {
+          throw new Error(
+            `@EventHandler method "${meta.propertyKey}" not found on ${className}.`,
+          );
+        }
+        const fn = (instance as Record<string, unknown>)[meta.propertyKey];
+        if (typeof fn !== "function") {
+          throw new Error(
+            `@EventHandler target ${className}.${meta.propertyKey} is not a function.`,
+          );
+        }
+        const bound = (fn as (...args: unknown[]) => Promise<void>).bind(
+          instance,
+        ) as EventHandlerFn<EventDef>;
+        result.push({ className, meta, handler: bound });
       }
-
-      result.push({ instance, options, className: metatype.name });
     }
 
     return result;

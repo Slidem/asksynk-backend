@@ -12,15 +12,11 @@ AFTER INSERT ON events_outbox
 FOR EACH ROW EXECUTE FUNCTION notify_all_new();
 
 -- Used to notify realtime listeners when a new event is inserted with delivery_mode 'realtime' or 'dual'.
--- This is different from the outbox_new notification as it includes the payload of the event and is only triggered for events that should be delivered in realtime.
--- Used for realtime fan-out notifications, for example to websocket servers that want to push events to clients immediately.
+-- Sends only the event id; consumers fetch the full row from events_outbox (avoids the 8KB pg_notify limit).
 CREATE OR REPLACE FUNCTION notify_realtime() RETURNS trigger AS $$
 BEGIN
   IF NEW.delivery_mode IN ('realtime', 'dual') THEN
-    PERFORM pg_notify(
-      'evt:' || NEW.event_type,
-      json_build_object('id', NEW.id, 'payload', NEW.payload::json)::text
-    );
+    PERFORM pg_notify('evt:' || NEW.event_type, NEW.id::text);
   END IF;
   RETURN NEW;
 END;

@@ -4,8 +4,8 @@ import { ContextLogger } from "nestjs-context-logger";
 import type { EventDef, EventOf } from "../event-registry/events.types";
 import { MessageBusService } from "../message-bus/message-bus.service";
 import {
-  EventConsumerHandler,
   EventHandlerContext,
+  EventHandlerFn,
 } from "./event-consumer.types";
 
 interface DurableJobData {
@@ -22,7 +22,7 @@ export class DurableConsumerRuntime {
   async bind<T extends EventDef>(
     event: T,
     group: string,
-    handler: EventConsumerHandler<T>,
+    handler: EventHandlerFn<T>,
     concurrency = 5,
   ): Promise<void> {
     const queue = `${event.name}.${group}`;
@@ -35,7 +35,7 @@ export class DurableConsumerRuntime {
           eventId: data.eventId,
           attempt: (job.retryCount ?? 0) + 1,
         };
-        await handler.handle(validated, ctx);
+        await handler(validated, ctx);
       },
       { localConcurrency: concurrency },
     );

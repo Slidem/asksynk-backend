@@ -3,7 +3,6 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -14,15 +13,15 @@ import { Server, Socket } from "socket.io";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { Ack, SendAck } from "@/api/realtime/ws.types";
+import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
+import { MessageCreated } from "@/shared/event-registry/events.registry";
+import { EventOf } from "@/shared/event-registry/events.types";
 
 import { WsAuthService, WsIdentity } from "./services/ws-auth.service";
-import { WsBroadcaster } from "./services/ws-broadcaster.service";
 import { guestRoom, threadRoom, userRoom } from "./ws.rooms";
 
 @WebSocketGateway({ cors: true })
-export class WsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
-{
+export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new ContextLogger(WsGateway.name);
 
   @WebSocketServer()
@@ -31,12 +30,7 @@ export class WsGateway
   constructor(
     private readonly wsAuthService: WsAuthService,
     private readonly messagingService: MessagingService,
-    private readonly broadcaster: WsBroadcaster,
   ) {}
-
-  afterInit(server: Server): void {
-    this.broadcaster.setServer(server);
-  }
 
   /**
    * Overridden method from OnGatewayConnection to handle new socket connections. Authenticates the socket and assigns the identity to socket.data.identity. Joins the user or guest room based on the identity.
@@ -150,5 +144,22 @@ export class WsGateway
       this.logger.error("message.send failed", { error });
       return { ok: false, error: "internal_error" };
     }
+  }
+
+  @EventHandler(MessageCreated)
+  async onMessageCreated(
+    payload: EventOf<typeof MessageCreated>,
+  ): Promise<void> {
+    const rooms = new Set<string>([threadRoom(payload.threadId)]);
+    for (const userId of payload.participantUserIds) {
+      rooms.add(userRoom(userId));
+    }
+    for (const guestId of payload.participantGuestIds) {
+      rooms.add(guestRoom(guestId));
+    }
+    this.server.to([...rooms]).emit("message.created", {
+      threadId: payload.threadId,
+      message: payload.message,
+    });
   }
 }

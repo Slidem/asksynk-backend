@@ -105,8 +105,10 @@ CREATE TABLE "events_outbox" (
 	"event_type" text NOT NULL,
 	"delivery_mode" "outbox_delivery_mode" NOT NULL,
 	"groups" text NOT NULL,
-	"payload" text NOT NULL,
+	"payload" jsonb NOT NULL,
 	"dispatched_at" timestamp with time zone,
+	"failed_at" timestamp with time zone,
+	"error" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -23,8 +24,10 @@ export const eventsOutbox = pgTable(
     eventType: text("event_type").notNull(),
     deliveryMode: outboxDeliveryMode("delivery_mode").notNull(),
     groups: text("groups").notNull(), // comma-separated list of groups
-    payload: text("payload").notNull(),
+    payload: jsonb("payload").$type<unknown>().notNull(),
     dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    error: text("error"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

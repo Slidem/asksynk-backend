@@ -1,20 +1,30 @@
-import { Injectable, OnModuleDestroy } from "@nestjs/common";
+import { Inject, Injectable, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { and, eq, isNull } from "drizzle-orm";
+import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 import { Client } from "pg";
 
+import { eventsOutbox } from "@/migrations/schema/outbox";
+
 import type { EventDef } from "../event-registry/events.types";
 import {
-  EventConsumerHandler,
   EventHandlerContext,
+  EventHandlerFn,
 } from "./event-consumer.types";
 
 const RECONNECT_BASE_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 15_000;
 
+export const EVENTS_CONSUMER_DB = "EVENTS_CONSUMER_DB";
+
+export type EventsConsumerDb = NodePgDatabase<{
+  eventsOutbox: typeof eventsOutbox;
+}>;
+
 interface Subscription {
   event: EventDef;
-  handler: EventConsumerHandler<EventDef>;
+  handler: EventHandlerFn<EventDef>;
 }
 
 @Injectable()
@@ -28,23 +38,26 @@ export class RealtimeListenerService implements OnModuleDestroy {
   private reconnectAttempts = 0;
   private reconnectHandle: NodeJS.Timeout | null = null;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Inject(EVENTS_CONSUMER_DB) private readonly db: EventsConsumerDb,
+  ) {}
 
   subscribe<T extends EventDef>(
     event: T,
-    handler: EventConsumerHandler<T>,
+    handler: EventHandlerFn<T>,
   ): void {
     if (this.started) {
       throw new Error(
         "RealtimeListenerService.subscribe called after start(). " +
-          "All @EventConsumer realtime classes must be discovered before bootstrap completes.",
+          "All @EventHandler realtime methods must be discovered before bootstrap completes.",
       );
     }
     const channel = this.channelFor(event);
     const list = this.subscriptions.get(channel) ?? [];
     list.push({
       event,
-      handler: handler as EventConsumerHandler<EventDef>,
+      handler: handler as EventHandlerFn<EventDef>,
     });
     this.subscriptions.set(channel, list);
   }
@@ -136,39 +149,50 @@ export class RealtimeListenerService implements OnModuleDestroy {
     const subs = this.subscriptions.get(channel);
     if (!subs || subs.length === 0) return;
 
-    let envelope: { id: string; payload: unknown };
-    try {
-      envelope = JSON.parse(payloadRaw ?? "{}");
-    } catch (error) {
-      this.logger.error("failed to parse realtime envelope", {
+    const eventId = payloadRaw?.trim();
+    if (!eventId) {
+      this.logger.error("realtime notify missing event id", { channel });
+      return;
+    }
+
+    const [row] = await this.db
+      .select({ payload: eventsOutbox.payload })
+      .from(eventsOutbox)
+      .where(
+        and(eq(eventsOutbox.id, eventId), isNull(eventsOutbox.failedAt)),
+      )
+      .limit(1);
+
+    if (!row) {
+      this.logger.error("realtime notify row not found", {
         channel,
-        error,
+        eventId,
       });
       return;
     }
 
     const event = subs[0].event;
-    const validated = event.schema.safeParse(envelope.payload);
+    const validated = event.schema.safeParse(row.payload);
     if (!validated.success) {
       this.logger.error("realtime payload failed schema validation", {
         channel,
-        eventId: envelope.id,
+        eventId,
         issues: validated.error.issues,
       });
       return;
     }
 
     const ctx: EventHandlerContext = {
-      eventId: envelope.id,
+      eventId,
       attempt: 1,
     };
 
     await Promise.allSettled(
       subs.map(({ event: e, handler }) =>
-        handler.handle(validated.data, ctx).catch((error) => {
+        handler(validated.data, ctx).catch((error: unknown) => {
           this.logger.error("realtime handler threw", {
             event: e.name,
-            eventId: envelope.id,
+            eventId,
             error,
           });
         }),

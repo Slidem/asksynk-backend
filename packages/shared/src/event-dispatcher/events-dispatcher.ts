@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, asc, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 import { Client } from "pg";
@@ -179,6 +179,7 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
         .where(
           and(
             isNull(eventsOutbox.dispatchedAt),
+            isNull(eventsOutbox.failedAt),
             inArray(eventsOutbox.deliveryMode, ["durable", "dual"]),
           ),
         )
@@ -190,32 +191,52 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
         return false;
       }
 
-      const jobs: PgBoss.JobInsert[] = rows.flatMap((row) => {
-        const groups = row.groups
-          .split(",")
-          .map((g) => g.trim())
-          .filter(Boolean);
+      const jobs: PgBoss.JobInsert[] = [];
+      const succeededIds: string[] = [];
+      const failed: { id: string; error: string }[] = [];
 
-        const payload = JSON.parse(row.payload) as unknown;
+      for (const row of rows) {
+        try {
+          const groups = row.groups
+            .split(",")
+            .map((g) => g.trim())
+            .filter(Boolean);
 
-        return groups.map((group) => ({
-          name: `${row.eventType}.${group}`,
-          data: { eventId: row.id, payload },
-          singletonKey: `${row.id}.${group}`,
-        }));
-      });
+          for (const group of groups) {
+            jobs.push({
+              name: `${row.eventType}.${group}`,
+              data: { eventId: row.id, payload: row.payload },
+              singletonKey: `${row.id}.${group}`,
+            });
+          }
+          succeededIds.push(row.id);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.error("dispatcher row build failed", {
+            eventId: row.id,
+            error,
+          });
+          failed.push({ id: row.id, error: message });
+        }
+      }
 
-      await this.bus.insertJobs(jobs);
+      if (jobs.length > 0) {
+        await this.bus.insertJobs(jobs);
+      }
 
-      await tx
-        .update(eventsOutbox)
-        .set({ dispatchedAt: sql`now()` })
-        .where(
-          inArray(
-            eventsOutbox.id,
-            rows.map((r) => r.id),
-          ),
-        );
+      if (succeededIds.length > 0) {
+        await tx
+          .update(eventsOutbox)
+          .set({ dispatchedAt: sql`now()` })
+          .where(inArray(eventsOutbox.id, succeededIds));
+      }
+
+      for (const f of failed) {
+        await tx
+          .update(eventsOutbox)
+          .set({ failedAt: sql`now()`, error: f.error })
+          .where(eq(eventsOutbox.id, f.id));
+      }
 
       return rows.length === BATCH_SIZE;
     });

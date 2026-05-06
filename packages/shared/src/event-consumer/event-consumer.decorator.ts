@@ -1,30 +1,47 @@
 import "reflect-metadata";
 
-import { Injectable } from "@nestjs/common";
-
 import type { EventDef } from "../event-registry/events.types";
 import { DeliveryMode } from "../event-registry/events.types";
-import { EVENT_CONSUMER_METADATA } from "./event-consumer.constants";
-import { EventConsumerOptions } from "./event-consumer.types";
+import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
+import {
+  EventHandlerFn,
+  EventHandlerMeta,
+  EventHandlerOptions,
+} from "./event-consumer.types";
 
-export function EventConsumer<T extends EventDef>(
-  options: EventConsumerOptions<T>,
-): ClassDecorator {
-  return (target) => {
-    validate(options);
-    Reflect.defineMetadata(EVENT_CONSUMER_METADATA, options, target);
-    Injectable()(target);
+export function EventHandler<T extends EventDef>(
+  event: T,
+  options?: EventHandlerOptions,
+): MethodDecorator {
+  return (target, propertyKey, descriptor) => {
+    validate(event, options?.group);
+
+    const ctor = target.constructor;
+    const list: EventHandlerMeta[] =
+      Reflect.getOwnMetadata(EVENT_HANDLERS_METADATA, ctor) ?? [];
+    list.push({
+      propertyKey: propertyKey as string,
+      event,
+      options,
+    });
+    Reflect.defineMetadata(EVENT_HANDLERS_METADATA, list, ctor);
+
+    return descriptor;
   };
 }
 
-function validate<T extends EventDef>(opts: EventConsumerOptions<T>): void {
-  const { event, group } = opts;
+export type { EventHandlerFn };
+
+function validate<T extends EventDef>(
+  event: T,
+  group: string | undefined,
+): void {
   const isRealtime = event.delivery === DeliveryMode.Realtime;
 
   if (isRealtime) {
     if (group !== undefined) {
       throw new Error(
-        `Event "${event.name}" is realtime; @EventConsumer must not declare a group.`,
+        `Event "${event.name}" is realtime; @EventHandler must not declare a group.`,
       );
     }
     return;
@@ -32,7 +49,7 @@ function validate<T extends EventDef>(opts: EventConsumerOptions<T>): void {
 
   if (!group) {
     throw new Error(
-      `Event "${event.name}" is ${event.delivery}; @EventConsumer requires a "group".`,
+      `Event "${event.name}" is ${event.delivery}; @EventHandler requires a "group".`,
     );
   }
 
