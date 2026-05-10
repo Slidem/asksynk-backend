@@ -32,6 +32,7 @@ export const MessageCreated = defineEvent({
     message: z.object({
       id: z.string(),
       threadId: z.string(),
+      parentMessageId: z.string().nullable(),
       senderKind: z.enum(["user", "guest"]),
       senderId: z.string(),
       body: z.string(),

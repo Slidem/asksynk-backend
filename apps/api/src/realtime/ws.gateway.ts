@@ -111,7 +111,12 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async onSendMessage(
     @ConnectedSocket() socket: Socket,
     @MessageBody()
-    body: { threadId?: string; body?: string; tagIds?: string[] },
+    body: {
+      threadId?: string;
+      body?: string;
+      tagIds?: string[];
+      parentMessageId?: string;
+    },
   ): Promise<SendAck> {
     const identity = socket.data.identity as WsIdentity | undefined;
     if (!identity) {
@@ -131,6 +136,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: false, error: "tagIds must be string[]" };
     }
 
+    const parentMessageId = body?.parentMessageId ?? null;
+
     try {
       if (identity.kind === "user") {
         if (!body?.threadId) {
@@ -141,6 +148,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           body.threadId,
           text,
           tagIds,
+          parentMessageId,
         );
         return { ok: true, messageId: message.id };
       }
@@ -152,6 +160,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const message = await this.messagingService.sendAsGuest(
         identity.guest,
         text,
+        parentMessageId,
       );
       return { ok: true, messageId: message.id };
     } catch (error) {

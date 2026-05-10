@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  AnyPgColumn,
   check,
   index,
   pgTable,
@@ -79,6 +80,10 @@ export const messages = pgTable(
       () => publicViewGuests.id,
       { onDelete: "set null" },
     ),
+    parentMessageId: uuid("parent_message_id").references(
+      (): AnyPgColumn => messages.id,
+      { onDelete: "cascade" },
+    ),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -90,5 +95,8 @@ export const messages = pgTable(
       sql`(sender_user_id IS NOT NULL) <> (sender_guest_id IS NOT NULL)`,
     ),
     index("idx_messages_thread_created").on(t.threadId, t.createdAt),
+    index("idx_messages_parent_created")
+      .on(t.parentMessageId, t.createdAt)
+      .where(sql`parent_message_id IS NOT NULL`),
   ],
 );

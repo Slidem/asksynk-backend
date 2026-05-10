@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import {
@@ -52,6 +52,11 @@ export type ThreadListItem = {
     createdAt: Date;
     senderKind: "user" | "guest";
   } | null;
+};
+
+export type ThreadMessageListItem = {
+  message: Message;
+  replyCount: number;
 };
 
 @Injectable()
@@ -159,6 +164,7 @@ export class MessagingRepository {
   async insertMessage(input: {
     id: string;
     threadId: string;
+    parentMessageId?: string | null;
     sender: MessageSender;
     body: string;
     tagIds: string[];
@@ -168,6 +174,7 @@ export class MessagingRepository {
       .values({
         id: input.id,
         threadId: input.threadId,
+        parentMessageId: input.parentMessageId ?? null,
         senderUserId: input.sender.kind === "user" ? input.sender.userId : null,
         senderGuestId:
           input.sender.kind === "guest" ? input.sender.guestId : null,
@@ -212,8 +219,44 @@ export class MessagingRepository {
   async listMessages(
     threadId: string,
     options: { before?: Date; limit: number },
+  ): Promise<ThreadMessageListItem[]> {
+    const conditions = [
+      eq(messages.threadId, threadId),
+      isNull(messages.parentMessageId),
+    ];
+    if (options.before) conditions.push(lt(messages.createdAt, options.before));
+
+    const rows = await this.txHost.tx
+      .select({
+        id: messages.id,
+        threadId: messages.threadId,
+        parentMessageId: messages.parentMessageId,
+        senderUserId: messages.senderUserId,
+        senderGuestId: messages.senderGuestId,
+        body: messages.body,
+        createdAt: messages.createdAt,
+        replyCount: sql<number>`(
+          SELECT COUNT(*)::int FROM ${messages} r
+          WHERE r.parent_message_id = ${messages.id}
+        )`,
+      })
+      .from(messages)
+      .where(and(...conditions))
+      .orderBy(desc(messages.createdAt))
+      .limit(options.limit);
+
+    const tagMap = await this.fetchTagIdsForMessages(rows.map((r) => r.id));
+    return rows.map((r) => ({
+      message: this.mapMessage(r, tagMap.get(r.id) ?? []),
+      replyCount: r.replyCount,
+    }));
+  }
+
+  async listReplies(
+    parentMessageId: string,
+    options: { before?: Date; limit: number },
   ): Promise<Message[]> {
-    const conditions = [eq(messages.threadId, threadId)];
+    const conditions = [eq(messages.parentMessageId, parentMessageId)];
     if (options.before) conditions.push(lt(messages.createdAt, options.before));
 
     const rows = await this.txHost.tx
@@ -382,6 +425,7 @@ export class MessagingRepository {
     return Message.create({
       id: row.id,
       threadId: row.threadId,
+      parentMessageId: row.parentMessageId,
       sender,
       body: row.body,
       tagIds,

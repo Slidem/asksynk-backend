@@ -8,8 +8,12 @@ import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-que
 import {
   toMessageResponseDto,
   toThreadListItemResponseDto,
+  toThreadMessageResponseDto,
 } from "@/api/messaging/rest/messaging.mapper";
-import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
+import {
+  MessageResponseDto,
+  ThreadMessageResponseDto,
+} from "@/api/messaging/rest/responses/message.response";
 import {
   CreateThreadResponseDto,
   ThreadListItemResponseDto,
@@ -45,8 +49,8 @@ export class ThreadsController {
     @UuidV7Param("id") threadId: string,
     @Query() query: ListMessagesQueryDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<MessageResponseDto[]> {
-    const messages = await this.messagingService.listThreadMessages(
+  ): Promise<ThreadMessageResponseDto[]> {
+    const items = await this.messagingService.listThreadMessages(
       user.id,
       threadId,
       {
@@ -54,6 +58,25 @@ export class ThreadsController {
         limit: query.limit,
       },
     );
-    return messages.map(toMessageResponseDto);
+    return items.map(toThreadMessageResponseDto);
+  }
+
+  @Get(":id/messages/:messageId/replies")
+  async listReplies(
+    @UuidV7Param("id") threadId: string,
+    @UuidV7Param("messageId") messageId: string,
+    @Query() query: ListMessagesQueryDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<MessageResponseDto[]> {
+    const replies = await this.messagingService.listThreadMessageReplies(
+      user.id,
+      threadId,
+      messageId,
+      {
+        before: query.before ? new Date(query.before) : undefined,
+        limit: query.limit,
+      },
+    );
+    return replies.map(toMessageResponseDto);
   }
 }
