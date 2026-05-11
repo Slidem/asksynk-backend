@@ -7,6 +7,7 @@ export interface MessageProps {
   threadId: string;
   sender: MessageSender;
   body: string;
+  tagIds: string[];
   createdAt: Date;
 }
 
@@ -15,6 +16,7 @@ export class Message {
   readonly threadId: string;
   readonly sender: MessageSender;
   readonly body: string;
+  readonly tagIds: string[];
   readonly createdAt: Date;
 
   private constructor(props: MessageProps) {
@@ -22,6 +24,7 @@ export class Message {
     this.threadId = props.threadId;
     this.sender = props.sender;
     this.body = props.body;
+    this.tagIds = props.tagIds;
     this.createdAt = props.createdAt;
   }
 

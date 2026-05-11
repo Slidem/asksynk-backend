@@ -4,5 +4,6 @@ export interface MessageResponseDto {
   senderKind: "user" | "guest";
   senderId: string;
   body: string;
+  tagIds: string[];
   createdAt: string;
 }

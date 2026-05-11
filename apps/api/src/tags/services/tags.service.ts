@@ -82,4 +82,15 @@ export class TagsService {
     }
     return this.tagsRepository.delete(tagId);
   }
+
+  async assertOwnedBy(userId: string, tagIds: string[]): Promise<void> {
+    if (tagIds.length === 0) return;
+    const found = await this.tagsRepository.getByIds(tagIds);
+    if (
+      found.length !== tagIds.length ||
+      !found.every((t) => t.belongsTo(userId))
+    ) {
+      throw AsksynkError.badRequest("One or more tags not found");
+    }
+  }
 }

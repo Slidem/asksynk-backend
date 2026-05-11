@@ -30,4 +30,8 @@ export class ListTagsQueryDto {
   @IsOptional()
   @IsNumberString()
   offset?: string;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }

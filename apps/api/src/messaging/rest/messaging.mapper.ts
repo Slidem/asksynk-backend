@@ -13,6 +13,7 @@ export function toMessageResponseDto(message: Message): MessageResponseDto {
         ? message.sender.userId
         : message.sender.guestId,
     body: message.body,
+    tagIds: message.tagIds,
     createdAt: message.createdAt.toISOString(),
   };
 }

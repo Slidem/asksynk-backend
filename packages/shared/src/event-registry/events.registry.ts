@@ -35,10 +35,28 @@ export const MessageCreated = defineEvent({
       senderKind: z.enum(["user", "guest"]),
       senderId: z.string(),
       body: z.string(),
+      tagIds: z.array(z.string()),
       createdAt: z.string(),
     }),
     participantUserIds: z.array(z.string()),
     participantGuestIds: z.array(z.string()),
+  }),
+  delivery: DeliveryMode.Realtime,
+});
+
+export const MessageUpdated = defineEvent({
+  name: "message.updated",
+  schema: z.object({
+    threadId: z.string(),
+    message: z.object({
+      id: z.string(),
+      threadId: z.string(),
+      senderKind: z.enum(["user", "guest"]),
+      senderId: z.string(),
+      body: z.string(),
+      tagIds: z.array(z.string()),
+      createdAt: z.string(),
+    }),
   }),
   delivery: DeliveryMode.Realtime,
 });

@@ -15,6 +15,13 @@
       "when": 1778044966319,
       "tag": "0001_colossal_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778465901289,
+      "tag": "0002_common_nebula",
+      "breakpoints": true
     }
   ]
 }

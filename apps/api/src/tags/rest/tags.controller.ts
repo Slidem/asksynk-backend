@@ -12,7 +12,9 @@ import { pick } from "lodash";
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import { AsksynkError } from "@/api/common/errors/errors.model";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
+import { NetworksService } from "@/api/networks/services/networks.service";
 import { CreateTagRequestDto } from "@/api/tags/rest/dto/create-tag.dto";
 import { ListTagsQueryDto } from "@/api/tags/rest/dto/list-tags-query.dto";
 import { UpdateTagRequestDto } from "@/api/tags/rest/dto/update-tag.dto";
@@ -22,7 +24,10 @@ import { TagsService } from "@/api/tags/services/tags.service";
 
 @Controller("tags")
 export class TagsController {
-  constructor(private readonly tagsService: TagsService) {}
+  constructor(
+    private readonly tagsService: TagsService,
+    private readonly networksService: NetworksService,
+  ) {}
 
   @Post()
   async createTag(
@@ -46,13 +51,22 @@ export class TagsController {
 
     const offset = toNonNegativeNumberOptional(query.offset);
 
+    const targetUserId = query.userId ?? user.id;
+    if (targetUserId !== user.id) {
+      const connected = await this.networksService.isActiveConnection(
+        user.id,
+        targetUserId,
+      );
+      if (!connected) throw AsksynkError.forbidden("Not connected");
+    }
+
     const listInput = {
       ...pick(query, ["orderBy", "orderDirection", "search", "answerMode"]),
       limit,
       offset,
     };
 
-    const tags = await this.tagsService.listTags(user.id, listInput);
+    const tags = await this.tagsService.listTags(targetUserId, listInput);
 
     return tags.map(toTagResponseDto);
   }

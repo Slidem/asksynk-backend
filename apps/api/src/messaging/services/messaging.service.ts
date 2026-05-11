@@ -3,7 +3,10 @@ import { Transactional } from "@nestjs-cls/transactional";
 
 import { AuthGuest } from "@/api/auth/auth.types";
 import { AsksynkError } from "@/api/common/errors/errors.model";
-import { Message } from "@/api/messaging/entities/message.entity";
+import {
+  Message,
+  MessageSender,
+} from "@/api/messaging/entities/message.entity";
 import { Thread } from "@/api/messaging/entities/thread.entity";
 import {
   MessagingRepository,
@@ -13,8 +16,12 @@ import {
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
 import { WsIdentity } from "@/api/realtime/services/ws-auth.service";
+import { TagsService } from "@/api/tags/services/tags.service";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
-import { MessageCreated } from "@/shared/event-registry/events.registry";
+import {
+  MessageCreated,
+  MessageUpdated,
+} from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
 import { generateId } from "@/shared/id";
 
@@ -27,6 +34,7 @@ export class MessagingService {
     private readonly networksService: NetworksService,
     private readonly publicViewsRepository: PublicViewsRepository,
     private readonly eventsPublisher: EventsPublisher,
+    private readonly tagsService: TagsService,
   ) {}
 
   async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
@@ -124,6 +132,7 @@ export class MessagingService {
     senderUserId: string,
     threadId: string,
     body: string,
+    tagIds: string[],
   ): Promise<Message> {
     const thread = await this.messagingRepository.getThread(threadId);
 
@@ -141,15 +150,27 @@ export class MessagingService {
 
     await this.assertNotFrozen(thread, senderUserId);
 
+    const sender: MessageSender = { kind: "user", userId: senderUserId };
+    const participants =
+      await this.messagingRepository.getParticipants(threadId);
+
+    if (tagIds.length > 0) {
+      const recipientUserId = this.resolveRecipientUserId(sender, participants);
+      if (!recipientUserId) {
+        throw AsksynkError.badRequest(
+          "Tagging not supported on this message",
+        );
+      }
+      await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
+    }
+
     const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId,
-      sender: { kind: "user", userId: senderUserId },
+      sender,
       body,
+      tagIds,
     });
-
-    const participants =
-      await this.messagingRepository.getParticipants(threadId);
 
     await this.notifyMessageCreated(message, participants);
 
@@ -175,6 +196,7 @@ export class MessagingService {
       threadId: thread.id,
       sender: { kind: "guest", guestId: guest.id },
       body,
+      tagIds: [],
     });
 
     const participants = await this.messagingRepository.getParticipants(
@@ -184,6 +206,63 @@ export class MessagingService {
     await this.notifyMessageCreated(message, participants);
 
     return message;
+  }
+
+  @Transactional()
+  async tagMessage(
+    callerUserId: string,
+    messageId: string,
+    tagIds: string[],
+  ): Promise<Message> {
+    const message = await this.messagingRepository.getMessageById(messageId);
+    if (!message) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    const isParticipant = await this.messagingRepository.isUserParticipant(
+      message.threadId,
+      callerUserId,
+    );
+    if (!isParticipant) {
+      throw AsksynkError.notFound("Thread not found");
+    }
+
+    const participants = await this.messagingRepository.getParticipants(
+      message.threadId,
+    );
+    const recipientUserId = this.resolveRecipientUserId(
+      message.sender,
+      participants,
+    );
+    if (!recipientUserId) {
+      throw AsksynkError.badRequest("Tagging not supported on this message");
+    }
+
+    await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
+    await this.messagingRepository.replaceMessageTags(messageId, tagIds);
+
+    const updated = await this.messagingRepository.getMessageById(messageId);
+    if (!updated) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    await this.notifyMessageUpdated(updated);
+
+    return updated;
+  }
+
+  private resolveRecipientUserId(
+    sender: MessageSender,
+    participants: ThreadParticipantRow[],
+  ): string | null {
+    if (sender.kind === "user") {
+      const other = participants.find(
+        (p) => p.userId && p.userId !== sender.userId,
+      );
+      return other?.userId ?? null;
+    }
+    const owner = participants.find((p) => p.userId);
+    return owner?.userId ?? null;
   }
 
   private async notifyMessageCreated(
@@ -211,6 +290,7 @@ export class MessagingService {
         senderKind: message.sender.kind,
         senderId: senderId,
         body: message.body,
+        tagIds: message.tagIds,
         createdAt: message.createdAt.toISOString(),
       },
       participantUserIds,
@@ -218,6 +298,28 @@ export class MessagingService {
     };
 
     await this.eventsPublisher.publish(MessageCreated, payload);
+  }
+
+  private async notifyMessageUpdated(message: Message): Promise<void> {
+    const senderId =
+      message.sender.kind === "user"
+        ? message.sender.userId
+        : message.sender.guestId;
+
+    const payload: EventOf<typeof MessageUpdated> = {
+      threadId: message.threadId,
+      message: {
+        id: message.id,
+        threadId: message.threadId,
+        senderKind: message.sender.kind,
+        senderId: senderId,
+        body: message.body,
+        tagIds: message.tagIds,
+        createdAt: message.createdAt.toISOString(),
+      },
+    };
+
+    await this.eventsPublisher.publish(MessageUpdated, payload);
   }
 
   private async assertNotFrozen(

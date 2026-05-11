@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import {
@@ -8,6 +8,7 @@ import {
   MessageSender,
 } from "@/api/messaging/entities/message.entity";
 import { Thread } from "@/api/messaging/entities/thread.entity";
+import { messageTags } from "@/migrations/schema/messageTags";
 import {
   messages,
   messageThreads,
@@ -160,6 +161,7 @@ export class MessagingRepository {
     threadId: string;
     sender: MessageSender;
     body: string;
+    tagIds: string[];
   }): Promise<Message> {
     const [row] = await this.txHost.tx
       .insert(messages)
@@ -172,7 +174,39 @@ export class MessagingRepository {
         body: input.body,
       })
       .returning();
-    return this.mapMessage(row);
+
+    if (input.tagIds.length > 0) {
+      await this.txHost.tx
+        .insert(messageTags)
+        .values(input.tagIds.map((tagId) => ({ messageId: row.id, tagId })));
+    }
+
+    return this.mapMessage(row, input.tagIds);
+  }
+
+  async getMessageById(messageId: string): Promise<Message | null> {
+    const [row] = await this.txHost.tx
+      .select()
+      .from(messages)
+      .where(eq(messages.id, messageId))
+      .limit(1);
+    if (!row) return null;
+    const tagIds = await this.fetchTagIdsForMessages([messageId]);
+    return this.mapMessage(row, tagIds.get(messageId) ?? []);
+  }
+
+  async replaceMessageTags(
+    messageId: string,
+    tagIds: string[],
+  ): Promise<void> {
+    await this.txHost.tx
+      .delete(messageTags)
+      .where(eq(messageTags.messageId, messageId));
+    if (tagIds.length > 0) {
+      await this.txHost.tx
+        .insert(messageTags)
+        .values(tagIds.map((tagId) => ({ messageId, tagId })));
+    }
   }
 
   async listMessages(
@@ -188,7 +222,34 @@ export class MessagingRepository {
       .where(and(...conditions))
       .orderBy(desc(messages.createdAt))
       .limit(options.limit);
-    return rows.map((r) => this.mapMessage(r));
+
+    const tagMap = await this.fetchTagIdsForMessages(rows.map((r) => r.id));
+    return rows.map((r) => this.mapMessage(r, tagMap.get(r.id) ?? []));
+  }
+
+  private async fetchTagIdsForMessages(
+    messageIds: string[],
+  ): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+    if (messageIds.length === 0) return result;
+
+    const links = await this.txHost.tx
+      .select({
+        messageId: messageTags.messageId,
+        tagId: messageTags.tagId,
+      })
+      .from(messageTags)
+      .where(inArray(messageTags.messageId, messageIds));
+
+    for (const link of links) {
+      const existing = result.get(link.messageId);
+      if (existing) {
+        existing.push(link.tagId);
+      } else {
+        result.set(link.messageId, [link.tagId]);
+      }
+    }
+    return result;
   }
 
   async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
@@ -314,7 +375,7 @@ export class MessagingRepository {
     });
   }
 
-  private mapMessage(row: MessageRow): Message {
+  private mapMessage(row: MessageRow, tagIds: string[] = []): Message {
     const sender: MessageSender = row.senderUserId
       ? { kind: "user", userId: row.senderUserId }
       : { kind: "guest", guestId: row.senderGuestId! };
@@ -323,6 +384,7 @@ export class MessagingRepository {
       threadId: row.threadId,
       sender,
       body: row.body,
+      tagIds,
       createdAt: row.createdAt,
     });
   }

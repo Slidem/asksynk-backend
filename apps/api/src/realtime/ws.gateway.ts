@@ -14,7 +14,10 @@ import { AsksynkError } from "@/api/common/errors/errors.model";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { Ack, SendAck } from "@/api/realtime/ws.types";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
-import { MessageCreated } from "@/shared/event-registry/events.registry";
+import {
+  MessageCreated,
+  MessageUpdated,
+} from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
 
 import { WsAuthService, WsIdentity } from "./services/ws-auth.service";
@@ -107,7 +110,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("message.send")
   async onSendMessage(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() body: { threadId?: string; body?: string },
+    @MessageBody()
+    body: { threadId?: string; body?: string; tagIds?: string[] },
   ): Promise<SendAck> {
     const identity = socket.data.identity as WsIdentity | undefined;
     if (!identity) {
@@ -119,6 +123,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: false, error: "body required" };
     }
 
+    const tagIds = body?.tagIds ?? [];
+    if (
+      !Array.isArray(tagIds) ||
+      !tagIds.every((id) => typeof id === "string")
+    ) {
+      return { ok: false, error: "tagIds must be string[]" };
+    }
+
     try {
       if (identity.kind === "user") {
         if (!body?.threadId) {
@@ -128,8 +140,13 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           identity.user.id,
           body.threadId,
           text,
+          tagIds,
         );
         return { ok: true, messageId: message.id };
+      }
+
+      if (tagIds.length > 0) {
+        return { ok: false, error: "Guests cannot tag" };
       }
 
       const message = await this.messagingService.sendAsGuest(
@@ -146,6 +163,45 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage("message.tag")
+  async onTagMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { messageId?: string; tagIds?: string[] },
+  ): Promise<Ack> {
+    const identity = socket.data.identity as WsIdentity | undefined;
+    if (!identity) {
+      return { ok: false, error: "unauthorized" };
+    }
+    if (identity.kind !== "user") {
+      return { ok: false, error: "forbidden" };
+    }
+    if (!body?.messageId) {
+      return { ok: false, error: "messageId required" };
+    }
+    const tagIds = body?.tagIds ?? [];
+    if (
+      !Array.isArray(tagIds) ||
+      !tagIds.every((id) => typeof id === "string")
+    ) {
+      return { ok: false, error: "tagIds must be string[]" };
+    }
+
+    try {
+      await this.messagingService.tagMessage(
+        identity.user.id,
+        body.messageId,
+        tagIds,
+      );
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof AsksynkError) {
+        return { ok: false, error: error.message };
+      }
+      this.logger.error("message.tag failed", { error });
+      return { ok: false, error: "internal_error" };
+    }
+  }
+
   @EventHandler(MessageCreated)
   async onMessageCreated(
     payload: EventOf<typeof MessageCreated>,
@@ -158,6 +214,16 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       rooms.add(guestRoom(guestId));
     }
     this.server.to([...rooms]).emit("message.created", {
+      threadId: payload.threadId,
+      message: payload.message,
+    });
+  }
+
+  @EventHandler(MessageUpdated)
+  async onMessageUpdated(
+    payload: EventOf<typeof MessageUpdated>,
+  ): Promise<void> {
+    this.server.to(threadRoom(payload.threadId)).emit("message.updated", {
       threadId: payload.threadId,
       message: payload.message,
     });

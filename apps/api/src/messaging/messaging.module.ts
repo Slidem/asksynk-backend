@@ -6,10 +6,11 @@ import { ThreadsController } from "@/api/messaging/rest/threads.controller";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { TagsModule } from "@/api/tags/tags.module";
 import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher.module";
 
 @Module({
-  imports: [NetworksModule, PublicViewsModule, EventsPublisherModule],
+  imports: [NetworksModule, PublicViewsModule, EventsPublisherModule, TagsModule],
   providers: [MessagingRepository, MessagingService],
   controllers: [ThreadsController, GuestMessagingController],
   exports: [MessagingService, MessagingRepository],
