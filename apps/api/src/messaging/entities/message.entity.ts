@@ -5,6 +5,7 @@ export type MessageSender =
 export interface MessageProps {
   id: string;
   threadId: string;
+  parentMessageId: string | null;
   sender: MessageSender;
   body: string;
   tagIds: string[];
@@ -14,6 +15,7 @@ export interface MessageProps {
 export class Message {
   readonly id: string;
   readonly threadId: string;
+  readonly parentMessageId: string | null;
   readonly sender: MessageSender;
   readonly body: string;
   readonly tagIds: string[];
@@ -22,6 +24,7 @@ export class Message {
   private constructor(props: MessageProps) {
     this.id = props.id;
     this.threadId = props.threadId;
+    this.parentMessageId = props.parentMessageId;
     this.sender = props.sender;
     this.body = props.body;
     this.tagIds = props.tagIds;
@@ -30,5 +33,9 @@ export class Message {
 
   static create(props: MessageProps): Message {
     return new Message(props);
+  }
+
+  isReply(): boolean {
+    return this.parentMessageId !== null;
   }
 }

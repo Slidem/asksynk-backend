@@ -1,12 +1,19 @@
 import { Message } from "@/api/messaging/entities/message.entity";
-import { ThreadListItem } from "@/api/messaging/repositories/messaging.repository";
-import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
+import {
+  ThreadListItem,
+  ThreadMessageListItem,
+} from "@/api/messaging/repositories/messaging.repository";
+import {
+  MessageResponseDto,
+  ThreadMessageResponseDto,
+} from "@/api/messaging/rest/responses/message.response";
 import { ThreadListItemResponseDto } from "@/api/messaging/rest/responses/thread.response";
 
 export function toMessageResponseDto(message: Message): MessageResponseDto {
   return {
     id: message.id,
     threadId: message.threadId,
+    parentMessageId: message.parentMessageId,
     senderKind: message.sender.kind,
     senderId:
       message.sender.kind === "user"
@@ -15,6 +22,15 @@ export function toMessageResponseDto(message: Message): MessageResponseDto {
     body: message.body,
     tagIds: message.tagIds,
     createdAt: message.createdAt.toISOString(),
+  };
+}
+
+export function toThreadMessageResponseDto(
+  item: ThreadMessageListItem,
+): ThreadMessageResponseDto {
+  return {
+    ...toMessageResponseDto(item.message),
+    replyCount: item.replyCount,
   };
 }
 

@@ -11,6 +11,7 @@ import { Thread } from "@/api/messaging/entities/thread.entity";
 import {
   MessagingRepository,
   ThreadListItem,
+  ThreadMessageListItem,
   ThreadParticipantRow,
 } from "@/api/messaging/repositories/messaging.repository";
 import { NetworksService } from "@/api/networks/services/networks.service";
@@ -45,7 +46,7 @@ export class MessagingService {
     userId: string,
     threadId: string,
     options: { before?: Date; limit?: number },
-  ): Promise<Message[]> {
+  ): Promise<ThreadMessageListItem[]> {
     const isParticipant = await this.messagingRepository.isUserParticipant(
       threadId,
       userId,
@@ -60,7 +61,7 @@ export class MessagingService {
   async listGuestThreadMessages(
     guest: AuthGuest,
     options: { before?: Date; limit?: number },
-  ): Promise<Message[]> {
+  ): Promise<ThreadMessageListItem[]> {
     const thread = await this.messagingRepository.findGuestThread(guest.id);
 
     if (!thread) {
@@ -68,6 +69,50 @@ export class MessagingService {
     }
 
     return this.messagingRepository.listMessages(thread.id, {
+      before: options.before,
+      limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
+    });
+  }
+
+  async listThreadMessageReplies(
+    userId: string,
+    threadId: string,
+    messageId: string,
+    options: { before?: Date; limit?: number },
+  ): Promise<Message[]> {
+    const isParticipant = await this.messagingRepository.isUserParticipant(
+      threadId,
+      userId,
+    );
+    if (!isParticipant) throw AsksynkError.notFound("Thread not found");
+
+    const parent = await this.messagingRepository.getMessageById(messageId);
+    if (!parent || parent.threadId !== threadId) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    return this.messagingRepository.listReplies(messageId, {
+      before: options.before,
+      limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
+    });
+  }
+
+  async listGuestMessageReplies(
+    guest: AuthGuest,
+    messageId: string,
+    options: { before?: Date; limit?: number },
+  ): Promise<Message[]> {
+    const thread = await this.messagingRepository.findGuestThread(guest.id);
+    if (!thread) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    const parent = await this.messagingRepository.getMessageById(messageId);
+    if (!parent || parent.threadId !== thread.id) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    return this.messagingRepository.listReplies(messageId, {
       before: options.before,
       limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
     });
@@ -133,6 +178,7 @@ export class MessagingService {
     threadId: string,
     body: string,
     tagIds: string[],
+    parentMessageId?: string | null,
   ): Promise<Message> {
     const thread = await this.messagingRepository.getThread(threadId);
 
@@ -164,9 +210,14 @@ export class MessagingService {
       await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
     }
 
+    if (parentMessageId) {
+      await this.assertValidReplyParent(threadId, parentMessageId);
+    }
+
     const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId,
+      parentMessageId: parentMessageId ?? null,
       sender,
       body,
       tagIds,
@@ -178,7 +229,11 @@ export class MessagingService {
   }
 
   @Transactional()
-  async sendAsGuest(guest: AuthGuest, body: string): Promise<Message> {
+  async sendAsGuest(
+    guest: AuthGuest,
+    body: string,
+    parentMessageId?: string | null,
+  ): Promise<Message> {
     let thread = await this.messagingRepository.findGuestThread(guest.id);
     if (!thread) {
       thread = await this.messagingRepository.insertThread({
@@ -191,9 +246,14 @@ export class MessagingService {
       ]);
     }
 
+    if (parentMessageId) {
+      await this.assertValidReplyParent(thread.id, parentMessageId);
+    }
+
     const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId: thread.id,
+      parentMessageId: parentMessageId ?? null,
       sender: { kind: "guest", guestId: guest.id },
       body,
       tagIds: [],
@@ -265,6 +325,20 @@ export class MessagingService {
     return owner?.userId ?? null;
   }
 
+  private async assertValidReplyParent(
+    threadId: string,
+    parentMessageId: string,
+  ): Promise<void> {
+    const parent =
+      await this.messagingRepository.getMessageById(parentMessageId);
+    if (!parent || parent.threadId !== threadId) {
+      throw AsksynkError.notFound("Parent message not found");
+    }
+    if (parent.isReply()) {
+      throw AsksynkError.badRequest("Cannot reply to a reply");
+    }
+  }
+
   private async notifyMessageCreated(
     message: Message,
     participants: ThreadParticipantRow[],
@@ -287,6 +361,7 @@ export class MessagingService {
       message: {
         id: message.id,
         threadId: message.threadId,
+        parentMessageId: message.parentMessageId,
         senderKind: message.sender.kind,
         senderId: senderId,
         body: message.body,
