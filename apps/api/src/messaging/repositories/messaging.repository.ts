@@ -202,10 +202,7 @@ export class MessagingRepository {
     return this.mapMessage(row, tagIds.get(messageId) ?? []);
   }
 
-  async replaceMessageTags(
-    messageId: string,
-    tagIds: string[],
-  ): Promise<void> {
+  async replaceMessageTags(messageId: string, tagIds: string[]): Promise<void> {
     await this.txHost.tx
       .delete(messageTags)
       .where(eq(messageTags.messageId, messageId));
@@ -236,8 +233,8 @@ export class MessagingRepository {
         body: messages.body,
         createdAt: messages.createdAt,
         replyCount: sql<number>`(
-          SELECT COUNT(*)::int FROM ${messages} r
-          WHERE r.parent_message_id = ${messages.id}
+          SELECT COUNT(*)::int FROM "messages" AS replies
+          WHERE replies.parent_message_id = "messages"."id"
         )`,
       })
       .from(messages)

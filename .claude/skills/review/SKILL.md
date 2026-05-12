@@ -16,6 +16,7 @@ Review the current git diff and provide actionable feedback.
 ## Step 1 — Get the diff
 
 Run these in order, use the first that returns output:
+
 1. `git diff --staged`
 2. `git diff`
 3. `git diff HEAD~1`

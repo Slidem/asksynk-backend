@@ -203,9 +203,7 @@ export class MessagingService {
     if (tagIds.length > 0) {
       const recipientUserId = this.resolveRecipientUserId(sender, participants);
       if (!recipientUserId) {
-        throw AsksynkError.badRequest(
-          "Tagging not supported on this message",
-        );
+        throw AsksynkError.badRequest("Tagging not supported on this message");
       }
       await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
     }
@@ -417,13 +415,16 @@ export class MessagingService {
     const otherUser = participants.find(
       (p) => p.userId && p.userId !== userSenderId,
     );
+
     if (!otherUser?.userId) {
       throw AsksynkError.badRequest("Thread is frozen");
     }
+
     const connected = await this.networksService.isActiveConnection(
       userSenderId,
       otherUser.userId,
     );
+
     if (!connected) {
       throw AsksynkError.badRequest("Thread is frozen");
     }
