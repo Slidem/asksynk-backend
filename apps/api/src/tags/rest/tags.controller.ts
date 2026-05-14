@@ -11,7 +11,7 @@ import { pick } from "lodash";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 import { NetworksService } from "@/api/networks/services/networks.service";

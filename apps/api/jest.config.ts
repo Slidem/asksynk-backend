@@ -6,6 +6,7 @@ const config: Config = {
   testMatch: ["**/*.integration.test.ts"],
   globalSetup: "<rootDir>/test/helpers/globalSetup.ts",
   forceExit: true,
+  testTimeout: 30000,
   moduleNameMapper: {
     "^@/api/(.*)$": "<rootDir>/src/$1",
     "^@/migrations/(.*)$": "<rootDir>/../migrations/src/$1",

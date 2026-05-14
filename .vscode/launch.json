@@ -5,7 +5,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug Integration Tests",
-      "runtimeExecutable": "node",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v24.13.0/bin/node",
       "program": "${workspaceFolder}/apps/api/node_modules/jest/bin/jest.js",
       "args": [
         "--config",
@@ -19,6 +19,26 @@
       "internalConsoleOptions": "neverOpen",
       "sourceMaps": true,
       "outFiles": ["${workspaceFolder}/apps/api/dist/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "vscode-jest-tests.v2",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v24.13.0/bin/node",
+      "program": "${workspaceFolder}/apps/api/node_modules/jest/bin/jest.js",
+      "args": [
+        "--config",
+        "jest.config.ts",
+        "--runInBand",
+        "--watchAll=false",
+        "--testNamePattern",
+        "${jest.testNamePattern}",
+        "--runTestsByPath",
+        "${jest.testFile}"
+      ],
+      "cwd": "${workspaceFolder}/apps/api",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }

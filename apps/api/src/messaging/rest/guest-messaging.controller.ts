@@ -3,7 +3,7 @@ import { Controller, Get, Query } from "@nestjs/common";
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import { AuthGuest as AuthGuestType } from "@/api/auth/auth.types";
 import { AuthGuest } from "@/api/auth/authGuest.decorator";
-import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import {
   toMessageResponseDto,

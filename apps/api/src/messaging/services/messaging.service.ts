@@ -281,6 +281,7 @@ export class MessagingService {
       message.threadId,
       callerUserId,
     );
+
     if (!isParticipant) {
       throw AsksynkError.notFound("Thread not found");
     }
@@ -288,10 +289,12 @@ export class MessagingService {
     const participants = await this.messagingRepository.getParticipants(
       message.threadId,
     );
+
     const recipientUserId = this.resolveRecipientUserId(
       message.sender,
       participants,
     );
+
     if (!recipientUserId) {
       throw AsksynkError.badRequest("Tagging not supported on this message");
     }

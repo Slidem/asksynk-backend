@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Post } from "@nestjs/common";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { CreatePublicViewRequestDto } from "@/api/public-views/rest/dto/create-public-view.dto";
 import {
   toGuestResponseDto,

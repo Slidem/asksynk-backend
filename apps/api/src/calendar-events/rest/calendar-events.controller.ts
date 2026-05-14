@@ -24,7 +24,7 @@ import { parseIsoWallClockInTimezone } from "@/api/calendar-events/utils/recurre
 import {
   IsoDateWithOffsetParam,
   UuidV7Param,
-} from "@/api/common/decorators/id.decorators";
+} from "@/api/common/decorators/param.decorators";
 
 import { toCalendarEventInstance } from "../mappers/calendar-event-instance.mapper";
 import { CalendarEventInstance } from "../models/calendar-event-instance.model";

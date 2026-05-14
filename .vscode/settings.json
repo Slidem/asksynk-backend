@@ -13,6 +13,7 @@
   ],
   "jest.jestCommandLine": "node_modules/jest/bin/jest.js --config jest.config.ts",
   "jest.rootPath": "apps/api",
+  "jest.shell": { "path": "/bin/zsh", "args": ["-i"] },
   "jest.runMode": "on-demand",
   "jest.testPathPattern": ".*\\.integration\\.test\\.ts$",
   "cSpell.words": [

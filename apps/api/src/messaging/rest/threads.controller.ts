@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { CreateThreadRequestDto } from "@/api/messaging/rest/dto/create-thread.dto";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import {

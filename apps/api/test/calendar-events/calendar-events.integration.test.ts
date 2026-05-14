@@ -322,13 +322,16 @@ describe("CalendarEventsController (integration)", () => {
       .expect(201);
 
     const splitStart = "2026-04-15T10:00:00+00:00";
+    const newStart = "2026-04-15T11:00:00+00:00";
 
     const res = await request(app.getHttpServer())
       .put(`/calendar-events/${eventId}/split/${splitStart}`)
-      .send({})
-      .expect(200);
+      .send({
+        start: newStart,
+        timezone: TIMEZONE,
+      });
 
-    console.info("Split response:", res.body);
+    expect(res.status).toBe(200);
 
     // New series returned, linked to parent
     expect(res.body.id).not.toBe(eventId);
@@ -360,7 +363,7 @@ describe("CalendarEventsController (integration)", () => {
       .from(calendarEvents)
       .where(eq(calendarEvents.id, res.body.eventId));
 
-    expect(newEventRows[0].start).toEqual(new Date("2026-04-15T10:00:00Z"));
+    expect(newEventRows[0].start).toEqual(new Date("2026-04-15T11:00:00Z"));
   });
 
   it("PUT /events/:id/split/:start at recurrence start updates in-place", async () => {
@@ -378,10 +381,16 @@ describe("CalendarEventsController (integration)", () => {
       })
       .expect(201);
 
+    const newTime = "2026-04-10T11:00:00+00:00";
+
     // Split at the same date as recurrence start — should update, not create new
     const res = await request(app.getHttpServer())
       .put(`/calendar-events/${eventId}/split/${RECURRING_START}`)
-      .send({ title: "Renamed Standup" })
+      .send({
+        start: newTime,
+        title: "Renamed Standup",
+        timezone: TIMEZONE,
+      })
       .expect(200);
 
     // Same event returned (no new event created)

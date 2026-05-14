@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Post } from "@nestjs/common";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { UuidV7Param } from "@/api/common/decorators/id.decorators";
+import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { CreateInviteRequestDto } from "@/api/networks/rest/dto/create-invite.dto";
 import { toInviteResponseDto } from "@/api/networks/rest/networks.mapper";
 import { InviteResponseDto } from "@/api/networks/rest/responses/invite.response";
@@ -22,9 +22,7 @@ export class InvitesController {
   }
 
   @Get("sent")
-  async listSent(
-    @AuthUser() user: AuthUserType,
-  ): Promise<InviteResponseDto[]> {
+  async listSent(@AuthUser() user: AuthUserType): Promise<InviteResponseDto[]> {
     const invites = await this.networksService.listSent(user.id);
     return invites.map(toInviteResponseDto);
   }

@@ -178,16 +178,21 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() body: { messageId?: string; tagIds?: string[] },
   ): Promise<Ack> {
     const identity = socket.data.identity as WsIdentity | undefined;
+
     if (!identity) {
       return { ok: false, error: "unauthorized" };
     }
+
     if (identity.kind !== "user") {
       return { ok: false, error: "forbidden" };
     }
+
     if (!body?.messageId) {
       return { ok: false, error: "messageId required" };
     }
+
     const tagIds = body?.tagIds ?? [];
+
     if (
       !Array.isArray(tagIds) ||
       !tagIds.every((id) => typeof id === "string")
