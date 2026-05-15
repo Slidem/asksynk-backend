@@ -1,4 +1,11 @@
-import { Controller, Delete, Get, HttpCode, Param, Query } from "@nestjs/common";
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Query,
+} from "@nestjs/common";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
