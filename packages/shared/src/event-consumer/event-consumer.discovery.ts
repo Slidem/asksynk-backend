@@ -6,10 +6,7 @@ import type { EventDef } from "../event-registry/events.types";
 import { DeliveryMode } from "../event-registry/events.types";
 import { DurableConsumerRuntime } from "./durable-consumer-runtime.service";
 import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
-import {
-  EventHandlerFn,
-  EventHandlerMeta,
-} from "./event-consumer.types";
+import { EventHandlerFn, EventHandlerMeta } from "./event-consumer.types";
 import { RealtimeListenerService } from "./realtime-listener.service";
 
 interface DiscoveredHandler {
@@ -41,12 +38,16 @@ export class EventConsumerDiscovery implements OnApplicationBootstrap {
       const id = `${h.className}.${h.meta.propertyKey}`;
 
       if (
-        (delivery === DeliveryMode.Realtime || delivery === DeliveryMode.Dual) &&
+        (delivery === DeliveryMode.Realtime ||
+          delivery === DeliveryMode.Dual) &&
         options?.group === undefined
       ) {
         this.realtime.subscribe(event, h.handler);
         realtimeCount += 1;
-        this.logger.info("bound realtime handler", { event: event.name, handler: id });
+        this.logger.info("bound realtime handler", {
+          event: event.name,
+          handler: id,
+        });
         continue;
       }
 
@@ -54,7 +55,12 @@ export class EventConsumerDiscovery implements OnApplicationBootstrap {
         (delivery === DeliveryMode.Durable || delivery === DeliveryMode.Dual) &&
         options?.group !== undefined
       ) {
-        await this.durable.bind(event, options.group, h.handler, options.concurrency);
+        await this.durable.bind(
+          event,
+          options.group,
+          h.handler,
+          options.concurrency,
+        );
         durableCount += 1;
         continue;
       }

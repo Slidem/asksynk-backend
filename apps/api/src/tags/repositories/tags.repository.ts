@@ -7,6 +7,7 @@ import { UUID } from "uuidv7";
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import { Tag } from "@/api/tags/entities/tag.entity";
 import { AnswerModeType } from "@/api/tags/models/tag.model";
+import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
 import { tags } from "@/migrations/schema/tags";
 
 type TagRow = typeof tags.$inferSelect;
@@ -55,15 +56,23 @@ export class TagRepository {
     return this.mapDbRowToTag(updated);
   }
 
-  async delete(tagId: string): Promise<Tag> {
+  async delete(tagId: string): Promise<{ tag: Tag; affectedAttentionItemIds: string[] }> {
     this.logger.info("Deleting tag", { tagId });
+
+    const affected = await this.txHost.tx
+      .select({ attentionItemId: attentionItemTags.attentionItemId })
+      .from(attentionItemTags)
+      .where(eq(attentionItemTags.tagId, tagId));
 
     const [deleted] = await this.txHost.tx
       .delete(tags)
       .where(eq(tags.id, tagId))
       .returning();
 
-    return this.mapDbRowToTag(deleted);
+    return {
+      tag: this.mapDbRowToTag(deleted),
+      affectedAttentionItemIds: affected.map((r) => r.attentionItemId),
+    };
   }
 
   async getById(id: string): Promise<Tag | null> {

@@ -5,8 +5,10 @@ import { CalendarEventsRepository } from "@/api/calendar-events/repositories/cal
 import { CalendarEventsController } from "@/api/calendar-events/rest/calendar-events.controller";
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
+import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher.module";
 
 @Module({
+  imports: [EventsPublisherModule],
   providers: [
     CalendarRepository,
     CalendarEventsRepository,

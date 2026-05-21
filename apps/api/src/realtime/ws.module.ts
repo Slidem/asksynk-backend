@@ -20,10 +20,7 @@ import { WsGateway } from "./ws.gateway";
     }),
     MessagingModule,
   ],
-  providers: [
-    WsAuthService,
-    WsGateway,
-  ],
+  providers: [WsAuthService, WsGateway],
   exports: [],
 })
 export class RealtimeModule {}

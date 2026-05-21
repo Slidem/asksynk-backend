@@ -20,9 +20,22 @@ export const TagUpdated = defineEvent({
     id: z.string(),
     name: z.string(),
     userId: z.string(),
+    answerModeType: z.enum(["immediately", "timeblock"]),
+  }),
+  delivery: DeliveryMode.Dual,
+  groups: ["email", "attention-items"],
+});
+
+export const TagDeleted = defineEvent({
+  name: "tag.deleted",
+  schema: z.object({
+    tagId: z.string(),
+    userId: z.string(),
+    answerModeType: z.enum(["immediately", "timeblock"]),
+    affectedAttentionItemIds: z.array(z.string()),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["email"],
+  groups: ["attention-items"],
 });
 
 export const MessageCreated = defineEvent({
@@ -42,7 +55,8 @@ export const MessageCreated = defineEvent({
     participantUserIds: z.array(z.string()),
     participantGuestIds: z.array(z.string()),
   }),
-  delivery: DeliveryMode.Realtime,
+  delivery: DeliveryMode.Dual,
+  groups: ["attention-items"],
 });
 
 export const MessageUpdated = defineEvent({
@@ -58,6 +72,46 @@ export const MessageUpdated = defineEvent({
       tagIds: z.array(z.string()),
       createdAt: z.string(),
     }),
+    participantUserIds: z.array(z.string()),
+    participantGuestIds: z.array(z.string()),
   }),
-  delivery: DeliveryMode.Realtime,
+  delivery: DeliveryMode.Dual,
+  groups: ["attention-items"],
+});
+
+export const CalendarEventCreated = defineEvent({
+  name: "calendar.event.created",
+  schema: z.object({
+    eventId: z.string(),
+    userId: z.string(),
+    tagIds: z.array(z.string()),
+    startAt: z.string(),
+    endAt: z.string(),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const CalendarEventUpdated = defineEvent({
+  name: "calendar.event.updated",
+  schema: z.object({
+    eventId: z.string(),
+    userId: z.string(),
+    tagIds: z.array(z.string()),
+    startAt: z.string(),
+    endAt: z.string(),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const CalendarEventDeleted = defineEvent({
+  name: "calendar.event.deleted",
+  schema: z.object({
+    eventId: z.string(),
+    userId: z.string(),
+    tagIds: z.array(z.string()),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
 });

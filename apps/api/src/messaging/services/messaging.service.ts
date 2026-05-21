@@ -307,7 +307,7 @@ export class MessagingService {
       throw AsksynkError.notFound("Message not found");
     }
 
-    await this.notifyMessageUpdated(updated);
+    await this.notifyMessageUpdated(updated, participants);
 
     return updated;
   }
@@ -376,11 +376,22 @@ export class MessagingService {
     await this.eventsPublisher.publish(MessageCreated, payload);
   }
 
-  private async notifyMessageUpdated(message: Message): Promise<void> {
+  private async notifyMessageUpdated(
+    message: Message,
+    participants: ThreadParticipantRow[],
+  ): Promise<void> {
     const senderId =
       message.sender.kind === "user"
         ? message.sender.userId
         : message.sender.guestId;
+
+    const participantUserIds = participants
+      .map((p) => p.userId)
+      .filter((id): id is string => !!id);
+
+    const participantGuestIds = participants
+      .map((p) => p.guestId)
+      .filter((id): id is string => !!id);
 
     const payload: EventOf<typeof MessageUpdated> = {
       threadId: message.threadId,
@@ -393,6 +404,8 @@ export class MessagingService {
         tagIds: message.tagIds,
         createdAt: message.createdAt.toISOString(),
       },
+      participantUserIds,
+      participantGuestIds,
     };
 
     await this.eventsPublisher.publish(MessageUpdated, payload);

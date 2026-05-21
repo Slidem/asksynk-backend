@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER } from "@nestjs/core";
 
+import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
 import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
@@ -24,6 +25,7 @@ import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
     DbModule,
     MessageBusModule,
     TxModule,
+    AttentionItemsModule,
     TagsModule,
     CalendarEventsModule,
     NetworksModule,

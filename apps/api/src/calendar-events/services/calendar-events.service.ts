@@ -19,6 +19,12 @@ import {
 } from "@/api/calendar-events/utils/recurrence.utils";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
+import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
+import {
+  CalendarEventCreated,
+  CalendarEventDeleted,
+  CalendarEventUpdated,
+} from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
 
 function mergeNullable<T>(
@@ -34,6 +40,7 @@ export class CalendarEventsService {
     private readonly calendarEventsRepository: CalendarEventsRepository,
     private readonly calendarRepository: CalendarRepository,
     private readonly tagRepository: TagRepository,
+    private readonly eventsPublisher: EventsPublisher,
   ) {}
 
   @Transactional()
@@ -81,7 +88,18 @@ export class CalendarEventsService {
       updatedAt: new Date(),
     });
 
-    return this.calendarEventsRepository.add(event);
+    const created = await this.calendarEventsRepository.add(event);
+    const endAt = new Date(
+      created.start.getTime() + created.durationSeconds * 1000,
+    );
+    await this.eventsPublisher.publish(CalendarEventCreated, {
+      eventId: created.id,
+      userId,
+      tagIds: created.tagIds,
+      startAt: created.start.toISOString(),
+      endAt: endAt.toISOString(),
+    });
+    return created;
   }
 
   @Transactional()
@@ -152,13 +170,20 @@ export class CalendarEventsService {
       event.tagIds = input.tagIds;
     }
 
-    return this.calendarEventsRepository.update(event);
+    const updated = await this.calendarEventsRepository.update(event);
+    await this.emitUpdated(userId, updated);
+    return updated;
   }
 
   @Transactional()
   async deleteCalendarEvent(userId: string, eventId: string): Promise<void> {
-    await this.getCalendarEvent(userId, eventId);
+    const event = await this.getCalendarEvent(userId, eventId);
     await this.calendarEventsRepository.delete(eventId);
+    await this.eventsPublisher.publish(CalendarEventDeleted, {
+      eventId: event.id,
+      userId,
+      tagIds: event.tagIds,
+    });
   }
 
   @Transactional()
@@ -176,6 +201,7 @@ export class CalendarEventsService {
       event.timezone,
     );
     await this.calendarEventsRepository.addException(eventId, occStart);
+    await this.emitUpdated(userId, event);
   }
 
   @Transactional()
@@ -219,11 +245,14 @@ export class CalendarEventsService {
       updatedAt: new Date(),
     });
 
-    return this.calendarEventsRepository.detachInstance(
+    const detached = await this.calendarEventsRepository.detachInstance(
       eventId,
       occStart,
       newEvent,
     );
+    await this.emitUpdated(userId, event);
+    await this.emitUpdated(userId, detached);
+    return detached;
   }
 
   @Transactional()
@@ -267,7 +296,9 @@ export class CalendarEventsService {
         event.tagIds = input.tagIds;
       }
 
-      return this.calendarEventsRepository.update(event);
+      const inPlaceUpdated = await this.calendarEventsRepository.update(event);
+      await this.emitUpdated(userId, inPlaceUpdated);
+      return inPlaceUpdated;
     }
 
     // UNTIL = splitDate - 1 day + 1 second (just after previous occurrence)
@@ -305,11 +336,27 @@ export class CalendarEventsService {
       updatedAt: new Date(),
     });
 
-    return this.calendarEventsRepository.splitSeries(
+    const splitResult = await this.calendarEventsRepository.splitSeries(
       eventId,
       truncatedRrule,
       newEvent,
     );
+    await this.emitUpdated(userId, event);
+    await this.emitUpdated(userId, splitResult);
+    return splitResult;
+  }
+
+  private async emitUpdated(userId: string, event: CalendarEvent): Promise<void> {
+    const endAt = new Date(
+      event.start.getTime() + event.durationSeconds * 1000,
+    );
+    await this.eventsPublisher.publish(CalendarEventUpdated, {
+      eventId: event.id,
+      userId,
+      tagIds: event.tagIds,
+      startAt: event.start.toISOString(),
+      endAt: endAt.toISOString(),
+    });
   }
 
   private async validateTagIds(

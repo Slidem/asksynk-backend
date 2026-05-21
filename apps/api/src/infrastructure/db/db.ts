@@ -2,6 +2,8 @@ import { ConfigService } from "@nestjs/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { attentionItems } from "@/migrations/schema/attentionItems";
+import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";
@@ -32,6 +34,8 @@ export const getDbInstance = (config: ConfigService) => {
 
   return drizzle(pool, {
     schema: {
+      attentionItems,
+      attentionItemTags,
       tags,
       users,
       calendars,

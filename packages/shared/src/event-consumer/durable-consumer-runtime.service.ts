@@ -3,10 +3,7 @@ import { ContextLogger } from "nestjs-context-logger";
 
 import type { EventDef, EventOf } from "../event-registry/events.types";
 import { MessageBusService } from "../message-bus/message-bus.service";
-import {
-  EventHandlerContext,
-  EventHandlerFn,
-} from "./event-consumer.types";
+import { EventHandlerContext, EventHandlerFn } from "./event-consumer.types";
 
 interface DurableJobData {
   eventId: string;
@@ -35,7 +32,18 @@ export class DurableConsumerRuntime {
           eventId: data.eventId,
           attempt: (job.retryCount ?? 0) + 1,
         };
-        await handler(validated, ctx);
+        try {
+          await handler(validated, ctx);
+        } catch (error) {
+          this.logger.error("Error processing durable event", {
+            event: event.name,
+            eventId: data.eventId,
+            group,
+            attempt: ctx.attempt,
+            error: error instanceof Error ? error.stack : String(error),
+          });
+          throw error;
+        }
       },
       { localConcurrency: concurrency },
     );

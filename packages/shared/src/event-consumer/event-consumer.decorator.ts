@@ -47,13 +47,7 @@ function validate<T extends EventDef>(
     return;
   }
 
-  if (!group) {
-    throw new Error(
-      `Event "${event.name}" is ${event.delivery}; @EventHandler requires a "group".`,
-    );
-  }
-
-  if (!event.groups.includes(group)) {
+  if (group && !event.groups.includes(group)) {
     throw new Error(
       `Group "${group}" is not declared on event "${event.name}". ` +
         `Declared groups: ${event.groups.join(", ") || "(none)"}.`,

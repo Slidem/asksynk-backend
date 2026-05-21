@@ -30,7 +30,8 @@ const dbFactory = (config: ConfigService) => {
     EmailModule,
     EventConsumerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService): EventsConsumerDb => dbFactory(config),
+      useFactory: (config: ConfigService): EventsConsumerDb =>
+        dbFactory(config),
     }),
     MessageBusModule,
     EventsDispatcherModule.forRootAsync({

@@ -211,7 +211,8 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
           }
           succeededIds.push(row.id);
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           this.logger.error("dispatcher row build failed", {
             eventId: row.id,
             error,

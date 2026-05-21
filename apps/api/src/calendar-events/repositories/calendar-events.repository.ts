@@ -121,7 +121,10 @@ export class CalendarEventsRepository {
     const tagFilterFragment = tagIds?.length
       ? sql`AND EXISTS (
             SELECT 1 FROM calendar_event_tags et2
-            WHERE et2.event_id = c.id AND et2.tag_id = ANY(${tagIds}::uuid[])
+            WHERE et2.event_id = c.id AND et2.tag_id IN (${sql.join(
+              tagIds.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )})
           )`
       : sql``;
 
