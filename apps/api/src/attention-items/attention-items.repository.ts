@@ -222,9 +222,7 @@ export class AttentionItemsRepository {
     return this.groupRowsToItems(rows);
   }
 
-  async findBySourceCalendarEventId(
-    eventId: string,
-  ): Promise<AttentionItem[]> {
+  async findBySourceCalendarEventId(eventId: string): Promise<AttentionItem[]> {
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
