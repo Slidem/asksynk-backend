@@ -15,7 +15,6 @@
   "jest.rootPath": "apps/api",
   "jest.shell": { "path": "/bin/zsh", "args": ["-i"] },
   "jest.runMode": "on-demand",
-  "jest.testPathPattern": ".*\\.integration\\.test\\.ts$",
   "cSpell.words": [
     "Asksynk",
     "docorators",

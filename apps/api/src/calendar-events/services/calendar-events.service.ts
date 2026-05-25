@@ -182,7 +182,6 @@ export class CalendarEventsService {
     await this.eventsPublisher.publish(CalendarEventDeleted, {
       eventId: event.id,
       userId,
-      tagIds: event.tagIds,
     });
   }
 
@@ -346,7 +345,10 @@ export class CalendarEventsService {
     return splitResult;
   }
 
-  private async emitUpdated(userId: string, event: CalendarEvent): Promise<void> {
+  private async emitUpdated(
+    userId: string,
+    event: CalendarEvent,
+  ): Promise<void> {
     const endAt = new Date(
       event.start.getTime() + event.durationSeconds * 1000,
     );

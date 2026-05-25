@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
+import _ from "node_modules/@types/lodash";
 
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
@@ -33,16 +34,17 @@ export class AttentionItemsEventHandler {
   async onMessageCreated(
     payload: EventOf<typeof MessageCreated>,
   ): Promise<void> {
+    if (_.isEmpty(payload.message.tagIds)) {
+      return;
+    }
+
     this.logger.info(
-      `Handling MessageCreated event for message ${payload.message.id} with tags [${payload.message.tagIds.join(
+      `Handling MessageCreated event for message ${payload.message.id} with tags [${payload.message.tagIds!.join(
         ", ",
       )}]`,
     );
-    const { message, participantUserIds } = payload;
 
-    if (message.tagIds.length === 0) {
-      return;
-    }
+    const { message, participantUserIds } = payload;
 
     await this.createAttentionItemsForMessage(message, participantUserIds);
   }
@@ -52,12 +54,17 @@ export class AttentionItemsEventHandler {
   async onMessageUpdated(
     payload: EventOf<typeof MessageUpdated>,
   ): Promise<void> {
+    const { message, participantUserIds } = payload;
+
+    if (message.tagIds === undefined) {
+      return;
+    }
+
     this.logger.info(
-      `Handling MessageUpdated event for message ${payload.message.id} with tags [${payload.message.tagIds.join(
+      `Handling MessageUpdated event for message ${message.id} with tags [${message.tagIds.join(
         ", ",
       )}]`,
     );
-    const { message, participantUserIds } = payload;
 
     const existing = await this.attentionItemsRepository.findByMessageId(
       message.id,
@@ -91,9 +98,11 @@ export class AttentionItemsEventHandler {
   async onCalendarEventCreated(
     payload: EventOf<typeof CalendarEventCreated>,
   ): Promise<void> {
-    if (payload.tagIds.length === 0) return;
+    if (_.isEmpty(payload.tagIds)) {
+      return;
+    }
     const items = await this.attentionItemsRepository.findByTagIds(
-      payload.tagIds,
+      payload.tagIds!,
     );
     await this.recomputeDueDatesForItems(this.activeItems(items));
   }
@@ -105,8 +114,9 @@ export class AttentionItemsEventHandler {
   ): Promise<void> {
     const items = await this.collectItemsBySourceOrTags(
       payload.eventId,
-      payload.tagIds,
+      payload.tagIds || [],
     );
+
     await this.recomputeDueDatesForItems(items);
   }
 
@@ -139,11 +149,9 @@ export class AttentionItemsEventHandler {
   @EventHandler(TagDeleted, { group: "attention-items" })
   @Transactional()
   async onTagDeleted(payload: EventOf<typeof TagDeleted>): Promise<void> {
-    if (payload.affectedAttentionItemIds.length === 0) return;
-
-    const items = await this.attentionItemsRepository.findByIds(
-      payload.affectedAttentionItemIds,
-    );
+    const items = await this.attentionItemsRepository.findByTagIds([
+      payload.tagId,
+    ]);
 
     await this.recomputeDueDatesForItems(items);
   }
@@ -155,18 +163,25 @@ export class AttentionItemsEventHandler {
       senderKind: "user" | "guest";
       senderId: string;
       body: string;
-      tagIds: string[];
+      tagIds?: string[];
       createdAt: string;
     },
     participantUserIds: string[],
   ): Promise<void> {
+    if (_.isEmpty(message.tagIds)) {
+      return;
+    }
+
     const recipientUserIds = participantUserIds.filter(
       (id) => !(message.senderKind === "user" && id === message.senderId),
     );
 
-    if (recipientUserIds.length === 0) return;
+    if (recipientUserIds.length === 0) {
+      return;
+    }
 
-    const tags = await this.tagRepository.getByIds(message.tagIds);
+    const tagIds = message.tagIds!;
+    const tags = await this.tagRepository.getByIds(tagIds);
     const sentAt = new Date(message.createdAt);
 
     const metadata: TaggedMessageMetadata = {
@@ -176,7 +191,7 @@ export class AttentionItemsEventHandler {
       senderId: message.senderId,
       senderType: message.senderKind,
       content: message.body,
-      originalTagIds: message.tagIds,
+      originalTagIds: tagIds,
     };
 
     for (const userId of recipientUserIds) {
@@ -185,7 +200,7 @@ export class AttentionItemsEventHandler {
       );
       const { dueDate, sourceCalendarEventId } = await this.computeDueDate(
         tags,
-        message.tagIds,
+        tagIds,
         sentAt,
       );
 
@@ -195,7 +210,7 @@ export class AttentionItemsEventHandler {
         type: "tagged_message",
         dueDate,
         metadata,
-        tagIds: message.tagIds,
+        tagIds,
         sourceCalendarEventId,
       });
     }
@@ -217,9 +232,11 @@ export class AttentionItemsEventHandler {
     ]);
 
     const merged = new Map<string, AttentionItem>();
+
     for (const item of [...bySource, ...byTags]) {
       merged.set(item.id, item);
     }
+
     return this.activeItems([...merged.values()]);
   }
 

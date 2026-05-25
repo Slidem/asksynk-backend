@@ -7,12 +7,12 @@
     "rootDir": "../..",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "baseUrl": ".",
     "paths": {
-      "@/api/*": ["src/*"],
+      "*": ["./*"],
+      "@/api/*": ["./src/*"],
       "@/migrations/*": ["../migrations/src/*"],
       "@/shared/*": ["../../packages/shared/src/*"],
-      "@/test/*": ["test/*"]
+      "@/test/*": ["./test/*"]
     }
   },
   "include": [
