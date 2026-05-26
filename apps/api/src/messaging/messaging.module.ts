@@ -10,7 +10,12 @@ import { TagsModule } from "@/api/tags/tags.module";
 import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher.module";
 
 @Module({
-  imports: [NetworksModule, PublicViewsModule, EventsPublisherModule, TagsModule],
+  imports: [
+    NetworksModule,
+    PublicViewsModule,
+    EventsPublisherModule,
+    TagsModule,
+  ],
   providers: [MessagingRepository, MessagingService],
   controllers: [ThreadsController, GuestMessagingController],
   exports: [MessagingService, MessagingRepository],

@@ -11,7 +11,7 @@ import { ListTagsInput } from "@/api/tags/models/list-tags.model";
 import { UpdateTagInput } from "@/api/tags/models/update-tag.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
-import { TagDeleted, TagUpdated } from "@/shared/event-registry/events.registry";
+import { TagDeleted } from "@/shared/event-registry/events.registry";
 
 @Injectable()
 export class TagsService {
@@ -81,13 +81,13 @@ export class TagsService {
     if (!existing || !existing.belongsTo(userId)) {
       throw AsksynkError.notFound("Tag not found");
     }
-    const { tag, affectedAttentionItemIds } = await this.tagsRepository.delete(tagId);
+    const tag = await this.tagsRepository.delete(tagId);
+
     await this.eventsPublisher.publish(TagDeleted, {
       tagId,
       userId,
-      answerModeType: tag.answerMode.type,
-      affectedAttentionItemIds,
     });
+
     return tag;
   }
 

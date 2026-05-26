@@ -16,14 +16,14 @@ import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
 import { RealtimeModule } from "@/api/realtime/ws.module";
 import { TagsModule } from "@/api/tags/tags.module";
-import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
+
+import { EventsModule } from "./events/events.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     LoggerConfigModule,
     DbModule,
-    MessageBusModule,
     TxModule,
     AttentionItemsModule,
     TagsModule,
@@ -33,6 +33,7 @@ import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
     MessagingModule,
     RealtimeModule,
     AuthGuardModule,
+    EventsModule,
   ],
   controllers: [HealthController, AuthController],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

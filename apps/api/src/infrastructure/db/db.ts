@@ -30,8 +30,6 @@ export const getDbInstance = (config: ConfigService) => {
     max: config.get<number>("DB_POOL_MAX") ?? 10,
   });
 
-  const isDev = config.get<string>("ENVIRONMENT") === "dev";
-
   return drizzle(pool, {
     schema: {
       attentionItems,
@@ -51,6 +49,6 @@ export const getDbInstance = (config: ConfigService) => {
       messages,
       eventsOutbox,
     },
-    logger: isDev,
+    // logger: config.get<string>("ENVIRONMENT") === "dev",
   });
 };

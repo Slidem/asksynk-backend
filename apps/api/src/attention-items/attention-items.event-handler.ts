@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
-import _ from "node_modules/@types/lodash";
 
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";

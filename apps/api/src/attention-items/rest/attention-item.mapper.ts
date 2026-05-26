@@ -1,7 +1,9 @@
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
 
-export function toAttentionItemResponse(item: AttentionItem): AttentionItemResponse {
+export function toAttentionItemResponse(
+  item: AttentionItem,
+): AttentionItemResponse {
   return {
     id: item.id,
     userId: item.userId,

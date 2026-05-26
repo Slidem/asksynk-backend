@@ -8,10 +8,7 @@ import { Client } from "pg";
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
 import type { EventDef } from "../event-registry/events.types";
-import {
-  EventHandlerContext,
-  EventHandlerFn,
-} from "./event-consumer.types";
+import { EventHandlerContext, EventHandlerFn } from "./event-consumer.types";
 
 const RECONNECT_BASE_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 15_000;
@@ -43,10 +40,7 @@ export class RealtimeListenerService implements OnModuleDestroy {
     @Inject(EVENTS_CONSUMER_DB) private readonly db: EventsConsumerDb,
   ) {}
 
-  subscribe<T extends EventDef>(
-    event: T,
-    handler: EventHandlerFn<T>,
-  ): void {
+  subscribe<T extends EventDef>(event: T, handler: EventHandlerFn<T>): void {
     if (this.started) {
       throw new Error(
         "RealtimeListenerService.subscribe called after start(). " +
@@ -158,9 +152,7 @@ export class RealtimeListenerService implements OnModuleDestroy {
     const [row] = await this.db
       .select({ payload: eventsOutbox.payload })
       .from(eventsOutbox)
-      .where(
-        and(eq(eventsOutbox.id, eventId), isNull(eventsOutbox.failedAt)),
-      )
+      .where(and(eq(eventsOutbox.id, eventId), isNull(eventsOutbox.failedAt)))
       .limit(1);
 
     if (!row) {
