@@ -13,6 +13,7 @@ export function toAttentionItemResponse(
     note: item.note,
     metadata: item.metadata,
     tagIds: item.tagIds,
+    sourceCalendarEventId: item.sourceCalendarEventId,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };

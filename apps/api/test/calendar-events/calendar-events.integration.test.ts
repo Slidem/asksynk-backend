@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
+import { AuthUser } from "@/api/auth/auth.types";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import {
   DB_CLIENT_PROVIDER,
@@ -20,7 +21,10 @@ import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExcep
 import { users } from "@/migrations/schema/users";
 import { generateId } from "@/shared/id";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
-import { TEST_USER } from "@/test/helpers/testUser";
+import {
+  makeTestUser,
+  testUserRegistry,
+} from "@/test/helpers/testUserRegistry";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env.test") });
 
@@ -32,8 +36,12 @@ const TIMEZONE = "UTC";
 describe("CalendarEventsController (integration)", () => {
   let app: INestApplication;
   let db: ReturnType<typeof import("drizzle-orm/node-postgres").drizzle>;
+  let user: AuthUser;
 
   beforeAll(async () => {
+    user = makeTestUser();
+    testUserRegistry.register(user, { default: true });
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -56,17 +64,17 @@ describe("CalendarEventsController (integration)", () => {
     await db
       .insert(users)
       .values({
-        id: TEST_USER.id,
-        email: TEST_USER.email,
-        name: TEST_USER.name,
+        id: user.id,
+        email: user.email,
+        name: user.name,
         emailVerified: true,
       })
       .onConflictDoNothing();
   });
 
   afterAll(async () => {
-    await db.delete(users).where(eq(users.id, TEST_USER.id));
-    await db.delete(calendarEvents).execute();
+    await db.delete(users).where(eq(users.id, user.id));
+    testUserRegistry.clear();
     await app.close();
   });
 

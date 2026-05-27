@@ -13,6 +13,7 @@ export interface AttentionItemResponse {
   note: string | null;
   metadata: AttentionItemMetadata;
   tagIds: string[];
+  sourceCalendarEventId: string | null;
   createdAt: string;
   updatedAt: string;
 }

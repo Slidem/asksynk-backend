@@ -11,7 +11,10 @@ import { ListTagsInput } from "@/api/tags/models/list-tags.model";
 import { UpdateTagInput } from "@/api/tags/models/update-tag.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
-import { TagDeleted } from "@/shared/event-registry/events.registry";
+import {
+  TagDeleted,
+  TagUpdated,
+} from "@/shared/event-registry/events.registry";
 
 @Injectable()
 export class TagsService {
@@ -72,7 +75,16 @@ export class TagsService {
       (v) => v !== undefined,
     );
     Object.assign(existing, updates);
-    return this.tagsRepository.update(existing);
+    const updated = await this.tagsRepository.update(existing);
+
+    await this.eventsPublisher.publish(TagUpdated, {
+      id: updated.id.toString(),
+      name: updated.name,
+      userId: updated.userId,
+      answerModeType: updated.answerMode.type,
+    });
+
+    return updated;
   }
 
   @Transactional()
