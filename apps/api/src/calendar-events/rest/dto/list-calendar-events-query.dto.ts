@@ -11,6 +11,10 @@ export class ListCalendarEventsQueryDto {
   @IsIsoDateWithOffset()
   start!: string;
 
+  /** User ID of the calendar to view (connection or self); defaults to caller */
+  @IsOptional()
+  userId?: string;
+
   /** ISO 8601 with offset window end: "2026-03-16T00:00:00+02:00" */
   @IsIsoDateWithOffset()
   end!: string;

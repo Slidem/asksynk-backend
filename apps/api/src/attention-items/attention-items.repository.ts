@@ -14,6 +14,7 @@ import {
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
+import { tags } from "@/migrations/schema/tags";
 
 type AttentionItemRow = typeof attentionItems.$inferSelect;
 
@@ -57,13 +58,14 @@ export class AttentionItemsRepository {
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
-        tagId: attentionItemTags.tagId,
+        tagId: tags.id,
       })
       .from(attentionItems)
       .leftJoin(
         attentionItemTags,
         eq(attentionItemTags.attentionItemId, attentionItems.id),
       )
+      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
       .where(eq(attentionItems.id, id));
 
     if (rows.length === 0) return null;
@@ -95,13 +97,14 @@ export class AttentionItemsRepository {
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
-        tagId: attentionItemTags.tagId,
+        tagId: tags.id,
       })
       .from(attentionItems)
       .leftJoin(
         attentionItemTags,
         eq(attentionItemTags.attentionItemId, attentionItems.id),
       )
+      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
       .where(and(...filters))
       .orderBy(sql`${attentionItems.createdAt} DESC`)
       .limit(input.limit ?? 50);
@@ -146,6 +149,12 @@ export class AttentionItemsRepository {
       .where(eq(attentionItems.id, id));
   }
 
+  async deleteTagAssociations(tagId: string): Promise<void> {
+    await this.txHost.tx
+      .delete(attentionItemTags)
+      .where(eq(attentionItemTags.tagId, tagId));
+  }
+
   async updateDueDate(
     id: string,
     dueDate: Date | null,
@@ -175,27 +184,35 @@ export class AttentionItemsRepository {
   async findByTagIds(tagIds: string[]): Promise<AttentionItem[]> {
     if (tagIds.length === 0) return [];
 
+    // Step 1: find matching item ids via attentionItemTags directly.
+    // No join with `tags` here on purpose — we want to match even via ghost
+    // junction rows (rows pointing to a tag that was just deleted), so
+    // onTagDeleted can still locate its affected items.
+    const matching = await this.txHost.tx
+      .selectDistinct({ id: attentionItemTags.attentionItemId })
+      .from(attentionItemTags)
+      .where(inArray(attentionItemTags.tagId, tagIds));
+
+    // Step 2: load each item with its FULL (ghost-filtered) tag list.
+    return this.findByIds(matching.map((r) => r.id));
+  }
+
+  private async findByIds(ids: string[]): Promise<AttentionItem[]> {
+    if (ids.length === 0) return [];
+
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
-        tagId: attentionItemTags.tagId,
+        tagId: tags.id,
       })
       .from(attentionItems)
       .leftJoin(
         attentionItemTags,
         eq(attentionItemTags.attentionItemId, attentionItems.id),
       )
+      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
       .where(
-        and(
-          isNull(attentionItems.deletedAt),
-          inArray(
-            attentionItems.id,
-            this.txHost.tx
-              .select({ id: attentionItemTags.attentionItemId })
-              .from(attentionItemTags)
-              .where(inArray(attentionItemTags.tagId, tagIds)),
-          ),
-        ),
+        and(isNull(attentionItems.deletedAt), inArray(attentionItems.id, ids)),
       );
 
     return this.groupRowsToItems(rows);
@@ -205,13 +222,14 @@ export class AttentionItemsRepository {
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
-        tagId: attentionItemTags.tagId,
+        tagId: tags.id,
       })
       .from(attentionItems)
       .leftJoin(
         attentionItemTags,
         eq(attentionItemTags.attentionItemId, attentionItems.id),
       )
+      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
       .where(
         and(
           isNull(attentionItems.deletedAt),
@@ -226,38 +244,19 @@ export class AttentionItemsRepository {
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
-        tagId: attentionItemTags.tagId,
+        tagId: tags.id,
       })
       .from(attentionItems)
       .leftJoin(
         attentionItemTags,
         eq(attentionItemTags.attentionItemId, attentionItems.id),
       )
+      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
       .where(
         and(
           isNull(attentionItems.deletedAt),
           eq(attentionItems.sourceCalendarEventId, eventId),
         ),
-      );
-
-    return this.groupRowsToItems(rows);
-  }
-
-  async findByIds(ids: string[]): Promise<AttentionItem[]> {
-    if (ids.length === 0) return [];
-
-    const rows = await this.txHost.tx
-      .select({
-        item: attentionItems,
-        tagId: attentionItemTags.tagId,
-      })
-      .from(attentionItems)
-      .leftJoin(
-        attentionItemTags,
-        eq(attentionItemTags.attentionItemId, attentionItems.id),
-      )
-      .where(
-        and(isNull(attentionItems.deletedAt), inArray(attentionItems.id, ids)),
       );
 
     return this.groupRowsToItems(rows);

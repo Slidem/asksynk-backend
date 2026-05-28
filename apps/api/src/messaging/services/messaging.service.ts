@@ -47,31 +47,17 @@ export class MessagingService {
     threadId: string,
     options: { before?: Date; limit?: number },
   ): Promise<ThreadMessageListItem[]> {
-    const isParticipant = await this.messagingRepository.isUserParticipant(
-      threadId,
-      userId,
-    );
-    if (!isParticipant) throw AsksynkError.notFound("Thread not found");
-    return this.messagingRepository.listMessages(threadId, {
-      before: options.before,
-      limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
-    });
+    await this.assertUserParticipant(threadId, userId);
+    return this.messagingRepository.listMessages(threadId, this.paged(options));
   }
 
   async listGuestThreadMessages(
     guest: AuthGuest,
     options: { before?: Date; limit?: number },
   ): Promise<ThreadMessageListItem[]> {
-    const thread = await this.messagingRepository.findGuestThread(guest.id);
-
-    if (!thread) {
-      return [];
-    }
-
-    return this.messagingRepository.listMessages(thread.id, {
-      before: options.before,
-      limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
-    });
+    const threadId = await this.resolveGuestThreadId(guest.id);
+    if (!threadId) return [];
+    return this.messagingRepository.listMessages(threadId, this.paged(options));
   }
 
   async listThreadMessageReplies(
@@ -80,21 +66,9 @@ export class MessagingService {
     messageId: string,
     options: { before?: Date; limit?: number },
   ): Promise<Message[]> {
-    const isParticipant = await this.messagingRepository.isUserParticipant(
-      threadId,
-      userId,
-    );
-    if (!isParticipant) throw AsksynkError.notFound("Thread not found");
-
-    const parent = await this.messagingRepository.getMessageById(messageId);
-    if (!parent || parent.threadId !== threadId) {
-      throw AsksynkError.notFound("Message not found");
-    }
-
-    return this.messagingRepository.listReplies(messageId, {
-      before: options.before,
-      limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
-    });
+    await this.assertUserParticipant(threadId, userId);
+    await this.assertReplyParent(threadId, messageId);
+    return this.messagingRepository.listReplies(messageId, this.paged(options));
   }
 
   async listGuestMessageReplies(
@@ -102,20 +76,45 @@ export class MessagingService {
     messageId: string,
     options: { before?: Date; limit?: number },
   ): Promise<Message[]> {
-    const thread = await this.messagingRepository.findGuestThread(guest.id);
-    if (!thread) {
-      throw AsksynkError.notFound("Message not found");
-    }
+    const threadId = await this.resolveGuestThreadId(guest.id);
+    if (!threadId) throw AsksynkError.notFound("Message not found");
+    await this.assertReplyParent(threadId, messageId);
+    return this.messagingRepository.listReplies(messageId, this.paged(options));
+  }
 
-    const parent = await this.messagingRepository.getMessageById(messageId);
-    if (!parent || parent.threadId !== thread.id) {
-      throw AsksynkError.notFound("Message not found");
-    }
-
-    return this.messagingRepository.listReplies(messageId, {
+  private paged(options: { before?: Date; limit?: number }) {
+    return {
       before: options.before,
       limit: Math.min(options.limit ?? 50, MAX_MESSAGE_LIMIT),
-    });
+    };
+  }
+
+  private async assertUserParticipant(
+    threadId: string,
+    userId: string,
+  ): Promise<void> {
+    const isParticipant = await this.messagingRepository.isUserParticipant(
+      threadId,
+      userId,
+    );
+    if (!isParticipant) throw AsksynkError.notFound("Thread not found");
+  }
+
+  private async resolveGuestThreadId(
+    guestId: string,
+  ): Promise<string | null> {
+    const thread = await this.messagingRepository.findGuestThread(guestId);
+    return thread?.id ?? null;
+  }
+
+  private async assertReplyParent(
+    threadId: string,
+    messageId: string,
+  ): Promise<void> {
+    const parent = await this.messagingRepository.getMessageById(messageId);
+    if (!parent || parent.threadId !== threadId) {
+      throw AsksynkError.notFound("Message not found");
+    }
   }
 
   async canAccessThread(

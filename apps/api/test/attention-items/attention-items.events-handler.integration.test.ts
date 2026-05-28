@@ -238,6 +238,13 @@ describe("AttentionItemsEventHandler (integration)", () => {
       .expect(204);
   }
 
+  async function deleteTag(id: string): Promise<void> {
+    await request(app.getHttpServer())
+      .delete(`/tags/${id}`)
+      .set("x-test-user-id", recipient.id)
+      .expect(204);
+  }
+
   async function sendTaggedMessage(
     body: string,
     tagIds: string[],
@@ -264,6 +271,14 @@ describe("AttentionItemsEventHandler (integration)", () => {
       .set("x-test-user-id", recipient.id)
       .expect(200);
     return res.body;
+  }
+
+  async function updateItemStatus(id: string, status: string): Promise<void> {
+    await request(app.getHttpServer())
+      .patch(`/attention-items/${id}`)
+      .set("x-test-user-id", recipient.id)
+      .send({ status: status })
+      .expect(200);
   }
 
   async function awaitItem(
@@ -300,14 +315,6 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
   function approxEqual(actual: string | null, expected: Date): boolean {
     if (!actual) return false;
-
-    console.info("Comparing dates", {
-      actual,
-      expected: expected.toISOString(),
-      actualTime: new Date(actual).getTime(),
-      expectedTime: expected.getTime(),
-      diff: Math.abs(new Date(actual).getTime() - expected.getTime()),
-    });
 
     return (
       Math.abs(new Date(actual).getTime() - expected.getTime()) <
@@ -385,7 +392,83 @@ describe("AttentionItemsEventHandler (integration)", () => {
       await awaitNoItem((i) => msgMeta(i).messageId === msgId);
     });
 
-    it("should delete attention item when message tags are deleted", async () => {});
+    it("should delete attention item when message tags are deleted", async () => {
+      const tagId = await createTag({
+        type: "timeblock",
+      });
+
+      const msgId = await sendTaggedMessage("hi", [tagId]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await deleteTag(tagId);
+
+      await awaitNoItem((i) => i.id === item.id);
+    });
+
+    it("should keep attention item with remaining tag when one of multiple tags is deleted", async () => {
+      const tagA = await createTag({
+        type: "immediately",
+        responseTimeMillis: 60 * 60 * 1000,
+      });
+      const tagB = await createTag({
+        type: "immediately",
+        responseTimeMillis: 30 * 60 * 1000,
+      });
+
+      const msgId = await sendTaggedMessage("hi", [tagA, tagB]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await deleteTag(tagA);
+
+      const updated = await awaitItemState(
+        item.id,
+        (i) => i.tagIds.length === 1 && i.tagIds[0] === tagB,
+      );
+      expect(updated.tagIds).not.toContain(tagA);
+    });
+
+    it("should exclude deleted tag id from item tagIds returned by list endpoint", async () => {
+      const tagA = await createTag({
+        type: "immediately",
+        responseTimeMillis: 60 * 60 * 1000,
+      });
+      const tagB = await createTag({
+        type: "immediately",
+        responseTimeMillis: 30 * 60 * 1000,
+      });
+
+      const msgId = await sendTaggedMessage("hi", [tagA, tagB]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      expect(item.tagIds.sort()).toEqual([tagA, tagB].sort());
+
+      await deleteTag(tagB);
+
+      await awaitItemState(
+        item.id,
+        (i) => !i.tagIds.includes(tagB) && i.tagIds.includes(tagA),
+      );
+    });
+
+    it("should not soft-delete resolved attention item when its only tag is deleted", async () => {
+      const tagId = await createTag({
+        type: "immediately",
+        responseTimeMillis: 60 * 1000,
+      });
+      const msgId = await sendTaggedMessage("hi", [tagId]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await updateItemStatus(item.id, "resolved");
+
+      await deleteTag(tagId);
+
+      // give the handler time to process; then assert item is still present
+      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
+      const items = await getItems();
+      const found = items.find((i) => i.id === item.id);
+      expect(found).toBeDefined();
+      expect(found!.status).toBe("resolved");
+      expect(found!.tagIds).toEqual([]);
+    });
 
     it("should recompute due date for attention item when message tags are updated with new response time", async () => {
       const tagId = await createTag({

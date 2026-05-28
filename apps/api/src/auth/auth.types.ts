@@ -26,6 +26,16 @@ export type AuthGuest = {
   expiresAt: Date;
 };
 
+export type RequestActor =
+  | {
+      user: AuthUser;
+      isGuest: false;
+    }
+  | {
+      guest: AuthGuest;
+      isGuest: true;
+    };
+
 export type RequestWithUser = {
   user?: AuthUser;
   session?: AuthSession;

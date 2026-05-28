@@ -1,4 +1,4 @@
-import { All, Controller, Inject,Req, Res } from "@nestjs/common";
+import { All, Controller, Inject, Req, Res } from "@nestjs/common";
 import { toNodeHandler } from "better-auth/node";
 import { Request, Response } from "express";
 

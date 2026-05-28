@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
+import { RequestActor } from "@/api/auth/auth.types";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { Invite } from "@/api/networks/entities/invite.entity";
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
@@ -162,6 +163,34 @@ export class NetworksService {
 
   isActiveConnection(userIdA: string, userIdB: string): Promise<boolean> {
     return this.networkRepository.isActiveConnection(userIdA, userIdB);
+  }
+
+  async validateIsActiveConnection(
+    userIdA: string,
+    userIdB: string,
+  ): Promise<void> {
+    const isActive = await this.networkRepository.isActiveConnection(
+      userIdA,
+      userIdB,
+    );
+
+    if (!isActive) {
+      throw AsksynkError.notFound("Network connection not found");
+    }
+  }
+
+  async resolveTargetUserId(
+    actor: RequestActor,
+    requestedUserId?: string,
+  ): Promise<string> {
+    if (actor.isGuest) {
+      return actor.guest.ownerUserId;
+    }
+    if (!requestedUserId || requestedUserId === actor.user.id) {
+      return actor.user.id;
+    }
+    await this.validateIsActiveConnection(actor.user.id, requestedUserId);
+    return requestedUserId;
   }
 
   private async sendInviteEmail(

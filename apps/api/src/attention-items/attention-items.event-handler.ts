@@ -129,6 +129,7 @@ export class AttentionItemsEventHandler {
       await this.attentionItemsRepository.findBySourceCalendarEventId(
         payload.eventId,
       );
+
     await this.recomputeDueDatesForItems(this.activeItems(items));
   }
 
@@ -149,11 +150,30 @@ export class AttentionItemsEventHandler {
   @EventHandler(TagDeleted, { group: "attention-items" })
   @Transactional()
   async onTagDeleted(payload: EventOf<typeof TagDeleted>): Promise<void> {
+    this.logger.info(
+      `Handling TagDeleted event for tag ${payload.tagId}; checking for associated attention items...`,
+    );
+
     const items = await this.attentionItemsRepository.findByTagIds([
       payload.tagId,
     ]);
 
-    await this.recomputeDueDatesForItems(items);
+    // item.tagIds already excludes the deleted tag (ghost-filtered by repo)
+    const itemsToDelete = this.activeItems(
+      items.filter((i) => i.tagIds.length === 0),
+    );
+
+    const remaining = items.filter((i) => i.tagIds.length > 0);
+
+    await Promise.all(
+      itemsToDelete.map((item) =>
+        this.attentionItemsRepository.softDelete(item.id),
+      ),
+    );
+
+    await this.recomputeDueDatesForItems(this.activeItems(remaining));
+
+    await this.attentionItemsRepository.deleteTagAssociations(payload.tagId);
   }
 
   private async createAttentionItemsForMessage(

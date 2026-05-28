@@ -9,8 +9,13 @@ import {
   Query,
 } from "@nestjs/common";
 
-import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
+import { AllowGuest } from "@/api/auth/allowGuest.decorator";
+import {
+  AuthUser as AuthUserType,
+  RequestActor as RequestActorType,
+} from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
+import { RequestActor } from "@/api/auth/requestActor.decorator";
 import { toCalendarResponseDto } from "@/api/calendar-events/rest/calendar.mapper";
 import { AddCalendarEventExceptionRequestDto } from "@/api/calendar-events/rest/dto/add-calendar-event-exception.dto";
 import { CreateCalendarEventRequestDto } from "@/api/calendar-events/rest/dto/create-calendar-event.dto";
@@ -25,13 +30,17 @@ import {
   IsoDateWithOffsetParam,
   UuidV7Param,
 } from "@/api/common/decorators/param.decorators";
+import { NetworksService } from "@/api/networks/services/networks.service";
 
 import { toCalendarEventInstance } from "../mappers/calendar-event-instance.mapper";
 import { CalendarEventInstance } from "../models/calendar-event-instance.model";
 
 @Controller()
 export class CalendarEventsController {
-  constructor(private readonly calendarEventsService: CalendarEventsService) {}
+  constructor(
+    private readonly calendarEventsService: CalendarEventsService,
+    private readonly networksService: NetworksService,
+  ) {}
 
   @Post("calendars")
   async ensureCalendar(
@@ -74,12 +83,18 @@ export class CalendarEventsController {
     return toCalendarEventInstance(event);
   }
 
+  @AllowGuest()
   @Get("calendar-events")
   async listCalendarEvents(
     @Query() query: ListCalendarEventsQueryDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: RequestActorType,
   ): Promise<CalendarEventInstance[]> {
-    return await this.calendarEventsService.listCalendarEvents(user.id, {
+    const targetUserId = await this.networksService.resolveTargetUserId(
+      actor,
+      query.userId,
+    );
+
+    return await this.calendarEventsService.listCalendarEvents(targetUserId, {
       windowStart: parseIsoWallClockInTimezone(query.start, query.timezone),
       windowEnd: parseIsoWallClockInTimezone(query.end, query.timezone),
       tagIds: query.tagIds,

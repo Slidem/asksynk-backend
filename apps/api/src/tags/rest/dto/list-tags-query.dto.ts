@@ -32,6 +32,5 @@ export class ListTagsQueryDto {
   offset?: string;
 
   @IsOptional()
-  @IsString()
   userId?: string;
 }

@@ -3,16 +3,21 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Patch,
   Post,
   Query,
 } from "@nestjs/common";
 import { pick } from "lodash";
+import { AllowGuest } from "src/auth/allowGuest.decorator";
 
-import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
+import {
+  AuthUser as AuthUserType,
+  RequestActor as RequestActorType,
+} from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
+import { RequestActor } from "@/api/auth/requestActor.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { CreateTagRequestDto } from "@/api/tags/rest/dto/create-tag.dto";
@@ -43,27 +48,20 @@ export class TagsController {
   }
 
   @Get()
+  @AllowGuest()
   async listTags(
     @Query() query: ListTagsQueryDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: RequestActorType,
   ): Promise<TagResponseDto[]> {
-    const limit = toNonNegativeNumberOptional(query.limit);
-
-    const offset = toNonNegativeNumberOptional(query.offset);
-
-    const targetUserId = query.userId ?? user.id;
-    if (targetUserId !== user.id) {
-      const connected = await this.networksService.isActiveConnection(
-        user.id,
-        targetUserId,
-      );
-      if (!connected) throw AsksynkError.forbidden("Not connected");
-    }
+    const targetUserId = await this.networksService.resolveTargetUserId(
+      actor,
+      query.userId,
+    );
 
     const listInput = {
       ...pick(query, ["orderBy", "orderDirection", "search", "answerMode"]),
-      limit,
-      offset,
+      limit: toNonNegativeNumberOptional(query.limit),
+      offset: toNonNegativeNumberOptional(query.offset),
     };
 
     const tags = await this.tagsService.listTags(targetUserId, listInput);
@@ -87,6 +85,7 @@ export class TagsController {
   }
 
   @Delete(":id")
+  @HttpCode(204)
   async deleteTag(
     @UuidV7Param("id") tagId: string,
     @AuthUser() user: AuthUserType,
