@@ -6,6 +6,7 @@ import { ContextLogger } from "nestjs-context-logger";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-item.model";
+import { Tag } from "@/api/tags/entities/tag.entity";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
@@ -214,14 +215,17 @@ export class AttentionItemsEventHandler {
       originalTagIds: tagIds,
     };
 
+    const occurrenceMap = await this.fetchOccurrenceMap(tags, sentAt);
+    const tagsForItem = tags.filter((t) => tagIds.includes(t.id.toString()));
+    const { dueDate, sourceCalendarEventId } = this.pickEarliestCandidate(
+      tagsForItem,
+      sentAt,
+      occurrenceMap,
+    );
+
     for (const userId of recipientUserIds) {
       this.logger.info(
         `Creating attention item for user ${userId} based on message ${message.id}`,
-      );
-      const { dueDate, sourceCalendarEventId } = await this.computeDueDate(
-        tags,
-        tagIds,
-        sentAt,
       );
 
       await this.attentionItemsRepository.add({
@@ -269,87 +273,54 @@ export class AttentionItemsEventHandler {
     const tags = await this.tagRepository.getByIds(allTagIds);
     const tagMap = new Map(tags.map((t) => [t.id.toString(), t]));
 
-    const timeblockTagIds = tags
-      .filter((t) => t.answerMode.type === "timeblock")
-      .map((t) => t.id.toString());
-
-    const occurrenceMap =
-      await this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
-        timeblockTagIds,
-        new Date(),
-      );
-
-    this.logger.info(
-      `Occurrence map for recomputing due dates: ${[...occurrenceMap.entries()]
-        .map(
-          ([tagId, occ]) =>
-            `${tagId} => ${occ.date.toISOString()} (${occ.eventId})`,
-        )
-        .join(", ")}`,
-    );
+    const occurrenceMap = await this.fetchOccurrenceMap(tags, new Date());
 
     const updates = items.map((item) => {
-      const itemTags = item.tagIds.map((id) => tagMap.get(id)).filter(Boolean);
-      let dueDate: Date | null = null;
-      let sourceCalendarEventId: string | null = null;
-
-      for (const tag of itemTags) {
-        if (!tag) {
-          continue;
-        }
-        if (tag.answerMode.type === "immediately") {
-          const candidate = new Date(
-            item.createdAt.getTime() + tag.answerMode.responseTimeMillis,
-          );
-          if (!dueDate || candidate < dueDate) {
-            dueDate = candidate;
-            sourceCalendarEventId = null;
-          }
-        } else {
-          const candidate = occurrenceMap.get(tag.id.toString());
-          if (candidate && (!dueDate || candidate.date < dueDate)) {
-            dueDate = candidate.date;
-            sourceCalendarEventId = candidate.eventId;
-          }
-        }
-      }
-
+      const itemTags = item.tagIds
+        .map((id) => tagMap.get(id))
+        .filter((t): t is Tag => t !== undefined);
+      const { dueDate, sourceCalendarEventId } = this.pickEarliestCandidate(
+        itemTags,
+        item.createdAt,
+        occurrenceMap,
+      );
       return { id: item.id, dueDate, sourceCalendarEventId };
     });
 
     await this.attentionItemsRepository.batchUpdateDueDates(updates);
   }
 
-  private async computeDueDate(
-    tags: Awaited<ReturnType<TagRepository["getByIds"]>>,
-    tagIds: string[],
-    sentAt: Date,
-  ): Promise<{ dueDate: Date | null; sourceCalendarEventId: string | null }> {
-    let dueDate: Date | null = null;
-    let sourceCalendarEventId: string | null = null;
-
+  private async fetchOccurrenceMap(
+    tags: Tag[],
+    after: Date,
+  ): Promise<Map<string, { date: Date; eventId: string }>> {
     const timeblockTagIds = tags
       .filter((t) => t.answerMode.type === "timeblock")
       .map((t) => t.id.toString());
 
-    const occurrenceMap =
-      timeblockTagIds.length > 0
-        ? await this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
-            timeblockTagIds,
-            sentAt,
-          )
-        : new Map<string, { date: Date; eventId: string }>();
+    if (timeblockTagIds.length === 0) {
+      return new Map();
+    }
+
+    return this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
+      timeblockTagIds,
+      after,
+    );
+  }
+
+  private pickEarliestCandidate(
+    tags: Tag[],
+    immediateBase: Date,
+    occurrenceMap: Map<string, { date: Date; eventId: string }>,
+  ): { dueDate: Date | null; sourceCalendarEventId: string | null } {
+    let dueDate: Date | null = null;
+    let sourceCalendarEventId: string | null = null;
 
     for (const tag of tags) {
-      if (!tagIds.includes(tag.id.toString())) {
-        continue;
-      }
-
       if (tag.answerMode.type === "immediately") {
         const candidate = new Date(
-          sentAt.getTime() + tag.answerMode.responseTimeMillis,
+          immediateBase.getTime() + tag.answerMode.responseTimeMillis,
         );
-
         if (!dueDate || candidate < dueDate) {
           dueDate = candidate;
           sourceCalendarEventId = null;

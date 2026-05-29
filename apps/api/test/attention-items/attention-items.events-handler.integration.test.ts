@@ -97,11 +97,11 @@ describe("AttentionItemsEventHandler (integration)", () => {
         DbModule,
         TxModule,
         EventsModule,
+        NetworksModule,
         TagsModule,
         CalendarEventsModule,
         MessagingModule,
         AttentionItemsModule,
-        NetworksModule,
         PublicViewsModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: MockAuthGuard }],
@@ -338,6 +338,24 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(item.tagIds).toEqual([tagId]);
       expect(item.userId).toBe(recipient.id);
       expect(item.type).toBe("tagged_message");
+    });
+
+    it("should set due date to start of ongoing timeblock when message arrives during it", async () => {
+      const start = new Date(Date.now() - 30 * 60 * 1000);
+      const tagId = await createTag({ type: "timeblock" });
+      const tbId = await createTimeblock({
+        start,
+        durationSeconds: 3600,
+        tagIds: [tagId],
+      });
+      const msgId = await sendTaggedMessage("hello", [tagId]);
+
+      const item = await awaitItem(
+        (i) => msgMeta(i).messageId === msgId && i.dueDate !== null,
+      );
+
+      expect(approxEqual(item.dueDate, start)).toBe(true);
+      expect(item.sourceCalendarEventId).toBe(tbId);
     });
 
     it("should create new attention item when message is created with immediate tag type", async () => {

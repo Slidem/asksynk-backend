@@ -287,18 +287,24 @@ export class AttentionItemsRepository {
           sql`, `,
         )})
           AND e.rrule IS NULL
-          AND e.start > ${afterIso}::timestamptz
+          AND e.start + (e.duration_seconds * INTERVAL '1 second') > ${afterIso}::timestamptz
       ),
       recurring AS (
         SELECT cet.tag_id, e.id AS event_id, occurrence AS occ_start
         FROM calendar_events e
         JOIN calendar_event_tags cet ON cet.event_id = e.id
-        CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${afterIso}::timestamptz, ${windowEndIso}::timestamptz) AS occurrence
+        CROSS JOIN LATERAL rrule.between(
+          e.rrule,
+          e.start,
+          ${afterIso}::timestamptz - (e.duration_seconds * INTERVAL '1 second'),
+          ${windowEndIso}::timestamptz
+        ) AS occurrence
         WHERE cet.tag_id IN (${sql.join(
           tagIds.map((id) => sql`${id}::uuid`),
           sql`, `,
         )})
           AND e.rrule IS NOT NULL
+          AND occurrence + (e.duration_seconds * INTERVAL '1 second') > ${afterIso}::timestamptz
           AND NOT EXISTS (
             SELECT 1 FROM calendar_event_exceptions ex
             WHERE ex.event_id = e.id AND ex.original_start = occurrence

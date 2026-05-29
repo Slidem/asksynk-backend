@@ -9,8 +9,8 @@ import {
   Query,
 } from "@nestjs/common";
 import { pick } from "lodash";
-import { AllowGuest } from "src/auth/allowGuest.decorator";
 
+import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import {
   AuthUser as AuthUserType,
   RequestActor as RequestActorType,
