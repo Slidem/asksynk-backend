@@ -17,7 +17,7 @@ import { ContextLogger, ContextLoggerModule } from "nestjs-context-logger";
         };
 
         return {
-          ignoreBootstrapLogs: isProd,
+          ignoreBootstrapLogs: true,
           enrichContext: (context: ExecutionContext) => {
             const request = context.switchToHttp?.().getRequest?.();
 

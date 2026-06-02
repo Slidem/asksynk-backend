@@ -100,9 +100,7 @@ export class MessagingService {
     if (!isParticipant) throw AsksynkError.notFound("Thread not found");
   }
 
-  private async resolveGuestThreadId(
-    guestId: string,
-  ): Promise<string | null> {
+  private async resolveGuestThreadId(guestId: string): Promise<string | null> {
     const thread = await this.messagingRepository.findGuestThread(guestId);
     return thread?.id ?? null;
   }
