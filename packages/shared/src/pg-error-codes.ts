@@ -5,6 +5,8 @@
 export const PgErrorCode = {
   /** A unique constraint or primary key constraint was violated. */
   UNIQUE_VIOLATION: "23505",
+  /** A deadlock was detected; the transaction was chosen as the victim and rolled back. */
+  DEADLOCK_DETECTED: "40P01",
 } as const;
 
 /**

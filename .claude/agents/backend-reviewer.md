@@ -1,5 +1,5 @@
 ---
-name: reviewer
+name: backend-reviewer
 description: >
   Reviews code changes for bugs, security issues, missing error handling,
   and best-practice violations. Read-only — never modifies files. Use for

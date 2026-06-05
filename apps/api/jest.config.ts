@@ -14,20 +14,28 @@ const config: Config = {
     "^@/test/(.*)$": "<rootDir>/test/$1",
   },
   transform: {
-    "^.+\\.ts$": [
+    "^.+\\.[tj]s$": [
       "ts-jest",
       {
         tsconfig: {
+          target: "ES2022",
           module: "CommonJS",
           moduleResolution: "node",
           experimentalDecorators: true,
           emitDecoratorMetadata: true,
           strict: true,
           esModuleInterop: true,
+          allowJs: true,
         },
       },
     ],
   },
+  // pg-boss v12 + its transitive ESM deps (serialize-error -> non-error) ship pure
+  // ESM; un-ignore so ts-jest transpiles them to CJS instead of Node choking on
+  // their `import`/`export` statements.
+  transformIgnorePatterns: [
+    "/node_modules/(?!.*(?:pg-boss|serialize-error|non-error))",
+  ],
 };
 
 export default config;

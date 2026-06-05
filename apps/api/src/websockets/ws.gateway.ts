@@ -12,16 +12,17 @@ import { Server, Socket } from "socket.io";
 
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
-import { Ack, SendAck } from "@/api/realtime/ws.types";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
   MessageCreated,
   MessageUpdated,
+  TimerLifecycle,
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
 
 import { WsAuthService, WsIdentity } from "./services/ws-auth.service";
 import { guestRoom, threadRoom, userRoom } from "./ws.rooms";
+import { Ack, SendAck } from "./ws.types";
 
 @WebSocketGateway({ cors: true })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -241,5 +242,16 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       threadId: payload.threadId,
       message: payload.message,
     });
+  }
+
+  @EventHandler(TimerLifecycle)
+  async onTimerLifecycle(
+    payload: EventOf<typeof TimerLifecycle>,
+  ): Promise<void> {
+    if (payload.eventType !== "completed") {
+      return;
+    }
+
+    this.server.to(userRoom(payload.userId)).emit("timer.completed", payload);
   }
 }

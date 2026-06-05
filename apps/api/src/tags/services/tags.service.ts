@@ -44,8 +44,6 @@ export class TagsService {
 
   @Transactional()
   async listTags(userId: string, listTags: ListTagsInput): Promise<Tag[]> {
-    this.logger.info("Listing tags", { userId, listTags });
-
     return this.tagsRepository.listByUserIdWithFilters(userId, {
       answerMode: listTags.answerMode,
       orderBy: listTags.orderBy ?? "createdAt",

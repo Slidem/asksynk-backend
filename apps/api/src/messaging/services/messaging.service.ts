@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { WsIdentity } from "src/websockets/services/ws-auth.service";
 
 import { AuthGuest } from "@/api/auth/auth.types";
 import { AsksynkError } from "@/api/common/errors/errors.model";
@@ -16,7 +17,6 @@ import {
 } from "@/api/messaging/repositories/messaging.repository";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
-import { WsIdentity } from "@/api/realtime/services/ws-auth.service";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {

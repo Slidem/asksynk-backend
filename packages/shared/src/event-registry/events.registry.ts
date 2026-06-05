@@ -112,3 +112,17 @@ export const CalendarEventDeleted = defineEvent({
   delivery: DeliveryMode.Durable,
   groups: ["attention-items"],
 });
+
+export const TimerLifecycle = defineEvent({
+  name: "timer.lifecycle",
+  schema: z.object({
+    userId: z.string(),
+    eventType: z.enum(["started", "paused", "resumed", "stopped", "completed"]),
+    sessionType: z.enum(["focus", "short_break", "long_break"]),
+    sessionDurationSeconds: z.number(),
+    remainingSeconds: z.number(),
+    occurredAt: z.string(),
+  }),
+  delivery: DeliveryMode.Dual,
+  groups: ["timer-event-log"],
+});

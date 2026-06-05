@@ -1,5 +1,5 @@
 ---
-name: review
+name: backend-review
 description: >
   Review staged or recent git changes for bugs, missed edge cases, security
   issues, and best-practice violations. Runs tests if relevant. Use when

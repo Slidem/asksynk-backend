@@ -9,11 +9,11 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 import { Client } from "pg";
-import PgBoss from "pg-boss";
 
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
 import { MessageBusService } from "../message-bus/message-bus.service";
+import { QueuedJobInsert } from "../message-bus/message-bus.types";
 
 export const EVENTS_DISPATCHER_DB = "EVENTS_DISPATCHER_DB";
 
@@ -191,7 +191,7 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
         return false;
       }
 
-      const jobs: PgBoss.JobInsert[] = [];
+      const jobs: QueuedJobInsert[] = [];
       const succeededIds: string[] = [];
       const failed: { id: string; error: string }[] = [];
 

@@ -11,4 +11,4 @@ import { WsGateway } from "./ws.gateway";
   providers: [WsAuthService, WsGateway],
   exports: [],
 })
-export class RealtimeModule {}
+export class WebsocketsModule {}
