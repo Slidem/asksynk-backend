@@ -4,6 +4,10 @@ node_modules/
 .pnp.cjs
 .pnp.loader.mjs
 
+# pnpm-only repo: reject npm/yarn lockfiles
+package-lock.json
+yarn.lock
+
 # build
 dist/
 build/
@@ -39,5 +43,3 @@ localstack_data/
 docker-data/
 tmp/
 
-# cdk
-cdk.out/

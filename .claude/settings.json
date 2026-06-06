@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/pnpm-lock.yaml)",
+      "Read(**/package-lock.json)",
+      "Read(**/yarn.lock)",
+      "Read(./apps/migrations/migrations/meta/**)",
+      "Read(./localdev/initdb/02-rrule.sql)"
+    ]
+  }
+}
