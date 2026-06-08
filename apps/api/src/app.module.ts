@@ -15,6 +15,7 @@ import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { MessagingModule } from "@/api/messaging/messaging.module";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { StorageModule } from "@/api/storage/storage.module";
 import { TagsModule } from "@/api/tags/tags.module";
 import { TimersModule } from "@/api/timers/timers.module";
 
@@ -33,6 +34,7 @@ import { WebsocketsModule } from "./websockets/ws.module";
     CalendarEventsModule,
     NetworksModule,
     PublicViewsModule,
+    StorageModule,
     MessagingModule,
     WebsocketsModule,
     AuthGuardModule,

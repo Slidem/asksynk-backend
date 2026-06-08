@@ -1,3 +1,5 @@
+import { AttachmentResponseDto } from "src/storage/attachments/rest/responses/attachment.response";
+
 export interface MessageResponseDto {
   id: string;
   threadId: string;
@@ -6,6 +8,7 @@ export interface MessageResponseDto {
   senderId: string;
   body: string;
   tagIds: string[];
+  attachments: AttachmentResponseDto[];
   createdAt: string;
 }
 

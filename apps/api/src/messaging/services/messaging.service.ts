@@ -4,6 +4,7 @@ import { WsIdentity } from "src/websockets/services/ws-auth.service";
 
 import { AuthGuest } from "@/api/auth/auth.types";
 import { AsksynkError } from "@/api/common/errors/errors.model";
+import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import {
   Message,
   MessageSender,
@@ -36,6 +37,7 @@ export class MessagingService {
     private readonly publicViewsRepository: PublicViewsRepository,
     private readonly eventsPublisher: EventsPublisher,
     private readonly tagsService: TagsService,
+    private readonly messageAttachmentResolver: MessageAttachmentResolver,
   ) {}
 
   async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
@@ -176,6 +178,7 @@ export class MessagingService {
     body: string,
     tagIds: string[],
     parentMessageId?: string | null,
+    attachmentIds: string[] = [],
   ): Promise<Message> {
     const thread = await this.messagingRepository.getThread(threadId);
 
@@ -209,6 +212,12 @@ export class MessagingService {
       await this.assertValidReplyParent(threadId, parentMessageId);
     }
 
+    // Authz gate: sender must own each blob, finalized + declared for "message" placement.
+    await this.messageAttachmentResolver.assertLinkable(
+      attachmentIds,
+      senderUserId,
+    );
+
     const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId,
@@ -216,6 +225,7 @@ export class MessagingService {
       sender,
       body,
       tagIds,
+      attachmentIds,
     });
 
     await this.notifyMessageCreated(message, participants);
@@ -364,6 +374,7 @@ export class MessagingService {
         senderId: senderId,
         body: message.body,
         tagIds: message.tagIds,
+        attachmentIds: message.attachmentIds,
         createdAt: message.createdAt.toISOString(),
       },
       participantUserIds,

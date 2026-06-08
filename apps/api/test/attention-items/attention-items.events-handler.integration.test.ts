@@ -13,6 +13,7 @@ import { AttentionItemsModule } from "@/api/attention-items/attention-items.modu
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
 import { AuthUser } from "@/api/auth/auth.types";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
+import { ClockModule } from "@/api/common/clock/clock.module";
 import { EventsModule } from "@/api/events/events.module";
 import {
   DB_CLIENT_PROVIDER,
@@ -23,6 +24,7 @@ import { MessagingModule } from "@/api/messaging/messaging.module";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { StorageModule } from "@/api/storage/storage.module";
 import { TagsModule } from "@/api/tags/tags.module";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
@@ -103,6 +105,8 @@ describe("AttentionItemsEventHandler (integration)", () => {
         MessagingModule,
         AttentionItemsModule,
         PublicViewsModule,
+        ClockModule,
+        StorageModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: MockAuthGuard }],
     }).compile();

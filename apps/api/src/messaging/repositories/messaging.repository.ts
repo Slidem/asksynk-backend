@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import _ from "lodash";
 
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import {
@@ -10,6 +11,7 @@ import {
 import { Thread } from "@/api/messaging/entities/thread.entity";
 import { messageTags } from "@/migrations/schema/messageTags";
 import {
+  messageAttachments,
   messages,
   messageThreads,
   threadParticipants,
@@ -168,7 +170,9 @@ export class MessagingRepository {
     sender: MessageSender;
     body: string;
     tagIds: string[];
+    attachmentIds?: string[];
   }): Promise<Message> {
+    const attachmentIds = _.uniq(input.attachmentIds ?? []);
     const [row] = await this.txHost.tx
       .insert(messages)
       .values({
@@ -188,7 +192,17 @@ export class MessagingRepository {
         .values(input.tagIds.map((tagId) => ({ messageId: row.id, tagId })));
     }
 
-    return this.mapMessage(row, input.tagIds);
+    if (attachmentIds.length > 0) {
+      await this.txHost.tx.insert(messageAttachments).values(
+        attachmentIds.map((attachmentId, position) => ({
+          messageId: row.id,
+          attachmentId,
+          position,
+        })),
+      );
+    }
+
+    return this.mapMessage(row, input.tagIds, attachmentIds);
   }
 
   async getMessageById(messageId: string): Promise<Message | null> {
@@ -199,7 +213,12 @@ export class MessagingRepository {
       .limit(1);
     if (!row) return null;
     const tagIds = await this.fetchTagIdsForMessages([messageId]);
-    return this.mapMessage(row, tagIds.get(messageId) ?? []);
+    const attachmentIds = await this.fetchAttachmentIdsForMessages([messageId]);
+    return this.mapMessage(
+      row,
+      tagIds.get(messageId) ?? [],
+      attachmentIds.get(messageId) ?? [],
+    );
   }
 
   async replaceMessageTags(messageId: string, tagIds: string[]): Promise<void> {
@@ -243,8 +262,15 @@ export class MessagingRepository {
       .limit(options.limit);
 
     const tagMap = await this.fetchTagIdsForMessages(rows.map((r) => r.id));
+    const attachmentMap = await this.fetchAttachmentIdsForMessages(
+      rows.map((r) => r.id),
+    );
     return rows.map((r) => ({
-      message: this.mapMessage(r, tagMap.get(r.id) ?? []),
+      message: this.mapMessage(
+        r,
+        tagMap.get(r.id) ?? [],
+        attachmentMap.get(r.id) ?? [],
+      ),
       replyCount: r.replyCount,
     }));
   }
@@ -264,7 +290,39 @@ export class MessagingRepository {
       .limit(options.limit);
 
     const tagMap = await this.fetchTagIdsForMessages(rows.map((r) => r.id));
-    return rows.map((r) => this.mapMessage(r, tagMap.get(r.id) ?? []));
+    const attachmentMap = await this.fetchAttachmentIdsForMessages(
+      rows.map((r) => r.id),
+    );
+    return rows.map((r) =>
+      this.mapMessage(r, tagMap.get(r.id) ?? [], attachmentMap.get(r.id) ?? []),
+    );
+  }
+
+  private async fetchAttachmentIdsForMessages(
+    messageIds: string[],
+  ): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+    if (messageIds.length === 0) return result;
+
+    const links = await this.txHost.tx
+      .select({
+        messageId: messageAttachments.messageId,
+        attachmentId: messageAttachments.attachmentId,
+        position: messageAttachments.position,
+      })
+      .from(messageAttachments)
+      .where(inArray(messageAttachments.messageId, messageIds))
+      .orderBy(messageAttachments.position);
+
+    for (const link of links) {
+      const existing = result.get(link.messageId);
+      if (existing) {
+        existing.push(link.attachmentId);
+      } else {
+        result.set(link.messageId, [link.attachmentId]);
+      }
+    }
+    return result;
   }
 
   private async fetchTagIdsForMessages(
@@ -415,7 +473,11 @@ export class MessagingRepository {
     });
   }
 
-  private mapMessage(row: MessageRow, tagIds: string[] = []): Message {
+  private mapMessage(
+    row: MessageRow,
+    tagIds: string[] = [],
+    attachmentIds: string[] = [],
+  ): Message {
     const sender: MessageSender = row.senderUserId
       ? { kind: "user", userId: row.senderUserId }
       : { kind: "guest", guestId: row.senderGuestId! };
@@ -426,6 +488,7 @@ export class MessagingRepository {
       sender,
       body: row.body,
       tagIds,
+      attachmentIds,
       createdAt: row.createdAt,
     });
   }

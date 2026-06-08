@@ -15,3 +15,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Ephemeral Garage for integration tests (no persisted volumes). Bootstrapped by
+  # `test:integration:up` via localdev/garage/init.sh with GARAGE_CONTAINER override.
+  garage-test:
+    image: "dxflrs/garage:v1.0.1"
+    container_name: asksynk-garage-test
+    ports:
+      - "3910:3900" # S3 API
+      - "3912:3902" # web
+      - "3913:3903" # admin
+    volumes:
+      - ./garage/garage.toml:/etc/garage/garage.toml:ro
+    entrypoint: ["/garage"]
+    command: ["-c", "/etc/garage/garage.toml", "server"]

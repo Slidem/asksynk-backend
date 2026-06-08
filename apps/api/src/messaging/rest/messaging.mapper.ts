@@ -1,3 +1,5 @@
+import { ReadableAttachment } from "src/storage/attachments/models/attachment.model";
+
 import { Message } from "@/api/messaging/entities/message.entity";
 import {
   ThreadListItem,
@@ -8,8 +10,12 @@ import {
   ThreadMessageResponseDto,
 } from "@/api/messaging/rest/responses/message.response";
 import { ThreadListItemResponseDto } from "@/api/messaging/rest/responses/thread.response";
+import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
 
-export function toMessageResponseDto(message: Message): MessageResponseDto {
+export function toMessageResponseDto(
+  message: Message,
+  attachments: ReadableAttachment[],
+): MessageResponseDto {
   return {
     id: message.id,
     threadId: message.threadId,
@@ -21,15 +27,17 @@ export function toMessageResponseDto(message: Message): MessageResponseDto {
         : message.sender.guestId,
     body: message.body,
     tagIds: message.tagIds,
+    attachments: attachments.map(toAttachmentResponse),
     createdAt: message.createdAt.toISOString(),
   };
 }
 
 export function toThreadMessageResponseDto(
   item: ThreadMessageListItem,
+  attachments: ReadableAttachment[],
 ): ThreadMessageResponseDto {
   return {
-    ...toMessageResponseDto(item.message),
+    ...toMessageResponseDto(item.message, attachments),
     replyCount: item.replyCount,
   };
 }

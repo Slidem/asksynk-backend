@@ -33,8 +33,12 @@ const config: Config = {
   // pg-boss v12 + its transitive ESM deps (serialize-error -> non-error) ship pure
   // ESM; un-ignore so ts-jest transpiles them to CJS instead of Node choking on
   // their `import`/`export` statements.
+  // @smithy (AWS SDK runtime) uses native dynamic `import()` (e.g. node-http-handler
+  // does `await import("node:http")` on every request); un-ignore so ts-jest
+  // downlevels those to `require()` under module:CommonJS, avoiding the need for
+  // --experimental-vm-modules (which would break the pg-boss CJS transpile above).
   transformIgnorePatterns: [
-    "/node_modules/(?!.*(?:pg-boss|serialize-error|non-error))",
+    "/node_modules/(?!.*(?:pg-boss|serialize-error|non-error|@smithy))",
   ],
 };
 

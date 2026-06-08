@@ -48,6 +48,7 @@ export const MessageCreated = defineEvent({
       senderId: z.string(),
       body: z.string(),
       tagIds: z.optional(z.array(z.string())),
+      attachmentIds: z.optional(z.array(z.string())),
       createdAt: z.string(),
     }),
     participantUserIds: z.array(z.string()),

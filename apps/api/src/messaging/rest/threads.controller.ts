@@ -5,6 +5,7 @@ import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { CreateThreadRequestDto } from "@/api/messaging/rest/dto/create-thread.dto";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
+import { resolveAttachmentsByMessage } from "@/api/messaging/rest/message-attachments.helper";
 import {
   toMessageResponseDto,
   toThreadListItemResponseDto,
@@ -19,10 +20,14 @@ import {
   ThreadListItemResponseDto,
 } from "@/api/messaging/rest/responses/thread.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
+import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 
 @Controller("threads")
 export class ThreadsController {
-  constructor(private readonly messagingService: MessagingService) {}
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly attachmentService: AttachmentsService,
+  ) {}
 
   @Get()
   async list(
@@ -58,7 +63,18 @@ export class ThreadsController {
         limit: query.limit,
       },
     );
-    return items.map(toThreadMessageResponseDto);
+
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentService,
+      items.map((i) => i.message),
+    );
+
+    return items.map((item) =>
+      toThreadMessageResponseDto(
+        item,
+        attachmentsByMessage.get(item.message.id) ?? [],
+      ),
+    );
   }
 
   @Get(":id/messages/:messageId/replies")
@@ -77,6 +93,12 @@ export class ThreadsController {
         limit: query.limit,
       },
     );
-    return replies.map(toMessageResponseDto);
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentService,
+      replies,
+    );
+    return replies.map((r) =>
+      toMessageResponseDto(r, attachmentsByMessage.get(r.id) ?? []),
+    );
   }
 }

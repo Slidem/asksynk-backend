@@ -9,6 +9,7 @@ export interface MessageProps {
   sender: MessageSender;
   body: string;
   tagIds: string[];
+  attachmentIds: string[];
   createdAt: Date;
 }
 
@@ -19,6 +20,7 @@ export class Message {
   readonly sender: MessageSender;
   readonly body: string;
   readonly tagIds: string[];
+  readonly attachmentIds: string[];
   readonly createdAt: Date;
 
   private constructor(props: MessageProps) {
@@ -28,6 +30,7 @@ export class Message {
     this.sender = props.sender;
     this.body = props.body;
     this.tagIds = props.tagIds;
+    this.attachmentIds = props.attachmentIds;
     this.createdAt = props.createdAt;
   }
 

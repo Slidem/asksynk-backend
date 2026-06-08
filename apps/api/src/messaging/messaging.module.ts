@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { MessageAttachmentRepository } from "@/api/messaging/attachments/message-attachment.repository";
+import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import { MessagingRepository } from "@/api/messaging/repositories/messaging.repository";
 import { GuestMessagingController } from "@/api/messaging/rest/guest-messaging.controller";
 import { ThreadsController } from "@/api/messaging/rest/threads.controller";
@@ -16,7 +18,12 @@ import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher
     EventsPublisherModule,
     TagsModule,
   ],
-  providers: [MessagingRepository, MessagingService],
+  providers: [
+    MessagingRepository,
+    MessagingService,
+    MessageAttachmentRepository,
+    MessageAttachmentResolver,
+  ],
   controllers: [ThreadsController, GuestMessagingController],
   exports: [MessagingService, MessagingRepository],
 })

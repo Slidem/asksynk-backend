@@ -7,11 +7,16 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
+import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
+import { MAX_ATTACHMENTS_PER_MESSAGE } from "src/messaging/attachments/message-attachment.constants";
 
 import { AsksynkError } from "@/api/common/errors/errors.model";
+import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
+import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
+import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
   MessageCreated,
@@ -34,6 +39,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly wsAuthService: WsAuthService,
     private readonly messagingService: MessagingService,
+    private readonly attachmentsService: AttachmentsService,
   ) {}
 
   /**
@@ -116,6 +122,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       threadId?: string;
       body?: string;
       tagIds?: string[];
+      attachmentIds?: string[];
       parentMessageId?: string;
     },
   ): Promise<SendAck> {
@@ -129,12 +136,27 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: false, error: "body required" };
     }
 
-    const tagIds = body?.tagIds ?? [];
+    const tagIds = _.uniq(body?.tagIds ?? []);
     if (
       !Array.isArray(tagIds) ||
       !tagIds.every((id) => typeof id === "string")
     ) {
       return { ok: false, error: "tagIds must be string[]" };
+    }
+
+    const attachmentIds = _.uniq(body?.attachmentIds ?? []);
+    if (
+      !Array.isArray(attachmentIds) ||
+      !attachmentIds.every((id) => typeof id === "string")
+    ) {
+      return { ok: false, error: "attachmentIds must be string[]" };
+    }
+
+    if (attachmentIds.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      return {
+        ok: false,
+        error: `maximum ${MAX_ATTACHMENTS_PER_MESSAGE} attachments allowed`,
+      };
     }
 
     const parentMessageId = body?.parentMessageId ?? null;
@@ -150,12 +172,17 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           text,
           tagIds,
           parentMessageId,
+          attachmentIds,
         );
         return { ok: true, messageId: message.id };
       }
 
       if (tagIds.length > 0) {
         return { ok: false, error: "Guests cannot tag" };
+      }
+
+      if (attachmentIds.length > 0) {
+        return { ok: false, error: "Guests cannot attach files" };
       }
 
       const message = await this.messagingService.sendAsGuest(
@@ -228,9 +255,29 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const guestId of payload.participantGuestIds) {
       rooms.add(guestRoom(guestId));
     }
+
+    // Resolve attachments at emit time (fresh signed urls), not at publish time — the
+    // event payload is persisted in the durable outbox, so it carries only ids. Trusted:
+    // everyone in these rooms is a thread participant, so all are authorized to read.
+    const attachments = await this.attachmentsService.resolveMany(
+      payload.message.attachmentIds ?? [],
+    );
+
+    const message: MessageResponseDto = {
+      id: payload.message.id,
+      threadId: payload.message.threadId,
+      parentMessageId: payload.message.parentMessageId,
+      senderKind: payload.message.senderKind,
+      senderId: payload.message.senderId,
+      body: payload.message.body,
+      tagIds: payload.message.tagIds ?? [],
+      attachments: attachments.map(toAttachmentResponse),
+      createdAt: payload.message.createdAt,
+    };
+
     this.server.to([...rooms]).emit("message.created", {
       threadId: payload.threadId,
-      message: payload.message,
+      message,
     });
   }
 

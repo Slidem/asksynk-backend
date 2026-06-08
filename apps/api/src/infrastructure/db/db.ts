@@ -2,6 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { attachments } from "@/migrations/schema/attachments";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
@@ -9,6 +10,7 @@ import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExcep
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";
 import { calendars } from "@/migrations/schema/calendars";
 import {
+  messageAttachments,
   messages,
   messageThreads,
   threadParticipants,
@@ -47,6 +49,8 @@ export const getDbInstance = (config: ConfigService) => {
       messageThreads,
       threadParticipants,
       messages,
+      messageAttachments,
+      attachments,
       eventsOutbox,
     },
     // logger: config.get<string>("ENVIRONMENT") === "dev",

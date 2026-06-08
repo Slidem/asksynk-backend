@@ -35,5 +35,23 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  # Garage image is distroless (no shell). Bootstrap is a host script run once after
+  # `localdev:up`: `bash localdev/garage/init.sh` (layout, key, buckets, website, CORS).
+  garage:
+    image: "dxflrs/garage:v1.0.1"
+    container_name: asksynk-garage
+    ports:
+      - "3900:3900" # S3 API
+      - "3902:3902" # web (public bucket)
+      - "3903:3903" # admin API
+    volumes:
+      - ./garage/garage.toml:/etc/garage/garage.toml:ro
+      - asksynk-garage-meta:/var/lib/garage/meta
+      - asksynk-garage-data:/var/lib/garage/data
+    entrypoint: ["/garage"]
+    command: ["-c", "/etc/garage/garage.toml", "server"]
+
 volumes:
   asksynk-postgres-data:
+  asksynk-garage-meta:
+  asksynk-garage-data:

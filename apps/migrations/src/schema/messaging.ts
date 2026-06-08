@@ -3,13 +3,16 @@ import {
   AnyPgColumn,
   check,
   index,
+  integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { attachments } from "@/migrations/schema/attachments";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { users } from "@/migrations/schema/users";
 
@@ -98,5 +101,25 @@ export const messages = pgTable(
     index("idx_messages_parent_created")
       .on(t.parentMessageId, t.createdAt)
       .where(sql`parent_message_id IS NOT NULL`),
+  ],
+);
+
+export const messageAttachments = pgTable(
+  "message_attachments",
+  {
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.messageId, t.attachmentId] }),
+    index("idx_message_attachments_attachment").on(t.attachmentId),
   ],
 );

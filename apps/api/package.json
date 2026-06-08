@@ -12,6 +12,9 @@
   "dependencies": {
     "@asksynk/migrations": "workspace:*",
     "@asksynk/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.730.0",
+    "@aws-sdk/s3-presigned-post": "^3.730.0",
+    "@aws-sdk/s3-request-presigner": "^3.730.0",
     "@nestjs-cls/transactional": "^3.2.0",
     "@nestjs-cls/transactional-adapter-drizzle-orm": "^1.2.3",
     "@nestjs/common": "^10.3.10",
