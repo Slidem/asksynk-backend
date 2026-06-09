@@ -22,8 +22,9 @@ export class PublicVisitorsController {
   async getViewMetadata(
     @Param("slug") slug: string,
   ): Promise<PublicViewMetadataResponseDto> {
-    const view = await this.guestSessionsService.getViewMetadataBySlug(slug);
-    return toPublicViewMetadataResponseDto(view);
+    const metadata =
+      await this.guestSessionsService.getViewMetadataBySlug(slug);
+    return toPublicViewMetadataResponseDto(metadata);
   }
 
   @Public()

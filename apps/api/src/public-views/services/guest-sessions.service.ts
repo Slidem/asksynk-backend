@@ -6,7 +6,10 @@ import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { PublicViewGuest } from "@/api/public-views/entities/public-view-guest.entity";
 import { GUEST_SESSION_TTL_MS } from "@/api/public-views/public-views.constants";
 import { PublicViewGuestsRepository } from "@/api/public-views/repositories/public-view-guests.repository";
-import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
+import {
+  PublicViewMetadata,
+  PublicViewsRepository,
+} from "@/api/public-views/repositories/public-views.repository";
 import { generateGuestToken } from "@/api/public-views/utils/slug.util";
 import { generateId } from "@/shared/id";
 
@@ -17,12 +20,12 @@ export class GuestSessionsService {
     private readonly guestsRepository: PublicViewGuestsRepository,
   ) {}
 
-  async getViewMetadataBySlug(slug: string): Promise<PublicView> {
-    const view = await this.publicViewsRepository.getBySlug(slug);
-    if (!view || !view.isLive()) {
+  async getViewMetadataBySlug(slug: string): Promise<PublicViewMetadata> {
+    const metadata = await this.publicViewsRepository.getMetadataBySlug(slug);
+    if (!metadata || !metadata.view.isLive()) {
       throw AsksynkError.notFound("Public view not found or expired");
     }
-    return view;
+    return metadata;
   }
 
   @Transactional()

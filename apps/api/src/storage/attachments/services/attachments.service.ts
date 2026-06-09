@@ -142,6 +142,11 @@ export class AttachmentsService {
     );
   }
 
+  /** Stable public url for a `placement="public"` attachment (e.g. an avatar). */
+  publicUrlForAttachment(attachment: Attachment): string {
+    return this.storage.publicUrl(attachment.storageKey);
+  }
+
   /** Generic read: authorize via the placement resolver, then build a fresh url. */
   async getReadable(
     actor: AttachmentActor,

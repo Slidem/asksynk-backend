@@ -5,12 +5,18 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
+import { users } from "@/migrations/schema/users";
 
 type PublicViewRow = typeof publicViews.$inferSelect;
 
 export type PublicViewWithStats = {
   view: PublicView;
   guestCount: number;
+};
+
+export type PublicViewMetadata = {
+  view: PublicView;
+  ownerImage: string | null;
 };
 
 @Injectable()
@@ -53,6 +59,16 @@ export class PublicViewsRepository {
       .where(eq(publicViews.slug, slug))
       .limit(1);
     return row ? this.map(row) : null;
+  }
+
+  async getMetadataBySlug(slug: string): Promise<PublicViewMetadata | null> {
+    const [row] = await this.txHost.tx
+      .select({ view: publicViews, ownerImage: users.image })
+      .from(publicViews)
+      .leftJoin(users, eq(users.id, publicViews.ownerUserId))
+      .where(eq(publicViews.slug, slug))
+      .limit(1);
+    return row ? { view: this.map(row.view), ownerImage: row.ownerImage } : null;
   }
 
   async listForOwnerWithStats(

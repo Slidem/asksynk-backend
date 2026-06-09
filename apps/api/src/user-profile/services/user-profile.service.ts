@@ -1,14 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { pick, pickBy } from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { AsksynkError } from "@/api/common/errors/errors.model";
+import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { UserProfile } from "@/api/user-profile/entities/user-profile.entity";
 import { UpdateUserProfileInput } from "@/api/user-profile/models/update-user-profile.model";
-import { ResolvedUserProfile } from "@/api/user-profile/models/user-profile.model";
 import { UserProfileRepository } from "@/api/user-profile/repositories/user-profile.repository";
 
 @Injectable()
@@ -22,42 +21,48 @@ export class UserProfileService {
   ) {}
 
   @Transactional()
-  async getProfile(userId: string): Promise<ResolvedUserProfile> {
+  async getProfile(userId: string): Promise<UserProfile> {
     const profile = await this.userProfileRepository.getById(userId);
     if (!profile) {
       throw AsksynkError.notFound("User profile not found");
     }
-    return this.resolve(profile);
+    return profile;
   }
 
   @Transactional()
-  async updateProfile(
-    input: UpdateUserProfileInput,
-  ): Promise<ResolvedUserProfile> {
+  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const profile = await this.userProfileRepository.getById(input.userId);
     if (!profile) {
       throw AsksynkError.notFound("User profile not found");
     }
 
-    if (input.avatarAttachmentId) {
-      await this.assertUsableAvatar(input.userId, input.avatarAttachmentId);
+    if (input.phone !== undefined) {
+      profile.phone = input.phone;
     }
 
-    const updates = pickBy(
-      pick(input, ["phone", "avatarAttachmentId"]),
-      (v) => v !== undefined,
-    );
-    Object.assign(profile, updates);
+    // Materialize the avatar's public url into `image` once, at write time. The
+    // attachment id is only an input (which uploaded blob to use); we store the url.
+    if (input.avatarAttachmentId !== undefined) {
+      if (input.avatarAttachmentId === null) {
+        profile.image = null;
+      } else {
+        const attachment = await this.loadUsableAvatar(
+          input.userId,
+          input.avatarAttachmentId,
+        );
+        profile.image =
+          this.attachmentsService.publicUrlForAttachment(attachment);
+      }
+    }
 
-    const updated = await this.userProfileRepository.update(profile);
-    return this.resolve(updated);
+    return this.userProfileRepository.update(profile);
   }
 
   /** Avatar must be a public, finalized attachment owned by the same user. */
-  private async assertUsableAvatar(
+  private async loadUsableAvatar(
     userId: string,
     attachmentId: string,
-  ): Promise<void> {
+  ): Promise<Attachment> {
     const attachment = await this.attachmentsRepository.getById(attachmentId);
     if (
       !attachment ||
@@ -67,20 +72,6 @@ export class UserProfileService {
     ) {
       throw AsksynkError.badRequest("Invalid avatar attachment");
     }
-  }
-
-  private async resolve(profile: UserProfile): Promise<ResolvedUserProfile> {
-    if (!profile.avatarAttachmentId) {
-      return { profile, avatar: null };
-    }
-
-    const [resolved] = await this.attachmentsService.resolveMany([
-      profile.avatarAttachmentId,
-    ]);
-
-    return {
-      profile,
-      avatar: resolved ? { id: resolved.id, url: resolved.url } : null,
-    };
+    return attachment;
   }
 }

@@ -6,5 +6,4 @@ export interface UserProfileResponseDto {
   email: string;
   image: string | null;
   phone: string | null;
-  avatar: { id: string; url: string } | null;
 }

@@ -71,6 +71,13 @@
       "when": 1780979740823,
       "tag": "0009_lame_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780988714789,
+      "tag": "0010_curved_nuke",
+      "breakpoints": true
     }
   ]
 }

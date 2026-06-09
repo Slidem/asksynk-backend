@@ -31,7 +31,7 @@ export class UserProfileRepository {
       .update(users)
       .set({
         phone: profile.phone,
-        avatarAttachmentId: profile.avatarAttachmentId,
+        image: profile.image,
         updatedAt: new Date(),
       })
       .where(eq(users.id, profile.id))
@@ -49,7 +49,6 @@ export class UserProfileRepository {
       email: row.email,
       image: row.image,
       phone: row.phone,
-      avatarAttachmentId: row.avatarAttachmentId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });

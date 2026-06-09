@@ -12,6 +12,7 @@ export interface PublicViewResponseDto {
 export interface PublicViewMetadataResponseDto {
   slug: string;
   ownerUserId: string;
+  ownerImage: string | null;
   name: string | null;
   expiresAt: string;
 }

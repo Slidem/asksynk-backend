@@ -15,8 +15,8 @@ export class UserProfileController {
   async getProfile(
     @AuthUser() user: AuthUserType,
   ): Promise<UserProfileResponseDto> {
-    const resolved = await this.userProfileService.getProfile(user.id);
-    return toUserProfileResponseDto(resolved);
+    const profile = await this.userProfileService.getProfile(user.id);
+    return toUserProfileResponseDto(profile);
   }
 
   @Patch()
@@ -24,10 +24,10 @@ export class UserProfileController {
     @Body() body: UpdateUserProfileRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<UserProfileResponseDto> {
-    const resolved = await this.userProfileService.updateProfile({
+    const profile = await this.userProfileService.updateProfile({
       ...body,
       userId: user.id,
     });
-    return toUserProfileResponseDto(resolved);
+    return toUserProfileResponseDto(profile);
   }
 }

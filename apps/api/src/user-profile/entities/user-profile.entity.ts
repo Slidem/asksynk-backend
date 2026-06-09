@@ -6,7 +6,6 @@ export interface UserProfileProps {
   email: string;
   image: string | null;
   phone: string | null;
-  avatarAttachmentId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,9 +16,8 @@ export class UserProfile {
   readonly firstName: string | null;
   readonly lastName: string | null;
   readonly email: string;
-  readonly image: string | null;
+  image: string | null;
   phone: string | null;
-  avatarAttachmentId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -31,7 +29,6 @@ export class UserProfile {
     this.email = props.email;
     this.image = props.image;
     this.phone = props.phone;
-    this.avatarAttachmentId = props.avatarAttachmentId;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }

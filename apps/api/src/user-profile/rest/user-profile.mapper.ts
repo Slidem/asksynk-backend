@@ -1,10 +1,9 @@
-import { ResolvedUserProfile } from "@/api/user-profile/models/user-profile.model";
+import { UserProfile } from "@/api/user-profile/entities/user-profile.entity";
 import { UserProfileResponseDto } from "@/api/user-profile/rest/responses/user-profile.response";
 
 export function toUserProfileResponseDto(
-  resolved: ResolvedUserProfile,
+  profile: UserProfile,
 ): UserProfileResponseDto {
-  const { profile, avatar } = resolved;
   return {
     id: profile.id,
     name: profile.name,
@@ -13,6 +12,5 @@ export function toUserProfileResponseDto(
     email: profile.email,
     image: profile.image,
     phone: profile.phone,
-    avatar: avatar ? { id: avatar.id, url: avatar.url } : null,
   };
 }
