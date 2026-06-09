@@ -18,6 +18,8 @@ import { PublicViewsModule } from "@/api/public-views/public-views.module";
 import { StorageModule } from "@/api/storage/storage.module";
 import { TagsModule } from "@/api/tags/tags.module";
 import { TimersModule } from "@/api/timers/timers.module";
+import { UserProfileModule } from "@/api/user-profile/user-profile.module";
+import { UserSettingsModule } from "@/api/user-settings/user-settings.module";
 
 import { EventsModule } from "./events/events.module";
 import { WebsocketsModule } from "./websockets/ws.module";
@@ -40,6 +42,8 @@ import { WebsocketsModule } from "./websockets/ws.module";
     AuthGuardModule,
     EventsModule,
     TimersModule,
+    UserProfileModule,
+    UserSettingsModule,
   ],
   controllers: [HealthController, AuthController],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

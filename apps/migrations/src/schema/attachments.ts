@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   index,
   integer,
   pgEnum,
@@ -30,7 +31,7 @@ export const attachments = pgTable(
       .default(sql`uuidv7()`),
     ownerUserId: text("owner_user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
     placement: attachmentPlacement("placement").notNull(),
     storageKey: text("storage_key").notNull(),
     contentType: text("content_type").notNull(),

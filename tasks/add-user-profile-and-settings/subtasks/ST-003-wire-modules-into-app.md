@@ -2,7 +2,7 @@
 id: ST-003
 task: add-user-profile-and-settings
 title: Wire modules into app
-status: todo
+status: done
 source: overview
 depends_on: [ST-001, ST-002]
 owns:
@@ -12,25 +12,46 @@ created: 2026-06-08
 ---
 
 ## Context
-<!-- Why this sub-task exists; the slice of the source note it implements. -->
+
+ST-001 (`UserProfileModule`) and ST-002 (`UserSettingsModule`) each built a module but
+deliberately left it unregistered to avoid colliding on `app.module.ts` in parallel
+worktrees. This sub-task is the integration step: register both modules so their
+controllers/routes are actually served.
 
 ## Plan
-<!-- Concrete steps to implement, staying within owns:. -->
+
+1. Import `UserProfileModule` and `UserSettingsModule` (via `@/api/...` aliases).
+2. Add both to the `AppModule` `imports` array.
 
 ## Changes contained
-<!-- Files/dirs created or edited here (must be inside owns:). -->
+
+- `apps/api/src/app.module.ts` — two imports + two `imports[]` entries.
 
 ## Out of scope
-<!-- Explicitly not touched here (owned by other sub-tasks). -->
+
+- The modules themselves (ST-001 / ST-002).
+- Migration SQL generation (`apps/migrations/migrations/**`, shared journal) — both
+  source sub-tasks deferred it to post-merge; not in this sub-task's `owns:`. Must be
+  run before the API will boot against the DB (see Notes).
 
 ## Verification
-<!-- How to prove it works: tests/commands to run. -->
+
+API typecheck/build (manual, project rule):
+
+```sh
+pnpm --filter @asksynk/api exec tsc --noEmit
+# or: pnpm --filter @asksynk/api build
+```
 
 ## Implementation output
-<!-- FILL AFTER WORK. What was built and key files. Required before in-review/done. -->
 
-## API changes
-<!-- Backend only. Endpoint/contract changes. DELETE this whole section if no API changes. -->
+`apps/api/src/app.module.ts`: added `UserProfileModule` and `UserSettingsModule`
+imports and registered both in the `imports` array. No other changes.
 
 ## Notes/decisions
-<!-- Anything worth recording for reviewers. -->
+
+- Strictly within `owns:` (only `app.module.ts`).
+- **Follow-up before runtime**: the `users.phone` / `users.avatarAttachmentId` columns
+  (ST-001) and the `user_settings` table (ST-002) still need a generated + applied
+  drizzle migration. Both deferred it to post-merge to avoid `_journal.json` conflicts;
+  it's outside this sub-task's `owns:` so it isn't done here.

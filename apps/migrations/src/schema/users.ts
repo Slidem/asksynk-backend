@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   jsonb,
   pgTable,
@@ -20,7 +21,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   address: jsonb("address"),
   avatarAttachmentId: uuid("avatar_attachment_id").references(
-    () => attachments.id,
+    (): AnyPgColumn => attachments.id,
     { onDelete: "set null" },
   ),
   createdAt: timestamp("created_at", { withTimezone: true })

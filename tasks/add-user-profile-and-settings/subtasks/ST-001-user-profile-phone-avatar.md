@@ -2,7 +2,7 @@
 id: ST-001
 task: add-user-profile-and-settings
 title: User profile (phone + avatar)
-status: in-progress
+status: done
 source: overview
 depends_on: []
 owns:
@@ -58,6 +58,7 @@ pnpm dev:migrate
 ```
 
 Then, with the api running and an authed session:
+
 - `GET /profile` → 200 with `{ id, email, phone, avatar, … }`.
 - `PATCH /profile { "phone": "+40..." }` → phone persisted.
 - Upload a public attachment (POST /attachments placement=public → finalize), then

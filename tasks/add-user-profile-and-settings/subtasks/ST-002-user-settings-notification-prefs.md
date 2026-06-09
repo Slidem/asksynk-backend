@@ -2,7 +2,7 @@
 id: ST-002
 task: add-user-profile-and-settings
 title: User settings (notification prefs)
-status: in-progress
+status: done
 source: overview
 depends_on: []
 owns:
@@ -13,12 +13,14 @@ created: 2026-06-08
 ---
 
 ## Context
+
 Overview note: users need account settings, starting with notification prefs
 ("attention items notifications, timer notifications etc."). This slice adds a
 `user_settings` table + a `user-settings` NestJS module exposing get/update of a
 user's notification preferences. Mirrors the existing timer-settings slice.
 
 ## Plan
+
 1. `userSettings` Drizzle schema — one row per user (unique `user_id` FK,
    cascade delete), two boolean prefs defaulting to `true`, timestamps.
 2. `user-settings` module mirroring the timers settings pattern: entity, model
@@ -27,6 +29,7 @@ user's notification preferences. Mirrors the existing timer-settings slice.
    mapper.
 
 ## Changes contained
+
 - `apps/migrations/src/schema/userSettings.ts` — `user_settings` table.
 - `apps/api/src/user-settings/entities/user-settings.entity.ts`
 - `apps/api/src/user-settings/models/user-settings.model.ts`
@@ -39,6 +42,7 @@ user's notification preferences. Mirrors the existing timer-settings slice.
 - `apps/api/src/user-settings/user-settings.module.ts`
 
 ## Out of scope
+
 - Registering `UserSettingsModule` in `apps/api/src/app.module.ts` — ST-003.
 - Generating the SQL migration (`apps/migrations/migrations/**`, shared journal)
   — deferred to integration; can't run in parallel worktrees. Schema file only.
@@ -47,12 +51,14 @@ user's notification preferences. Mirrors the existing timer-settings slice.
 - User profile fields (phone/avatar) — ST-001.
 
 ## Verification
+
 - API typecheck/build: `pnpm --filter @asksynk/api build` (or `nest build`).
 - Migration generation (integration step, run from a merged branch):
   `pnpm --filter @asksynk/migrations db:generate` → review SQL → `db:migrate`.
 - `taskflow check ST-002`.
 
 ## Implementation output
+
 Added a `user-settings` module + `user_settings` table for per-user notification
 preferences, following the timer-settings slice exactly.
 
@@ -68,6 +74,7 @@ preferences, following the timer-settings slice exactly.
   `@AuthUser()`, returns `UserSettingsResponse` through the mapper.
 
 ## API changes
+
 Base path `/user-settings` (authenticated, current user).
 
 - `GET /user-settings` → `200` `UserSettingsResponse`
@@ -76,12 +83,14 @@ Base path `/user-settings` (authenticated, current user).
   `200` `UserSettingsResponse`.
 
 `UpdateUserSettingsDto` / `UserSettingsResponse`:
+
 ```
 attentionItemNotifications: boolean
 timerNotifications: boolean
 ```
 
 ## Notes/decisions
+
 - PUT (full replace) over PATCH to match the timer-settings convention; both
   prefs are always present, no partial-update need (YAGNI).
 - Kept to the two named prefs (attention-item + timer); no channels/per-type
