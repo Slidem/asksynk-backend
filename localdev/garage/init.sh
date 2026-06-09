@@ -42,14 +42,17 @@ done
 # Public bucket served anonymously over the web endpoint (:3902).
 G bucket website --allow "$BUCKET_PUBLIC" || true
 
-# CORS on the private bucket so browsers can POST/GET directly (S3 API op).
-docker run --rm \
-  --network "container:${CONTAINER}" \
-  -e AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
-  -e AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
-  -e AWS_DEFAULT_REGION=garage \
-  -v "${CORS_JSON}:/cors.json:ro" \
-  amazon/aws-cli --endpoint-url http://localhost:3900 \
-  s3api put-bucket-cors --bucket "$BUCKET_PRIVATE" --cors-configuration file:///cors.json
+# CORS so browsers can POST/GET directly (S3 API op). Both buckets take direct
+# browser uploads via presigned POST (attachments -> private, avatars -> public).
+for BUCKET in "$BUCKET_PRIVATE" "$BUCKET_PUBLIC"; do
+  docker run --rm \
+    --network "container:${CONTAINER}" \
+    -e AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
+    -e AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+    -e AWS_DEFAULT_REGION=garage \
+    -v "${CORS_JSON}:/cors.json:ro" \
+    amazon/aws-cli --endpoint-url http://localhost:3900 \
+    s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration file:///cors.json
+done
 
 echo "garage init done"
