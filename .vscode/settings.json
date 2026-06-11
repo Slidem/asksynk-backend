@@ -24,6 +24,7 @@
     "Readables",
     "responfications",
     "rrule",
+    "Syncable",
     "tmpl"
   ],
   "C_Cpp.errorSquiggles": "disabled"

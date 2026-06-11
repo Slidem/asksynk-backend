@@ -5,9 +5,11 @@ import { Pool } from "pg";
 import { attachments } from "@/migrations/schema/attachments";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
+import { calendarEventLinks } from "@/migrations/schema/calendarEventLinks";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";
+import { calendarIntegrations } from "@/migrations/schema/calendarIntegrations";
 import { calendars } from "@/migrations/schema/calendars";
 import {
   messageAttachments,
@@ -42,6 +44,8 @@ export const getDbInstance = (config: ConfigService) => {
       calendarEvents,
       calendarEventExceptions,
       calendarEventTags,
+      calendarIntegrations,
+      calendarEventLinks,
       userInvites,
       userNetwork,
       publicViews,

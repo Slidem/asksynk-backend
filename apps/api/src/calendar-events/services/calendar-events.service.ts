@@ -4,6 +4,7 @@ import { pick, pickBy } from "lodash";
 
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
 import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
+import { toCalendarEventInstance } from "@/api/calendar-events/mappers/calendar-event-instance.mapper";
 import { CalendarEventInstance } from "@/api/calendar-events/models/calendar-event-instance.model";
 import { CreateCalendarEventInput } from "@/api/calendar-events/models/create-calendar-event.model";
 import { DetachCalendarEventInstanceInput } from "@/api/calendar-events/models/detach-calendar-event-instance.model";
@@ -50,7 +51,7 @@ export class CalendarEventsService {
 
   @Transactional()
   async getCalendar(userId: string): Promise<Calendar> {
-    const calendar = await this.calendarRepository.getByUserId(userId);
+    const calendar = await this.calendarRepository.getAsksynkByUserId(userId);
     if (!calendar) {
       throw AsksynkError.notFound("Calendar not found");
     }
@@ -61,7 +62,7 @@ export class CalendarEventsService {
   async createCalendarEvent(
     userId: string,
     input: CreateCalendarEventInput,
-  ): Promise<CalendarEvent> {
+  ): Promise<CalendarEventInstance> {
     const calendar = await this.ensureCalendar(userId);
 
     const rrule = input.rrule
@@ -99,7 +100,7 @@ export class CalendarEventsService {
       startAt: created.start.toISOString(),
       endAt: endAt.toISOString(),
     });
-    return created;
+    return toCalendarEventInstance(created, calendar.source);
   }
 
   @Transactional()
@@ -121,15 +122,32 @@ export class CalendarEventsService {
   }
 
   @Transactional()
+  async getCalendarEventInstance(
+    userId: string,
+    eventId: string,
+  ): Promise<CalendarEventInstance> {
+    const event = await this.getCalendarEvent(userId, eventId);
+    return this.toInstance(event);
+  }
+
+  @Transactional()
   async listCalendarEvents(
     userId: string,
     input: ListCalendarEventsInput,
   ): Promise<CalendarEventInstance[]> {
-    const calendar = await this.calendarRepository.getByUserId(userId);
-    if (!calendar) return [];
+    const calendars = await this.calendarRepository.listByUserId(userId);
+    if (calendars.length === 0) return [];
+
+    let calendarIds = calendars.map((c) => c.id);
+    if (input.calendarId) {
+      if (!calendarIds.includes(input.calendarId)) {
+        throw AsksynkError.notFound("Calendar not found");
+      }
+      calendarIds = [input.calendarId];
+    }
 
     return this.calendarEventsRepository.listInWindow(
-      calendar.id,
+      calendarIds,
       input.windowStart,
       input.windowEnd,
       input.tagIds,
@@ -140,8 +158,9 @@ export class CalendarEventsService {
   async updateCalendarEvent(
     userId: string,
     input: UpdateCalendarEventInput,
-  ): Promise<CalendarEvent> {
+  ): Promise<CalendarEventInstance> {
     const event = await this.getCalendarEvent(userId, input.eventId);
+    const calendar = await this.calendarRepository.getById(event.calendarId);
 
     const updates = pickBy(
       pick(input, [
@@ -157,6 +176,17 @@ export class CalendarEventsService {
       ]),
       (v) => v !== undefined,
     );
+
+    // Imported (non-native) events are read-only except for tag association.
+    if (
+      (Object.keys(updates).length > 0 || input.rrule !== undefined) &&
+      !calendar?.isNative
+    ) {
+      throw AsksynkError.badRequest(
+        "Imported calendar events are read-only; only tags can be changed",
+      );
+    }
+
     Object.assign(event, updates);
 
     if (input.rrule !== undefined) {
@@ -172,17 +202,30 @@ export class CalendarEventsService {
 
     const updated = await this.calendarEventsRepository.update(event);
     await this.emitUpdated(userId, updated);
-    return updated;
+    return toCalendarEventInstance(updated, calendar?.source ?? "asksynk");
   }
 
   @Transactional()
   async deleteCalendarEvent(userId: string, eventId: string): Promise<void> {
     const event = await this.getCalendarEvent(userId, eventId);
+    const calendar = await this.calendarRepository.getById(event.calendarId);
+    if (!calendar?.isNative) {
+      throw AsksynkError.badRequest(
+        "Imported calendar events are read-only and cannot be deleted",
+      );
+    }
     await this.calendarEventsRepository.delete(eventId);
     await this.eventsPublisher.publish(CalendarEventDeleted, {
       eventId: event.id,
       userId,
     });
+  }
+
+  private async toInstance(
+    event: CalendarEvent,
+  ): Promise<CalendarEventInstance> {
+    const calendar = await this.calendarRepository.getById(event.calendarId);
+    return toCalendarEventInstance(event, calendar?.source ?? "asksynk");
   }
 
   @Transactional()
@@ -212,7 +255,7 @@ export class CalendarEventsService {
       DetachCalendarEventInstanceInput,
       "eventId" | "occurrenceStart"
     >,
-  ): Promise<CalendarEvent> {
+  ): Promise<CalendarEventInstance> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
       throw AsksynkError.badRequest("Calendar event is not recurring");
@@ -251,7 +294,7 @@ export class CalendarEventsService {
     );
     await this.emitUpdated(userId, event);
     await this.emitUpdated(userId, detached);
-    return detached;
+    return this.toInstance(detached);
   }
 
   @Transactional()
@@ -260,7 +303,7 @@ export class CalendarEventsService {
     eventId: string,
     splitStart: string,
     input: Omit<SplitCalendarEventSeriesInput, "eventId">,
-  ): Promise<CalendarEvent> {
+  ): Promise<CalendarEventInstance> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
       throw AsksynkError.badRequest("Calendar event is not recurring");
@@ -297,7 +340,7 @@ export class CalendarEventsService {
 
       const inPlaceUpdated = await this.calendarEventsRepository.update(event);
       await this.emitUpdated(userId, inPlaceUpdated);
-      return inPlaceUpdated;
+      return this.toInstance(inPlaceUpdated);
     }
 
     // UNTIL = splitDate - 1 day + 1 second (just after previous occurrence)
@@ -342,7 +385,7 @@ export class CalendarEventsService {
     );
     await this.emitUpdated(userId, event);
     await this.emitUpdated(userId, splitResult);
-    return splitResult;
+    return this.toInstance(splitResult);
   }
 
   private async emitUpdated(

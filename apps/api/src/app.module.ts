@@ -6,6 +6,7 @@ import { AttentionItemsModule } from "@/api/attention-items/attention-items.modu
 import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
+import { CalendarIntegrationsModule } from "@/api/calendar-integrations/calendar-integrations.module";
 import { ClockModule } from "@/api/common/clock/clock.module";
 import { AllExceptionsFilter } from "@/api/common/errors/errors.filter";
 import { LoggerConfigModule } from "@/api/common/logger/logger.config";
@@ -34,6 +35,7 @@ import { WebsocketsModule } from "./websockets/ws.module";
     AttentionItemsModule,
     TagsModule,
     CalendarEventsModule,
+    CalendarIntegrationsModule,
     NetworksModule,
     PublicViewsModule,
     StorageModule,

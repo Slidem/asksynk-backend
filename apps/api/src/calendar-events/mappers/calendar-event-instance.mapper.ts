@@ -4,10 +4,14 @@ import { getInstanceId } from "../utils/instanceId.utils";
 
 export const toCalendarEventInstance = (
   event: CalendarEvent,
+  source: string,
 ): CalendarEventInstance => {
   return {
     eventId: event.id,
     instanceId: getInstanceId(event.id, event.start),
+    calendarId: event.calendarId,
+    source,
+    readOnly: source !== "asksynk",
     title: event.title,
     description: event.description,
     location: event.location,

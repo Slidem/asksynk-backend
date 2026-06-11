@@ -88,7 +88,7 @@ export const CalendarEventCreated = defineEvent({
     endAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
+  groups: ["attention-items", "calendar-sync"],
 });
 
 export const CalendarEventUpdated = defineEvent({
@@ -101,7 +101,7 @@ export const CalendarEventUpdated = defineEvent({
     endAt: z.optional(z.string()),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
+  groups: ["attention-items", "calendar-sync"],
 });
 
 export const CalendarEventDeleted = defineEvent({
@@ -111,7 +111,7 @@ export const CalendarEventDeleted = defineEvent({
     userId: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
+  groups: ["attention-items", "calendar-sync"],
 });
 
 export const TimerLifecycle = defineEvent({

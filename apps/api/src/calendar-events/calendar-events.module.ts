@@ -17,6 +17,6 @@ import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher
     TagRepository,
   ],
   controllers: [CalendarEventsController],
-  exports: [CalendarEventsService],
+  exports: [CalendarEventsService, CalendarRepository, CalendarEventsRepository],
 })
 export class CalendarEventsModule {}

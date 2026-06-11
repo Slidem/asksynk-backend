@@ -110,13 +110,20 @@ export class CalendarEventsRepository {
   }
 
   async listInWindow(
-    calendarId: string,
+    calendarIds: string[],
     windowStart: Date,
     windowEnd: Date,
     tagIds?: string[],
   ): Promise<CalendarEventInstance[]> {
+    if (calendarIds.length === 0) return [];
+
     const windowStartIso = windowStart.toISOString();
     const windowEndIso = windowEnd.toISOString();
+
+    const calendarIdsFragment = sql.join(
+      calendarIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    );
 
     const tagFilterFragment = tagIds?.length
       ? sql`AND EXISTS (
@@ -132,6 +139,7 @@ export class CalendarEventsRepository {
       WITH oneoff AS (
         SELECT
           e.id,
+          e.calendar_id,
           e.title,
           e.description,
           e.location,
@@ -143,7 +151,7 @@ export class CalendarEventsRepository {
           e.rrule,
           e.start AS occ_start
         FROM calendar_events e
-        WHERE e.calendar_id = ${calendarId}
+        WHERE e.calendar_id IN (${calendarIdsFragment})
           AND e.rrule IS NULL
           AND e.start < ${windowEndIso}::timestamp
           AND e.start + (e.duration_seconds * INTERVAL '1 second') > ${windowStartIso}::timestamp
@@ -151,6 +159,7 @@ export class CalendarEventsRepository {
       recurring AS (
         SELECT
           e.id,
+          e.calendar_id,
           e.title,
           e.description,
           e.location,
@@ -163,7 +172,7 @@ export class CalendarEventsRepository {
           occurrence AS occ_start
         FROM calendar_events e
         CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${windowStartIso}::timestamp, ${windowEndIso}::timestamp) AS occurrence
-        WHERE e.calendar_id = ${calendarId}
+        WHERE e.calendar_id IN (${calendarIdsFragment})
           AND e.rrule IS NOT NULL
           AND NOT EXISTS (
             SELECT 1 FROM calendar_event_exceptions ex
@@ -177,6 +186,8 @@ export class CalendarEventsRepository {
       )
       SELECT
         c.id AS event_id,
+        c.calendar_id,
+        cal.source AS calendar_source,
         c.title,
         c.description,
         c.location,
@@ -192,18 +203,23 @@ export class CalendarEventsRepository {
           ARRAY[]::uuid[]
         ) AS tag_ids
       FROM combined c
+      JOIN calendars cal ON cal.id = c.calendar_id
       LEFT JOIN calendar_event_tags et ON et.event_id = c.id
       WHERE TRUE ${tagFilterFragment}
-      GROUP BY c.id, c.title, c.description, c.location, c.link, c.duration_seconds, c.all_day, c.timezone, c.color, c.occ_start, c.rrule
+      GROUP BY c.id, c.calendar_id, cal.source, c.title, c.description, c.location, c.link, c.duration_seconds, c.all_day, c.timezone, c.color, c.occ_start, c.rrule
       ORDER BY c.occ_start
     `);
 
     return (result.rows as Record<string, unknown>[]).map((row) => {
       const instanceStart = new Date((row.instance_start as string) + "Z");
+      const source = row.calendar_source as string;
 
       return {
         eventId: row.event_id as string,
         instanceId: getInstanceId(row.event_id as string, instanceStart),
+        calendarId: row.calendar_id as string,
+        source,
+        readOnly: source !== "asksynk",
         title: row.title as string,
         description: (row.description as string | null) ?? null,
         location: (row.location as string | null) ?? null,

@@ -1,15 +1,18 @@
-import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+} from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { CalendarEventsRepository } from "@/api/calendar-events/repositories/calendar-events.repository";
 import { AsksynkError, ErrorType } from "@/api/common/errors/errors.model";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new ContextLogger(CalendarEventsRepository.name);
+  private readonly logger = new ContextLogger(AllExceptionsFilter.name);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  catch(exception: any, host: ArgumentsHost) {
+  catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
 
@@ -25,16 +28,38 @@ export class AllExceptionsFilter implements ExceptionFilter {
         statusCode: exception.statusCode,
         message: exception.message,
       });
-    } else {
-      this.logger.error("Unexpected error occurred", {
-        error: exception.message,
-        stack: exception.stack,
-      });
-      response.status(500).json({
-        error: ErrorType.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
-        message: "An unexpected error occurred",
-      });
+      return;
     }
+
+    // NestJS built-in exceptions (validation 400s, 404s, etc.). Preserve their
+    // status + body; only 5xx is worth an error-level log with a stack.
+    if (exception instanceof HttpException) {
+      const statusCode = exception.getStatus();
+      if (statusCode >= 500) {
+        this.logger.error("HTTP exception", {
+          statusCode,
+          message: exception.message,
+          stack: exception.stack,
+        });
+      } else {
+        this.logger.warn("HTTP exception", {
+          statusCode,
+          message: exception.message,
+        });
+      }
+      response.status(statusCode).json(exception.getResponse());
+      return;
+    }
+
+    const err = exception as { message?: string; stack?: string };
+    this.logger.error("Unexpected error occurred", {
+      error: err?.message,
+      stack: err?.stack,
+    });
+    response.status(500).json({
+      error: ErrorType.INTERNAL_SERVER_ERROR,
+      statusCode: 500,
+      message: "An unexpected error occurred",
+    });
   }
 }

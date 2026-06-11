@@ -167,6 +167,29 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  /**
+   * Registers a recurring (cron) schedule for a queue. pg-boss runs a single
+   * clock-monitoring instance, so the job is enqueued on exactly one API
+   * instance per tick — no leader election needed. Idempotent: re-registering
+   * the same queue updates its schedule. Consume the resulting jobs with
+   * {@link work}.
+   */
+  async scheduleCron<T extends object>(
+    queue: string,
+    cron: string,
+    data?: T,
+    opts: SendOptions = {},
+  ): Promise<void> {
+    const boss = this.requireBoss();
+    await this.ensureQueue(queue);
+    await boss.schedule(queue, cron, data ?? {}, opts);
+  }
+
+  /** Removes a previously registered cron schedule. */
+  async unscheduleCron(queue: string): Promise<void> {
+    await this.requireBoss().unschedule(queue);
+  }
+
   private requireBoss(): PgBoss {
     if (!this.boss) {
       throw new Error("MessageBusService not initialized");

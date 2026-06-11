@@ -32,7 +32,6 @@ import {
 } from "@/api/common/decorators/param.decorators";
 import { NetworksService } from "@/api/networks/services/networks.service";
 
-import { toCalendarEventInstance } from "../mappers/calendar-event-instance.mapper";
 import { CalendarEventInstance } from "../models/calendar-event-instance.model";
 
 @Controller()
@@ -63,24 +62,20 @@ export class CalendarEventsController {
     @Body() dto: CreateCalendarEventRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
-    const event = await this.calendarEventsService.createCalendarEvent(
-      user.id,
-      {
-        id: dto.id,
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        link: dto.link,
-        start: parseIsoWallClockInTimezone(dto.start, dto.timezone),
-        durationSeconds: dto.durationSeconds,
-        allDay: dto.allDay,
-        timezone: dto.timezone,
-        rrule: dto.rrule,
-        color: dto.color,
-        tagIds: dto.tagIds,
-      },
-    );
-    return toCalendarEventInstance(event);
+    return this.calendarEventsService.createCalendarEvent(user.id, {
+      id: dto.id,
+      title: dto.title,
+      description: dto.description,
+      location: dto.location,
+      link: dto.link,
+      start: parseIsoWallClockInTimezone(dto.start, dto.timezone),
+      durationSeconds: dto.durationSeconds,
+      allDay: dto.allDay,
+      timezone: dto.timezone,
+      rrule: dto.rrule,
+      color: dto.color,
+      tagIds: dto.tagIds,
+    });
   }
 
   @AllowGuest()
@@ -98,6 +93,7 @@ export class CalendarEventsController {
       windowStart: parseIsoWallClockInTimezone(query.start, query.timezone),
       windowEnd: parseIsoWallClockInTimezone(query.end, query.timezone),
       tagIds: query.tagIds,
+      calendarId: query.calendarId,
     });
   }
 
@@ -106,11 +102,7 @@ export class CalendarEventsController {
     @UuidV7Param("id") id: string,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
-    const event = await this.calendarEventsService.getCalendarEvent(
-      user.id,
-      id,
-    );
-    return toCalendarEventInstance(event);
+    return this.calendarEventsService.getCalendarEventInstance(user.id, id);
   }
 
   @Put("calendar-events/:id")
@@ -119,27 +111,23 @@ export class CalendarEventsController {
     @Body() dto: UpdateCalendarEventRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
-    const event = await this.calendarEventsService.updateCalendarEvent(
-      user.id,
-      {
-        eventId: id,
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        link: dto.link,
-        start:
-          dto.start && dto.timezone
-            ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
-            : undefined,
-        durationSeconds: dto.durationSeconds,
-        allDay: dto.allDay,
-        timezone: dto.timezone,
-        rrule: dto.rrule,
-        color: dto.color,
-        tagIds: dto.tagIds,
-      },
-    );
-    return toCalendarEventInstance(event);
+    return this.calendarEventsService.updateCalendarEvent(user.id, {
+      eventId: id,
+      title: dto.title,
+      description: dto.description,
+      location: dto.location,
+      link: dto.link,
+      start:
+        dto.start && dto.timezone
+          ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
+          : undefined,
+      durationSeconds: dto.durationSeconds,
+      allDay: dto.allDay,
+      timezone: dto.timezone,
+      rrule: dto.rrule,
+      color: dto.color,
+      tagIds: dto.tagIds,
+    });
   }
 
   @Delete("calendar-events/:id")
@@ -172,26 +160,20 @@ export class CalendarEventsController {
     @Body() dto: UpdateCalendarEventInstanceRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
-    const event = await this.calendarEventsService.detachInstance(
-      user.id,
-      id,
-      start,
-      {
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        link: dto.link,
-        start:
-          dto.start && dto.timezone
-            ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
-            : undefined,
-        durationSeconds: dto.durationSeconds,
-        timezone: dto.timezone,
-        color: dto.color,
-        tagIds: dto.tagIds,
-      },
-    );
-    return toCalendarEventInstance(event);
+    return this.calendarEventsService.detachInstance(user.id, id, start, {
+      title: dto.title,
+      description: dto.description,
+      location: dto.location,
+      link: dto.link,
+      start:
+        dto.start && dto.timezone
+          ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
+          : undefined,
+      durationSeconds: dto.durationSeconds,
+      timezone: dto.timezone,
+      color: dto.color,
+      tagIds: dto.tagIds,
+    });
   }
 
   @Put("calendar-events/:id/split/:start")
@@ -201,23 +183,17 @@ export class CalendarEventsController {
     @Body() dto: SplitCalendarEventSeriesRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstance> {
-    const event = await this.calendarEventsService.splitSeries(
-      user.id,
-      id,
-      start,
-      {
-        title: dto.title,
-        description: dto.description,
-        location: dto.location,
-        link: dto.link,
-        start: dto.start,
-        durationSeconds: dto.durationSeconds,
-        timezone: dto.timezone,
-        rrule: dto.rrule,
-        color: dto.color,
-        tagIds: dto.tagIds,
-      },
-    );
-    return toCalendarEventInstance(event);
+    return this.calendarEventsService.splitSeries(user.id, id, start, {
+      title: dto.title,
+      description: dto.description,
+      location: dto.location,
+      link: dto.link,
+      start: dto.start,
+      durationSeconds: dto.durationSeconds,
+      timezone: dto.timezone,
+      rrule: dto.rrule,
+      color: dto.color,
+      tagIds: dto.tagIds,
+    });
   }
 }

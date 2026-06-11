@@ -27,4 +27,9 @@ export class ListCalendarEventsQueryDto {
   @IsUUID("all", { each: true })
   @Transform(({ value }) => (typeof value === "string" ? [value] : value))
   tagIds?: string[];
+
+  /** Optional: only return events from this calendar (default: all the user's calendars) */
+  @IsOptional()
+  @IsUUID()
+  calendarId?: string;
 }
