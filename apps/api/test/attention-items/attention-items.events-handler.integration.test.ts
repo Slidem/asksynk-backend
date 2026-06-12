@@ -5,7 +5,7 @@ import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
@@ -34,6 +34,7 @@ import {
   messageThreads,
   threadParticipants,
 } from "@/migrations/schema/messaging";
+import { eventsOutbox } from "@/migrations/schema/outbox";
 import { tags as tagsTable } from "@/migrations/schema/tags";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
@@ -317,6 +318,30 @@ describe("AttentionItemsEventHandler (integration)", () => {
     });
   }
 
+  async function awaitOutboxAttentionCreated(
+    itemId: string,
+  ): Promise<{ item: AttentionItemResponse }> {
+    const rows = await pollUntil(
+      () =>
+        db
+          .select({
+            payload: eventsOutbox.payload,
+            deliveryMode: eventsOutbox.deliveryMode,
+          })
+          .from(eventsOutbox)
+          .where(
+            and(
+              eq(eventsOutbox.eventType, "attention.created"),
+              sql`${eventsOutbox.payload}->'item'->>'id' = ${itemId}`,
+            ),
+          ),
+      (xs) => xs.length > 0,
+      { timeoutMs: POLL_TIMEOUT_MS },
+    );
+    expect(rows[0].deliveryMode).toBe("realtime");
+    return rows[0].payload as { item: AttentionItemResponse };
+  }
+
   function approxEqual(actual: string | null, expected: Date): boolean {
     if (!actual) return false;
 
@@ -342,6 +367,24 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(item.tagIds).toEqual([tagId]);
       expect(item.userId).toBe(recipient.id);
       expect(item.type).toBe("tagged_message");
+    });
+
+    it("should publish a realtime attention.created event identical to the GET response", async () => {
+      const tagId = await createTag({
+        type: "immediately",
+        responseTimeMillis: 30 * 60 * 1000,
+      });
+      const msgId = await sendTaggedMessage("hello", [tagId]);
+
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      const { item: emitted } = await awaitOutboxAttentionCreated(item.id);
+
+      // Payload must match the GET /attention-items shape byte-for-byte.
+      expect(emitted).toEqual(item);
+      // tagIds populated (empty => client stays silent); metadata.type === item.type.
+      expect(emitted.tagIds.length).toBeGreaterThan(0);
+      expect(emitted.metadata.type).toBe(emitted.type);
     });
 
     it("should set due date to start of ongoing timeblock when message arrives during it", async () => {

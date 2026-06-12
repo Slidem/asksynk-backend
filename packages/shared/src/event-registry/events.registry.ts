@@ -127,3 +127,42 @@ export const TimerLifecycle = defineEvent({
   delivery: DeliveryMode.Dual,
   groups: ["timer-event-log"],
 });
+
+const attentionItemTypeSchema = z.enum([
+  "tagged_message",
+  "incoming_email",
+  "slack_message",
+  "whatsapp_message",
+  "suggested_timeblock",
+  "suggested_task",
+]);
+
+// Mirrors AttentionItemResponse (apps/api). Kept inline because the shared
+// package must not depend on apps/api. metadata is `{ type } & Partial<TaggedMessageMetadata>`.
+const attentionItemDtoSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: attentionItemTypeSchema,
+  status: z.enum(["created", "in_progress", "resolved"]),
+  dueDate: z.string().nullable(),
+  note: z.string().nullable(),
+  metadata: z.object({
+    type: attentionItemTypeSchema,
+    messageId: z.string().optional(),
+    threadId: z.string().optional(),
+    senderId: z.string().optional(),
+    senderType: z.enum(["user", "guest"]).optional(),
+    content: z.string().optional(),
+    originalTagIds: z.array(z.string()).optional(),
+  }),
+  tagIds: z.array(z.string()),
+  sourceCalendarEventId: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const AttentionItemCreated = defineEvent({
+  name: "attention.created",
+  schema: z.object({ item: attentionItemDtoSchema }),
+  delivery: DeliveryMode.Realtime,
+});

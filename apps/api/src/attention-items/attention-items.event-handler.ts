@@ -4,6 +4,7 @@ import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-item.model";
 import { Tag } from "@/api/tags/entities/tag.entity";
@@ -27,6 +28,7 @@ export class AttentionItemsEventHandler {
 
   constructor(
     private readonly attentionItemsRepository: AttentionItemsRepository,
+    private readonly attentionItemsService: AttentionItemsService,
     private readonly tagRepository: TagRepository,
   ) {}
 
@@ -228,7 +230,7 @@ export class AttentionItemsEventHandler {
         `Creating attention item for user ${userId} based on message ${message.id}`,
       );
 
-      await this.attentionItemsRepository.add({
+      await this.attentionItemsService.create({
         id: generateId(),
         userId,
         type: "tagged_message",

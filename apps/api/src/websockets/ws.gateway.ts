@@ -19,6 +19,7 @@ import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
+  AttentionItemCreated,
   MessageCreated,
   MessageUpdated,
   TimerLifecycle,
@@ -300,5 +301,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.server.to(userRoom(payload.userId)).emit("timer.completed", payload);
+  }
+
+  @EventHandler(AttentionItemCreated)
+  async onAttentionItemCreated(
+    payload: EventOf<typeof AttentionItemCreated>,
+  ): Promise<void> {
+    this.server
+      .to(userRoom(payload.item.userId))
+      .emit("attention.created", { item: payload.item });
   }
 }
