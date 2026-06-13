@@ -15,6 +15,7 @@ export class ListAttentionItemsQueryDto {
     "whatsapp_message",
     "suggested_timeblock",
     "suggested_task",
+    "task",
   ])
   type?: AttentionItemType;
 

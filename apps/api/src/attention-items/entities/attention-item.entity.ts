@@ -10,6 +10,7 @@ export interface AttentionItemProps {
   type: AttentionItemType;
   status: AttentionItemStatus;
   dueDate: Date | null;
+  dueDatePinned: boolean;
   note: string | null;
   metadata: AttentionItemMetadata;
   tagIds: string[];
@@ -25,6 +26,7 @@ export class AttentionItem {
   readonly type: AttentionItemType;
   status: AttentionItemStatus;
   dueDate: Date | null;
+  readonly dueDatePinned: boolean;
   note: string | null;
   readonly metadata: AttentionItemMetadata;
   tagIds: string[];
@@ -39,6 +41,7 @@ export class AttentionItem {
     this.type = props.type;
     this.status = props.status;
     this.dueDate = props.dueDate;
+    this.dueDatePinned = props.dueDatePinned;
     this.note = props.note;
     this.metadata = props.metadata;
     this.tagIds = props.tagIds;

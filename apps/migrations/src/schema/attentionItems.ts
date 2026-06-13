@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   jsonb,
   pgEnum,
@@ -18,6 +19,7 @@ export const attentionItemType = pgEnum("attention_item_type", [
   "whatsapp_message",
   "suggested_timeblock",
   "suggested_task",
+  "task",
 ]);
 
 export const attentionItemStatus = pgEnum("attention_item_status", [
@@ -38,6 +40,7 @@ export const attentionItems = pgTable(
     type: attentionItemType("type").notNull(),
     status: attentionItemStatus("status").notNull().default("created"),
     dueDate: timestamp("due_date", { withTimezone: true }),
+    dueDatePinned: boolean("due_date_pinned").notNull().default(false),
     note: text("note"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
     sourceCalendarEventId: uuid("source_calendar_event_id"),

@@ -4,7 +4,8 @@ export type AttentionItemType =
   | "slack_message"
   | "whatsapp_message"
   | "suggested_timeblock"
-  | "suggested_task";
+  | "suggested_task"
+  | "task";
 
 export type AttentionItemStatus = "created" | "in_progress" | "resolved";
 
@@ -18,13 +19,34 @@ export type TaggedMessageMetadata = {
   originalTagIds: string[];
 };
 
-export type AttentionItemMetadata = TaggedMessageMetadata;
+// Realized tagged task or batch. Exactly one of taskId / taskBatchId is set.
+export type TaskMetadata = {
+  type: "task";
+  title: string;
+  taskId?: string;
+  taskBatchId?: string;
+};
+
+// Inbox item for a pending suggestion awaiting accept/reject.
+export type SuggestedTaskMetadata = {
+  type: "suggested_task";
+  suggestionId: string;
+  suggesterUserId: string;
+  title: string;
+};
+
+export type AttentionItemMetadata =
+  | TaggedMessageMetadata
+  | TaskMetadata
+  | SuggestedTaskMetadata;
 
 export interface CreateAttentionItemInput {
   id: string;
   userId: string;
   type: AttentionItemType;
   dueDate: Date | null;
+  // Explicit due date that must survive tag/calendar recomputes. Defaults false.
+  dueDatePinned?: boolean;
   metadata: AttentionItemMetadata;
   tagIds: string[];
   sourceCalendarEventId: string | null;
@@ -44,3 +66,9 @@ export interface ListAttentionItemsInput {
   limit?: number;
   cursor?: string;
 }
+
+// A non-message domain object an attention item mirrors, found via metadata.
+export type AttentionSource =
+  | { taskId: string }
+  | { taskBatchId: string }
+  | { suggestionId: string };

@@ -135,10 +135,11 @@ const attentionItemTypeSchema = z.enum([
   "whatsapp_message",
   "suggested_timeblock",
   "suggested_task",
+  "task",
 ]);
 
 // Mirrors AttentionItemResponse (apps/api). Kept inline because the shared
-// package must not depend on apps/api. metadata is `{ type } & Partial<TaggedMessageMetadata>`.
+// package must not depend on apps/api. metadata is `{ type } & Partial<...>`.
 const attentionItemDtoSchema = z.object({
   id: z.string(),
   userId: z.string(),
@@ -154,6 +155,11 @@ const attentionItemDtoSchema = z.object({
     senderType: z.enum(["user", "guest"]).optional(),
     content: z.string().optional(),
     originalTagIds: z.array(z.string()).optional(),
+    title: z.string().optional(),
+    taskId: z.string().optional(),
+    taskBatchId: z.string().optional(),
+    suggestionId: z.string().optional(),
+    suggesterUserId: z.string().optional(),
   }),
   tagIds: z.array(z.string()),
   sourceCalendarEventId: z.string().nullable(),
@@ -163,6 +169,12 @@ const attentionItemDtoSchema = z.object({
 
 export const AttentionItemCreated = defineEvent({
   name: "attention.created",
+  schema: z.object({ item: attentionItemDtoSchema }),
+  delivery: DeliveryMode.Realtime,
+});
+
+export const AttentionItemUpdated = defineEvent({
+  name: "attention.updated",
   schema: z.object({ item: attentionItemDtoSchema }),
   delivery: DeliveryMode.Realtime,
 });

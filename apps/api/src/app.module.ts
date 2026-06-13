@@ -18,6 +18,7 @@ import { NetworksModule } from "@/api/networks/networks.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
 import { StorageModule } from "@/api/storage/storage.module";
 import { TagsModule } from "@/api/tags/tags.module";
+import { TasksModule } from "@/api/tasks/tasks.module";
 import { TimersModule } from "@/api/timers/timers.module";
 import { UserProfileModule } from "@/api/user-profile/user-profile.module";
 import { UserSettingsModule } from "@/api/user-settings/user-settings.module";
@@ -34,6 +35,7 @@ import { WebsocketsModule } from "./websockets/ws.module";
     TxModule,
     AttentionItemsModule,
     TagsModule,
+    TasksModule,
     CalendarEventsModule,
     CalendarIntegrationsModule,
     NetworksModule,

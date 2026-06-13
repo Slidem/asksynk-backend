@@ -3,11 +3,11 @@ import { Transactional } from "@nestjs-cls/transactional";
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 
+import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-item.model";
-import { Tag } from "@/api/tags/entities/tag.entity";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
@@ -30,6 +30,7 @@ export class AttentionItemsEventHandler {
     private readonly attentionItemsRepository: AttentionItemsRepository,
     private readonly attentionItemsService: AttentionItemsService,
     private readonly tagRepository: TagRepository,
+    private readonly dueDateService: AttentionDueDateService,
   ) {}
 
   @Transactional()
@@ -93,7 +94,7 @@ export class AttentionItemsEventHandler {
       await this.attentionItemsRepository.update(item);
     }
 
-    await this.recomputeDueDatesForItems(existing);
+    await this.dueDateService.recomputeForItems(existing);
   }
 
   @EventHandler(CalendarEventCreated, { group: "attention-items" })
@@ -107,7 +108,7 @@ export class AttentionItemsEventHandler {
     const items = await this.attentionItemsRepository.findByTagIds(
       payload.tagIds!,
     );
-    await this.recomputeDueDatesForItems(this.activeItems(items));
+    await this.dueDateService.recomputeForItems(this.activeItems(items));
   }
 
   @EventHandler(CalendarEventUpdated, { group: "attention-items" })
@@ -120,7 +121,7 @@ export class AttentionItemsEventHandler {
       payload.tagIds || [],
     );
 
-    await this.recomputeDueDatesForItems(items);
+    await this.dueDateService.recomputeForItems(items);
   }
 
   @EventHandler(CalendarEventDeleted, { group: "attention-items" })
@@ -133,7 +134,7 @@ export class AttentionItemsEventHandler {
         payload.eventId,
       );
 
-    await this.recomputeDueDatesForItems(this.activeItems(items));
+    await this.dueDateService.recomputeForItems(this.activeItems(items));
   }
 
   @EventHandler(TagUpdated, { group: "attention-items" })
@@ -147,7 +148,7 @@ export class AttentionItemsEventHandler {
     const updatedTag = await this.tagRepository.getById(payload.id);
     if (!updatedTag) return;
 
-    await this.recomputeDueDatesForItems(affectedItems);
+    await this.dueDateService.recomputeForItems(affectedItems);
   }
 
   @EventHandler(TagDeleted, { group: "attention-items" })
@@ -174,7 +175,7 @@ export class AttentionItemsEventHandler {
       ),
     );
 
-    await this.recomputeDueDatesForItems(this.activeItems(remaining));
+    await this.dueDateService.recomputeForItems(this.activeItems(remaining));
 
     await this.attentionItemsRepository.deleteTagAssociations(payload.tagId);
   }
@@ -204,7 +205,6 @@ export class AttentionItemsEventHandler {
     }
 
     const tagIds = message.tagIds!;
-    const tags = await this.tagRepository.getByIds(tagIds);
     const sentAt = new Date(message.createdAt);
 
     const metadata: TaggedMessageMetadata = {
@@ -217,13 +217,8 @@ export class AttentionItemsEventHandler {
       originalTagIds: tagIds,
     };
 
-    const occurrenceMap = await this.fetchOccurrenceMap(tags, sentAt);
-    const tagsForItem = tags.filter((t) => tagIds.includes(t.id.toString()));
-    const { dueDate, sourceCalendarEventId } = this.pickEarliestCandidate(
-      tagsForItem,
-      sentAt,
-      occurrenceMap,
-    );
+    const { dueDate, sourceCalendarEventId } =
+      await this.dueDateService.deriveFromTags(tagIds, sentAt);
 
     for (const userId of recipientUserIds) {
       this.logger.info(
@@ -264,78 +259,5 @@ export class AttentionItemsEventHandler {
     }
 
     return this.activeItems([...merged.values()]);
-  }
-
-  private async recomputeDueDatesForItems(
-    items: AttentionItem[],
-  ): Promise<void> {
-    if (items.length === 0) return;
-
-    const allTagIds = [...new Set(items.flatMap((i) => i.tagIds))];
-    const tags = await this.tagRepository.getByIds(allTagIds);
-    const tagMap = new Map(tags.map((t) => [t.id.toString(), t]));
-
-    const occurrenceMap = await this.fetchOccurrenceMap(tags, new Date());
-
-    const updates = items.map((item) => {
-      const itemTags = item.tagIds
-        .map((id) => tagMap.get(id))
-        .filter((t): t is Tag => t !== undefined);
-      const { dueDate, sourceCalendarEventId } = this.pickEarliestCandidate(
-        itemTags,
-        item.createdAt,
-        occurrenceMap,
-      );
-      return { id: item.id, dueDate, sourceCalendarEventId };
-    });
-
-    await this.attentionItemsRepository.batchUpdateDueDates(updates);
-  }
-
-  private async fetchOccurrenceMap(
-    tags: Tag[],
-    after: Date,
-  ): Promise<Map<string, { date: Date; eventId: string }>> {
-    const timeblockTagIds = tags
-      .filter((t) => t.answerMode.type === "timeblock")
-      .map((t) => t.id.toString());
-
-    if (timeblockTagIds.length === 0) {
-      return new Map();
-    }
-
-    return this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
-      timeblockTagIds,
-      after,
-    );
-  }
-
-  private pickEarliestCandidate(
-    tags: Tag[],
-    immediateBase: Date,
-    occurrenceMap: Map<string, { date: Date; eventId: string }>,
-  ): { dueDate: Date | null; sourceCalendarEventId: string | null } {
-    let dueDate: Date | null = null;
-    let sourceCalendarEventId: string | null = null;
-
-    for (const tag of tags) {
-      if (tag.answerMode.type === "immediately") {
-        const candidate = new Date(
-          immediateBase.getTime() + tag.answerMode.responseTimeMillis,
-        );
-        if (!dueDate || candidate < dueDate) {
-          dueDate = candidate;
-          sourceCalendarEventId = null;
-        }
-      } else {
-        const candidate = occurrenceMap.get(tag.id.toString());
-        if (candidate && (!dueDate || candidate.date < dueDate)) {
-          dueDate = candidate.date;
-          sourceCalendarEventId = candidate.eventId;
-        }
-      }
-    }
-
-    return { dueDate, sourceCalendarEventId };
   }
 }

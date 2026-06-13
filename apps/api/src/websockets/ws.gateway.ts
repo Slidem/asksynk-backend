@@ -20,6 +20,7 @@ import { AttachmentsService } from "@/api/storage/attachments/services/attachmen
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
   AttentionItemCreated,
+  AttentionItemUpdated,
   MessageCreated,
   MessageUpdated,
   TimerLifecycle,
@@ -310,5 +311,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(userRoom(payload.item.userId))
       .emit("attention.created", { item: payload.item });
+  }
+
+  @EventHandler(AttentionItemUpdated)
+  async onAttentionItemUpdated(
+    payload: EventOf<typeof AttentionItemUpdated>,
+  ): Promise<void> {
+    this.server
+      .to(userRoom(payload.item.userId))
+      .emit("attention.updated", { item: payload.item });
   }
 }

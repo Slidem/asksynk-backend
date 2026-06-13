@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
 import { AttentionItemsEventHandler } from "@/api/attention-items/attention-items.event-handler";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
@@ -13,8 +14,10 @@ import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher
     AttentionItemsRepository,
     AttentionItemsService,
     AttentionItemsEventHandler,
+    AttentionDueDateService,
     TagRepository,
   ],
   controllers: [AttentionItemsController],
+  exports: [AttentionItemsService, AttentionDueDateService],
 })
 export class AttentionItemsModule {}

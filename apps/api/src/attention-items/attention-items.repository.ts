@@ -38,6 +38,7 @@ export class AttentionItemsRepository {
         type: input.type,
         status: "created",
         dueDate: input.dueDate,
+        dueDatePinned: input.dueDatePinned ?? false,
         metadata: input.metadata,
         sourceCalendarEventId: input.sourceCalendarEventId,
       })
@@ -166,6 +167,17 @@ export class AttentionItemsRepository {
       .where(eq(attentionItems.id, id));
   }
 
+  async updateContent(
+    id: string,
+    metadata: AttentionItemMetadata,
+    dueDate: Date | null,
+  ): Promise<void> {
+    await this.txHost.tx
+      .update(attentionItems)
+      .set({ metadata, dueDate, updatedAt: new Date() })
+      .where(eq(attentionItems.id, id));
+  }
+
   async batchUpdateDueDates(
     updates: {
       id: string;
@@ -234,6 +246,43 @@ export class AttentionItemsRepository {
         and(
           isNull(attentionItems.deletedAt),
           sql`${attentionItems.metadata}->>'messageId' = ${messageId}`,
+        ),
+      );
+
+    return this.groupRowsToItems(rows);
+  }
+
+  async findByTaskId(taskId: string): Promise<AttentionItem[]> {
+    return this.findBySourceMetadata("taskId", taskId);
+  }
+
+  async findByTaskBatchId(batchId: string): Promise<AttentionItem[]> {
+    return this.findBySourceMetadata("taskBatchId", batchId);
+  }
+
+  async findBySuggestionId(suggestionId: string): Promise<AttentionItem[]> {
+    return this.findBySourceMetadata("suggestionId", suggestionId);
+  }
+
+  private async findBySourceMetadata(
+    key: "taskId" | "taskBatchId" | "suggestionId",
+    value: string,
+  ): Promise<AttentionItem[]> {
+    const rows = await this.txHost.tx
+      .select({
+        item: attentionItems,
+        tagId: tags.id,
+      })
+      .from(attentionItems)
+      .leftJoin(
+        attentionItemTags,
+        eq(attentionItemTags.attentionItemId, attentionItems.id),
+      )
+      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
+      .where(
+        and(
+          isNull(attentionItems.deletedAt),
+          sql`${attentionItems.metadata}->>${key} = ${value}`,
         ),
       );
 
@@ -374,6 +423,7 @@ export class AttentionItemsRepository {
       type: row.type as AttentionItemType,
       status: row.status as AttentionItemStatus,
       dueDate: row.dueDate,
+      dueDatePinned: row.dueDatePinned ?? false,
       note: row.note,
       metadata: row.metadata as AttentionItemMetadata,
       tagIds,

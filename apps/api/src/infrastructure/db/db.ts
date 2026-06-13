@@ -20,6 +20,11 @@ import {
 import { eventsOutbox } from "@/migrations/schema/outbox";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { tags } from "@/migrations/schema/tags";
+import { taskBatches } from "@/migrations/schema/taskBatches";
+import { taskBatchTags } from "@/migrations/schema/taskBatchTags";
+import { tasks } from "@/migrations/schema/tasks";
+import { taskSuggestions } from "@/migrations/schema/taskSuggestions";
+import { taskTags } from "@/migrations/schema/taskTags";
 import { userInvites, userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
 
@@ -56,6 +61,11 @@ export const getDbInstance = (config: ConfigService) => {
       messageAttachments,
       attachments,
       eventsOutbox,
+      tasks,
+      taskBatches,
+      taskTags,
+      taskBatchTags,
+      taskSuggestions,
     },
     // logger: config.get<string>("ENVIRONMENT") === "dev",
   });
