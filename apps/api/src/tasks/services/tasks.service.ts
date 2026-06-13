@@ -1,8 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { Task } from "@/api/tasks/entities/task.entity";
@@ -14,16 +12,20 @@ import {
 import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
+import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
+import {
+  TaskDeleted,
+  TaskUpserted,
+} from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
 
 @Injectable()
 export class TasksService {
   constructor(
     private readonly tasksRepository: TasksRepository,
-    private readonly attentionItems: AttentionItemsService,
     private readonly tags: TagsService,
-    private readonly dueDate: AttentionDueDateService,
     private readonly taskBatches: TaskBatchesService,
+    private readonly eventsPublisher: EventsPublisher,
   ) {}
 
   @Transactional()
@@ -45,16 +47,15 @@ export class TasksService {
         tagIds: [],
         dueDate: null,
       });
-      await this.taskBatches.resyncBatchAttention(input.batchId);
+      // Adding a child shifts the batch aggregate; the batch owns the item.
+      await this.taskBatches.emitBatchUpserted(input.batchId);
       return task;
     }
 
     // Standalone task: assignee = creator. Tags must belong to the assignee.
     await this.tags.assertOwnedBy(input.assigneeUserId, input.tagIds);
     const task = await this.tasksRepository.add(generateId(), input);
-    if (task.tagIds.length > 0) {
-      await this.createTaskAttentionItem(task);
-    }
+    await this.publishTaskUpserted(task);
     return task;
   }
 
@@ -93,37 +94,25 @@ export class TasksService {
     }
 
     const prevStatus = task.status;
-    let tagsChanged = false;
-    let dueDateChanged = false;
 
     if (input.title !== undefined) task.title = input.title;
     if (input.description !== undefined) task.description = input.description;
-    if (input.dueDate !== undefined) {
-      task.dueDate = input.dueDate;
-      dueDateChanged = true;
-    }
+    if (input.dueDate !== undefined) task.dueDate = input.dueDate;
     if (input.status !== undefined) task.status = input.status;
     if (input.tagIds !== undefined) {
       await this.tags.assertOwnedBy(task.assigneeUserId, input.tagIds);
       task.tagIds = input.tagIds;
-      tagsChanged = true;
     }
 
     const saved = await this.tasksRepository.update(task);
-    const statusChanged =
-      input.status !== undefined && input.status !== prevStatus;
 
     if (saved.batchId) {
-      if (statusChanged) {
-        await this.taskBatches.recomputeBatchStatus(saved.batchId);
+      // Only a child's status moves the batch aggregate; title/description don't.
+      if (input.status !== undefined && input.status !== prevStatus) {
+        await this.taskBatches.emitBatchUpserted(saved.batchId);
       }
-    } else if (tagsChanged || dueDateChanged) {
-      await this.resyncTaskItems(saved);
-    } else if (statusChanged) {
-      await this.attentionItems.syncSourceStatus(
-        { taskId: saved.id },
-        mapTaskStatusToAttention(saved.status),
-      );
+    } else {
+      await this.publishTaskUpserted(saved);
     }
 
     return saved;
@@ -140,42 +129,25 @@ export class TasksService {
     }
     await this.tasksRepository.softDelete(id);
     if (task.batchId) {
-      await this.taskBatches.resyncBatchAttention(task.batchId);
+      await this.taskBatches.emitBatchUpserted(task.batchId);
     } else {
-      await this.attentionItems.deleteBySource({ taskId: id });
+      await this.eventsPublisher.publish(TaskDeleted, { taskId: id });
     }
   }
 
-  // One attention item for the assignee. Explicit due date pins (survives
-  // tag/calendar recomputes); otherwise it is derived from the assignee's tags.
-  // Caller guarantees the task is tagged (untagged → no attention item).
-  private async createTaskAttentionItem(task: Task): Promise<void> {
-    const pinned = task.dueDate !== null;
-    const { dueDate, sourceCalendarEventId } = pinned
-      ? { dueDate: task.dueDate, sourceCalendarEventId: null }
-      : await this.dueDate.deriveFromTags(task.tagIds, new Date());
-
-    await this.attentionItems.create({
-      id: generateId(),
-      userId: task.assigneeUserId,
-      type: "task",
-      dueDate,
-      dueDatePinned: pinned,
-      metadata: { type: "task", title: task.title, taskId: task.id },
+  // One durable event carrying the full post-state; the attention-items consumer
+  // creates/updates/removes the assignee's single "task" item. Untagged tasks
+  // produce no item (the consumer no-ops). Due date is derived consumer-side.
+  private async publishTaskUpserted(task: Task): Promise<void> {
+    await this.eventsPublisher.publish(TaskUpserted, {
+      taskId: task.id,
+      assigneeUserId: task.assigneeUserId,
+      title: task.title,
+      status: mapTaskStatusToAttention(task.status),
       tagIds: task.tagIds,
-      sourceCalendarEventId,
+      dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+      dueDatePinned: task.dueDate !== null,
+      createdAt: task.createdAt.toISOString(),
     });
-  }
-
-  // Rebuilds a standalone task's attention item to reflect current tags + due
-  // date, then re-applies its status. No-op (just removal) when untagged.
-  private async resyncTaskItems(task: Task): Promise<void> {
-    await this.attentionItems.deleteBySource({ taskId: task.id });
-    if (task.tagIds.length === 0) return;
-    await this.createTaskAttentionItem(task);
-    await this.attentionItems.syncSourceStatus(
-      { taskId: task.id },
-      mapTaskStatusToAttention(task.status),
-    );
   }
 }

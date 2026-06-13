@@ -141,6 +141,49 @@ export class AttentionItemsRepository {
     return this.mapRowToItem(updated, item.tagIds);
   }
 
+  // Full in-place update for source-mirrored items (task/batch): rewrites status,
+  // metadata (title), tag list, due date + pin, and calendar source on the same id.
+  // Distinct from update(), which only touches status/note/tags.
+  async updateFromSource(input: {
+    id: string;
+    status: AttentionItemStatus;
+    metadata: AttentionItemMetadata;
+    tagIds: string[];
+    dueDate: Date | null;
+    dueDatePinned: boolean;
+    sourceCalendarEventId: string | null;
+  }): Promise<AttentionItem> {
+    const [updated] = await this.txHost.tx
+      .update(attentionItems)
+      .set({
+        status: input.status,
+        metadata: input.metadata,
+        dueDate: input.dueDate,
+        dueDatePinned: input.dueDatePinned,
+        sourceCalendarEventId: input.sourceCalendarEventId,
+        updatedAt: new Date(),
+      })
+      .where(eq(attentionItems.id, input.id))
+      .returning();
+
+    await this.txHost.tx
+      .delete(attentionItemTags)
+      .where(eq(attentionItemTags.attentionItemId, input.id));
+
+    if (input.tagIds.length > 0) {
+      await this.txHost.tx
+        .insert(attentionItemTags)
+        .values(
+          input.tagIds.map((tagId) => ({
+            attentionItemId: input.id,
+            tagId,
+          })),
+        );
+    }
+
+    return this.mapRowToItem(updated, input.tagIds);
+  }
+
   async softDelete(id: string): Promise<void> {
     this.logger.info("Soft deleting attention item", { id });
 

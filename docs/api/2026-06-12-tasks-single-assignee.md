@@ -40,6 +40,7 @@ Create a task assigned to **you**. To put it in a batch, pass `batchId` (you mus
 **Rules**: if `batchId` is set, `tagIds`/`dueDate` must be empty/absent → otherwise `400 "Tags and due date are managed at batch level"`.
 
 **Response `201`** (`TaskResponse`):
+
 ```json
 {
   "id": "01979f...-7000-...",
@@ -55,12 +56,13 @@ Create a task assigned to **you**. To put it in a batch, pass `batchId` (you mus
   "updatedAt": "2026-06-12T12:00:00.000Z"
 }
 ```
+
 **Side effect**: if tagged, creates a `task` attention item for the assignee (realtime `attention.created`).
 
-| Status | Condition |
-|--------|-----------|
-| 400 | validation / tag not owned / `tagIds`+`dueDate` on a batched task |
-| 403 | adding to a batch you don't assign |
+| Status | Condition                                                         |
+| ------ | ----------------------------------------------------------------- |
+| 400    | validation / tag not owned / `tagIds`+`dueDate` on a batched task |
+| 403    | adding to a batch you don't assign                                |
 
 ---
 
@@ -82,6 +84,7 @@ List tasks visible to you.
 ---
 
 ### `GET /tasks/:id`
+
 Visible to the creator or the assignee. **Response `200`**: `TaskResponse`. `404` if not visible.
 
 ---
@@ -104,6 +107,7 @@ Visible to the creator or the assignee. **Response `200`**: `TaskResponse`. `404
 ---
 
 ### `DELETE /tasks/:id`
+
 **Assignee only** (creator → `403`). **Response `204`**.
 
 ---
@@ -126,6 +130,7 @@ Creates a batch assigned to **you** plus its child tasks.
 | tasks | `{ title, description? }[]` | yes | ≥1; **title/description only** (no per-task tags/dueDate/assignee) |
 
 **Response `201`** (`TaskBatchResponse`):
+
 ```json
 {
   "id": "01979f...batch",
@@ -135,19 +140,24 @@ Creates a batch assigned to **you** plus its child tasks.
   "description": null,
   "dueDate": "2026-07-01T00:00:00.000Z",
   "tagIds": ["01979f...tag"],
-  "tasks": [ /* TaskResponse[] — each batchId=this, assigneeUserId=batch assignee, tagIds:[], dueDate:null */ ],
+  "tasks": [
+    /* TaskResponse[] — each batchId=this, assigneeUserId=batch assignee, tagIds:[], dueDate:null */
+  ],
   "createdAt": "…",
   "updatedAt": "…"
 }
 ```
 
 ### `GET /task-batches/:id`
+
 Creator or assignee. **Response `200`**: `TaskBatchResponse` (with `tasks`).
 
 ### `PATCH /task-batches/:id`
+
 **Assignee only**. Fields (all optional): `title`, `description` (nullable), `dueDate` (string \| null — null clears), `tagIds`. Tag/dueDate changes rebuild the batch attention item. **Response `200`**: `TaskBatchResponse`.
 
 ### `DELETE /task-batches/:id`
+
 **Assignee only**. Soft-deletes the batch + its tasks + the batch attention item. **Response `204`**.
 
 ---
@@ -177,23 +187,34 @@ Creator or assignee. **Response `200`**: `TaskBatchResponse` (with `tasks`).
 | tasks | `{ title, description? }[]` | for `batch` | ≥1; **no per-task tags/dueDate** |
 
 **Response `201`** (`TaskSuggestionResponse`):
+
 ```json
 {
   "id": "01979f...sug",
   "suggesterUserId": "usr_me",
   "suggesteeUserId": "usr_you",
   "status": "pending",
-  "payload": { "kind": "task", "title": "...", "description": null, "dueDate": null, "tagIds": ["01979f...tag"], "tasks": [] },
+  "payload": {
+    "kind": "task",
+    "title": "...",
+    "description": null,
+    "dueDate": null,
+    "tagIds": ["01979f...tag"],
+    "tasks": []
+  },
   "createdAt": "…",
   "updatedAt": "…"
 }
 ```
+
 **Side effect**: creates a `suggested_task` attention item in the suggestee's inbox (realtime `attention.created`).
 
 ### `GET /task-suggestions`
+
 **Query**: `role` = `sent` | `received` (required); `status` = `pending`|`accepted`|`rejected` (optional). **Response `200`**: `TaskSuggestionResponse[]`.
 
 ### `GET /task-suggestions/:id`
+
 Suggester or suggestee. **Response `200`**: `TaskSuggestionResponse`.
 
 ### `PATCH /task-suggestions/:id` — two mutually-exclusive modes
@@ -201,10 +222,12 @@ Suggester or suggestee. **Response `200`**: `TaskSuggestionResponse`.
 Send **either** a status transition **or** payload-edit fields, never both (mixed → `400`; empty → `400`).
 
 **(a) Lifecycle** — `{ "status": "accepted" | "rejected" }`
+
 - `accepted`: **suggestee only**, must be pending. Materializes the payload into real task(s) (`createdBy`=suggester, `assigneeUserId`=suggestee, **tagged with `payload.tagIds`**) and resolves the inbox item. If a proposed tag was deleted since suggesting → `400 "One or more tags not found"` (edit the payload to drop it, then accept).
 - `rejected`: **suggestee only**, must be pending.
 
 **(b) Edit pending payload** — any of `{ title?, description?(nullable), dueDate?(string|null), tagIds?, tasks? }`
+
 - Allowed for **both** the suggester and the suggestee while `pending`.
 - `kind` immutable; `tagIds` must belong to the suggestee (else `400`); `tasks` only valid for `batch` suggestions (else `400`); a batch must keep ≥1 task.
 - Resyncs the suggestee's inbox attention item title + dueDate → realtime **`attention.updated`**. (The inbox item stays untagged; proposed tags live in the payload.)
@@ -212,6 +235,7 @@ Send **either** a status transition **or** payload-edit fields, never both (mixe
 **Response `200`**: `TaskSuggestionResponse`. Errors: `400` mixed/empty/invalid edit, `403` not a party, `400` "Suggestion is not pending".
 
 ### `DELETE /task-suggestions/:id`
+
 Suggester rescinds a pending suggestion (resolves the inbox item). **Response `204`**.
 
 ---
@@ -220,14 +244,15 @@ Suggester rescinds a pending suggestion (resolves the inbox item). **Response `2
 
 Events are emitted to the recipient's user room. Payload is always `{ item: AttentionItem }`.
 
-| Event | When | Status |
-|-------|------|--------|
+| Event               | When                                                                                     | Status   |
+| ------------------- | ---------------------------------------------------------------------------------------- | -------- |
 | `attention.created` | new attention item (tagged message, **tagged task/batch**, or new suggestion inbox item) | existing |
-| `attention.updated` | **NEW** — task/batch status sync, or a pending suggestion's payload edit (title/dueDate) | **new** |
+| `attention.updated` | **NEW** — task/batch status sync, or a pending suggestion's payload edit (title/dueDate) | **new**  |
 
 > Note: background due-date recomputes triggered by calendar/tag edits update the row but do **not** emit a socket event (same as today's message behavior) — refetch on those flows if needed.
 
 **`AttentionItem`** payload shape (unchanged except `type` now includes `"task"` and metadata gained task fields):
+
 ```ts
 {
   id: string;
@@ -255,6 +280,7 @@ Events are emitted to the recipient's user room. Payload is always `{ item: Atte
   updatedAt: string;
 }
 ```
+
 > `dueDatePinned` is intentionally **not** exposed — it's server-internal. If you ever need a "pinned" badge, ask backend to surface it.
 
 **Attention REST** (`GET /attention-items?type=…`) now also accepts `type=task`.

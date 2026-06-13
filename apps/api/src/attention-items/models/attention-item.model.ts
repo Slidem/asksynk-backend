@@ -72,3 +72,17 @@ export type AttentionSource =
   | { taskId: string }
   | { taskBatchId: string }
   | { suggestionId: string };
+
+// Create-or-update a single "task" item mirrored from a task or batch. The
+// service creates when none exists (and tags present), updates in place
+// otherwise (stable id), or removes when the source goes untagged.
+export interface UpsertAttentionFromSourceInput {
+  source: { taskId: string } | { taskBatchId: string };
+  userId: string;
+  title: string;
+  status: AttentionItemStatus;
+  tagIds: string[];
+  dueDate: Date | null;
+  dueDatePinned: boolean;
+  sourceCalendarEventId: string | null;
+}

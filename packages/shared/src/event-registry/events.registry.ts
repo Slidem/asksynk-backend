@@ -128,6 +128,88 @@ export const TimerLifecycle = defineEvent({
   groups: ["timer-event-log"],
 });
 
+// Tasks emit durable domain events; the attention-items consumer group mirrors
+// them into attention items. Status fields already carry the mapped attention
+// status (created|in_progress|resolved) so the consumer needs no task imports.
+const attentionStatusSchema = z.enum(["created", "in_progress", "resolved"]);
+
+export const TaskUpserted = defineEvent({
+  name: "task.upserted",
+  schema: z.object({
+    taskId: z.string(),
+    assigneeUserId: z.string(),
+    title: z.string(),
+    status: attentionStatusSchema,
+    tagIds: z.array(z.string()),
+    dueDate: z.string().nullable(),
+    dueDatePinned: z.boolean(),
+    createdAt: z.string(),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const TaskDeleted = defineEvent({
+  name: "task.deleted",
+  schema: z.object({ taskId: z.string() }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const TaskBatchUpserted = defineEvent({
+  name: "task.batch.upserted",
+  schema: z.object({
+    taskBatchId: z.string(),
+    assigneeUserId: z.string(),
+    title: z.string(),
+    aggregateStatus: attentionStatusSchema,
+    tagIds: z.array(z.string()),
+    dueDate: z.string().nullable(),
+    dueDatePinned: z.boolean(),
+    createdAt: z.string(),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const TaskBatchDeleted = defineEvent({
+  name: "task.batch.deleted",
+  schema: z.object({ taskBatchId: z.string() }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const TaskSuggested = defineEvent({
+  name: "task.suggestion.created",
+  schema: z.object({
+    suggestionId: z.string(),
+    suggesteeUserId: z.string(),
+    suggesterUserId: z.string(),
+    title: z.string(),
+    dueDate: z.string().nullable(),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const TaskSuggestionResolved = defineEvent({
+  name: "task.suggestion.resolved",
+  schema: z.object({ suggestionId: z.string() }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
+export const TaskSuggestionUpdated = defineEvent({
+  name: "task.suggestion.updated",
+  schema: z.object({
+    suggestionId: z.string(),
+    title: z.string(),
+    dueDate: z.string().nullable(),
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["attention-items"],
+});
+
 const attentionItemTypeSchema = z.enum([
   "tagged_message",
   "incoming_email",
@@ -167,14 +249,17 @@ const attentionItemDtoSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const AttentionItemCreated = defineEvent({
-  name: "attention.created",
+// Single generic upsert: clients keep a map keyed by item.id and upsert on every
+// event; removal drops the id. Replaces the old created/updated pair so callers
+// never have to decide which to emit, and tag/due edits stay id-stable.
+export const AttentionItemUpserted = defineEvent({
+  name: "attention.upserted",
   schema: z.object({ item: attentionItemDtoSchema }),
   delivery: DeliveryMode.Realtime,
 });
 
-export const AttentionItemUpdated = defineEvent({
-  name: "attention.updated",
-  schema: z.object({ item: attentionItemDtoSchema }),
+export const AttentionItemRemoved = defineEvent({
+  name: "attention.removed",
+  schema: z.object({ id: z.string(), userId: z.string() }),
   delivery: DeliveryMode.Realtime,
 });

@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { TagsService } from "@/api/tags/services/tags.service";
@@ -15,6 +14,12 @@ import {
 import { TaskSuggestionsRepository } from "@/api/tasks/repositories/task-suggestions.repository";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { TasksService } from "@/api/tasks/services/tasks.service";
+import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
+import {
+  TaskSuggested,
+  TaskSuggestionResolved,
+  TaskSuggestionUpdated,
+} from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
 
 @Injectable()
@@ -23,7 +28,7 @@ export class TaskSuggestionsService {
     private readonly suggestionsRepository: TaskSuggestionsRepository,
     private readonly tasksService: TasksService,
     private readonly taskBatchesService: TaskBatchesService,
-    private readonly attentionItems: AttentionItemsService,
+    private readonly eventsPublisher: EventsPublisher,
     private readonly networks: NetworksService,
     private readonly tags: TagsService,
   ) {}
@@ -44,21 +49,14 @@ export class TaskSuggestionsService {
     const id = generateId();
     const suggestion = await this.suggestionsRepository.add(id, input);
 
-    // Inbox notification for the suggestee. Stays untagged — the proposed tags
-    // live in the payload and materialize onto the real task on accept.
-    await this.attentionItems.create({
-      id: generateId(),
-      userId: input.suggesteeUserId,
-      type: "suggested_task",
-      dueDate: this.parseDate(input.payload.dueDate),
-      metadata: {
-        type: "suggested_task",
-        suggestionId: id,
-        suggesterUserId: input.suggesterUserId,
-        title: input.payload.title,
-      },
-      tagIds: [],
-      sourceCalendarEventId: null,
+    // Opens the suggestee's inbox item (untagged — proposed tags live in the
+    // payload and materialize onto the real task on accept).
+    await this.eventsPublisher.publish(TaskSuggested, {
+      suggestionId: id,
+      suggesteeUserId: input.suggesteeUserId,
+      suggesterUserId: input.suggesterUserId,
+      title: input.payload.title,
+      dueDate: input.payload.dueDate,
     });
 
     return suggestion;
@@ -96,10 +94,9 @@ export class TaskSuggestionsService {
       id,
       "accepted",
     );
-    await this.attentionItems.syncSourceStatus(
-      { suggestionId: id },
-      "resolved",
-    );
+    await this.eventsPublisher.publish(TaskSuggestionResolved, {
+      suggestionId: id,
+    });
     return updated ?? suggestion;
   }
 
@@ -110,10 +107,9 @@ export class TaskSuggestionsService {
       id,
       "rejected",
     );
-    await this.attentionItems.syncSourceStatus(
-      { suggestionId: id },
-      "resolved",
-    );
+    await this.eventsPublisher.publish(TaskSuggestionResolved, {
+      suggestionId: id,
+    });
     return updated ?? suggestion;
   }
 
@@ -122,10 +118,9 @@ export class TaskSuggestionsService {
   async rescind(userId: string, id: string): Promise<void> {
     await this.requirePending(userId, id, "suggester");
     await this.suggestionsRepository.updateStatus(id, "rejected");
-    await this.attentionItems.syncSourceStatus(
-      { suggestionId: id },
-      "resolved",
-    );
+    await this.eventsPublisher.publish(TaskSuggestionResolved, {
+      suggestionId: id,
+    });
   }
 
   // Edits a still-pending suggestion's payload. Allowed for both parties. `kind`
@@ -171,10 +166,11 @@ export class TaskSuggestionsService {
       input.id,
       merged,
     );
-    await this.attentionItems.syncSourceContent(
-      { suggestionId: input.id },
-      { title: merged.title, dueDate: this.parseDate(merged.dueDate) },
-    );
+    await this.eventsPublisher.publish(TaskSuggestionUpdated, {
+      suggestionId: input.id,
+      title: merged.title,
+      dueDate: merged.dueDate,
+    });
     return updated ?? suggestion;
   }
 

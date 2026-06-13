@@ -318,7 +318,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
     });
   }
 
-  async function awaitOutboxAttentionCreated(
+  async function awaitOutboxAttentionUpserted(
     itemId: string,
   ): Promise<{ item: AttentionItemResponse }> {
     const rows = await pollUntil(
@@ -331,7 +331,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
           .from(eventsOutbox)
           .where(
             and(
-              eq(eventsOutbox.eventType, "attention.created"),
+              eq(eventsOutbox.eventType, "attention.upserted"),
               sql`${eventsOutbox.payload}->'item'->>'id' = ${itemId}`,
             ),
           ),
@@ -369,7 +369,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(item.type).toBe("tagged_message");
     });
 
-    it("should publish a realtime attention.created event identical to the GET response", async () => {
+    it("should publish a realtime attention.upserted event identical to the GET response", async () => {
       const tagId = await createTag({
         type: "immediately",
         responseTimeMillis: 30 * 60 * 1000,
@@ -378,7 +378,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
       const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
 
-      const { item: emitted } = await awaitOutboxAttentionCreated(item.id);
+      const { item: emitted } = await awaitOutboxAttentionUpserted(item.id);
 
       // Payload must match the GET /attention-items shape byte-for-byte.
       expect(emitted).toEqual(item);

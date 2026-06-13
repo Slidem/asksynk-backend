@@ -4,19 +4,22 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import {
+  AttentionItemMetadata,
   AttentionItemStatus,
   AttentionSource,
   CreateAttentionItemInput,
   ListAttentionItemsInput,
   UpdateAttentionItemInput,
+  UpsertAttentionFromSourceInput,
 } from "@/api/attention-items/models/attention-item.model";
 import { toAttentionItemResponse } from "@/api/attention-items/rest/attention-item.mapper";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
-  AttentionItemCreated,
-  AttentionItemUpdated,
+  AttentionItemRemoved,
+  AttentionItemUpserted,
 } from "@/shared/event-registry/events.registry";
+import { generateId } from "@/shared/id";
 
 @Injectable()
 export class AttentionItemsService {
@@ -27,13 +30,13 @@ export class AttentionItemsService {
 
   /**
    * Single create chokepoint for every ingestion path: persists the item and
-   * publishes `attention.created` (realtime). The outbox insert joins the caller's
+   * publishes `attention.upserted` (realtime). The outbox insert joins the caller's
    * transaction, so the emit only fires once the item is committed.
    */
   @Transactional()
   async create(input: CreateAttentionItemInput): Promise<AttentionItem> {
     const item = await this.attentionItemsRepository.add(input);
-    await this.eventsPublisher.publish(AttentionItemCreated, {
+    await this.eventsPublisher.publish(AttentionItemUpserted, {
       item: toAttentionItemResponse(item),
     });
     return item;
@@ -70,16 +73,73 @@ export class AttentionItemsService {
     if (input.tagIds !== undefined) item.tagIds = input.tagIds;
 
     const updated = await this.attentionItemsRepository.update(item);
-    await this.eventsPublisher.publish(AttentionItemUpdated, {
+    await this.eventsPublisher.publish(AttentionItemUpserted, {
       item: toAttentionItemResponse(updated),
     });
     return updated;
   }
 
   /**
+   * Create-or-update the single item mirrored from a task or batch. Creates when
+   * none exists and the source is tagged; updates in place (stable id) when one
+   * exists; removes it when the source has gone untagged. Idempotent under
+   * redelivery. No `belongsTo` check — the caller is the task domain.
+   */
+  @Transactional()
+  async upsertFromSource(input: UpsertAttentionFromSourceInput): Promise<void> {
+    const existing = await this.findBySource(input.source);
+    const metadata = this.metadataForSource(input.source, input.title);
+
+    if (existing.length === 0) {
+      if (input.tagIds.length === 0) return; // untagged source → no item
+      await this.create({
+        id: generateId(),
+        userId: input.userId,
+        type: "task",
+        dueDate: input.dueDate,
+        dueDatePinned: input.dueDatePinned,
+        metadata,
+        tagIds: input.tagIds,
+        sourceCalendarEventId: input.sourceCalendarEventId,
+      });
+      return;
+    }
+
+    for (const item of existing) {
+      // Source untagged → its item should no longer exist.
+      if (input.tagIds.length === 0) {
+        await this.softDeleteAndNotify(item.id, item.userId);
+        continue;
+      }
+      const updated = await this.attentionItemsRepository.updateFromSource({
+        id: item.id,
+        status: input.status,
+        metadata,
+        tagIds: input.tagIds,
+        dueDate: input.dueDate,
+        dueDatePinned: input.dueDatePinned,
+        sourceCalendarEventId: input.sourceCalendarEventId,
+      });
+      await this.eventsPublisher.publish(AttentionItemUpserted, {
+        item: toAttentionItemResponse(updated),
+      });
+    }
+  }
+
+  private metadataForSource(
+    source: { taskId: string } | { taskBatchId: string },
+    title: string,
+  ): AttentionItemMetadata {
+    if ("taskId" in source) {
+      return { type: "task", title, taskId: source.taskId };
+    }
+    return { type: "task", title, taskBatchId: source.taskBatchId };
+  }
+
+  /**
    * System-driven status sync for items mirrored from a task, batch or
    * suggestion. Updates every linked item (one per assignee) and emits
-   * `attention.updated`. No `belongsTo` check — the caller is the task domain.
+   * `attention.upserted`. No `belongsTo` check — the caller is the task domain.
    */
   @Transactional()
   async syncSourceStatus(
@@ -91,7 +151,7 @@ export class AttentionItemsService {
       if (item.status === status) continue;
       item.status = status;
       const updated = await this.attentionItemsRepository.update(item);
-      await this.eventsPublisher.publish(AttentionItemUpdated, {
+      await this.eventsPublisher.publish(AttentionItemUpserted, {
         item: toAttentionItemResponse(updated),
       });
     }
@@ -100,8 +160,7 @@ export class AttentionItemsService {
   /**
    * System-driven content sync for items mirrored from a source (used when a
    * pending suggestion's payload is edited). Rewrites title + due date in place
-   * and emits `attention.updated` — avoids delete/recreate churn since there is
-   * no `attention.deleted` realtime event.
+   * and emits `attention.upserted`.
    */
   @Transactional()
   async syncSourceContent(
@@ -118,7 +177,7 @@ export class AttentionItemsService {
       );
       const updated = await this.attentionItemsRepository.getById(item.id);
       if (updated) {
-        await this.eventsPublisher.publish(AttentionItemUpdated, {
+        await this.eventsPublisher.publish(AttentionItemUpserted, {
           item: toAttentionItemResponse(updated),
         });
       }
@@ -130,8 +189,15 @@ export class AttentionItemsService {
   async deleteBySource(source: AttentionSource): Promise<void> {
     const items = await this.findBySource(source);
     for (const item of items) {
-      await this.attentionItemsRepository.softDelete(item.id);
+      await this.softDeleteAndNotify(item.id, item.userId);
     }
+  }
+
+  /** Soft-delete a single item and emit `attention.removed` so clients drop it. */
+  @Transactional()
+  async softDeleteAndNotify(id: string, userId: string): Promise<void> {
+    await this.attentionItemsRepository.softDelete(id);
+    await this.eventsPublisher.publish(AttentionItemRemoved, { id, userId });
   }
 
   private findBySource(source: AttentionSource): Promise<AttentionItem[]> {
@@ -154,6 +220,6 @@ export class AttentionItemsService {
     if (!item || item.isDeleted || !item.belongsTo(userId)) {
       throw AsksynkError.notFound("Attention item not found");
     }
-    await this.attentionItemsRepository.softDelete(id);
+    await this.softDeleteAndNotify(id, userId);
   }
 }
