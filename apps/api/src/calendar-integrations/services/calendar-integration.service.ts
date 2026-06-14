@@ -5,11 +5,13 @@ import { ContextLogger } from "nestjs-context-logger";
 
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
 import { CalendarRepository } from "@/api/calendar-events/repositories/calendar.repository";
+import { CalendarEventsRepository } from "@/api/calendar-events/repositories/calendar-events.repository";
 import { CalendarIntegration } from "@/api/calendar-integrations/entities/calendar-integration.entity";
 import { IntegrationWithCalendars } from "@/api/calendar-integrations/models/integration-with-calendars.model";
 import { UpdateIntegrationInput } from "@/api/calendar-integrations/models/update-integration.model";
 import { CalendarProviderRegistry } from "@/api/calendar-integrations/providers/calendar-provider.registry";
 import { ProviderCredentials } from "@/api/calendar-integrations/providers/types";
+import { CalendarEventLinkRepository } from "@/api/calendar-integrations/repositories/calendar-event-link.repository";
 import { CalendarIntegrationRepository } from "@/api/calendar-integrations/repositories/calendar-integration.repository";
 import {
   signOAuthState,
@@ -26,6 +28,8 @@ export class CalendarIntegrationService {
     private readonly registry: CalendarProviderRegistry,
     private readonly integrationRepository: CalendarIntegrationRepository,
     private readonly calendarRepository: CalendarRepository,
+    private readonly calendarEventsRepository: CalendarEventsRepository,
+    private readonly linkRepository: CalendarEventLinkRepository,
     private readonly config: ConfigService,
   ) {}
 
@@ -150,12 +154,17 @@ export class CalendarIntegrationService {
       const owned = await this.calendarRepository.listByIntegration(
         integration.id,
       );
-      const ownedIds = new Set(owned.map((c) => c.id));
+      const ownedById = new Map(owned.map((c) => [c.id, c] as const));
       for (const selection of input.calendars) {
-        if (!ownedIds.has(selection.calendarId)) {
+        const calendar = ownedById.get(selection.calendarId);
+        if (!calendar) {
           throw AsksynkError.badRequest(
             "Calendar does not belong to this integration",
           );
+        }
+        // disabling a previously-synced calendar: drop its imported events
+        if (!selection.syncEnabled && calendar.syncEnabled) {
+          await this.purgeImportedEvents(calendar);
         }
         await this.calendarRepository.setSyncEnabled(
           selection.calendarId,
@@ -168,6 +177,16 @@ export class CalendarIntegrationService {
       integration.id,
     );
     return { integration, calendars };
+  }
+
+  /** Drops a provider calendar's imported events, links, and sync cursor. */
+  private async purgeImportedEvents(calendar: Calendar): Promise<void> {
+    await this.linkRepository.deleteImportedByCalendar(
+      calendar.integrationId!,
+      calendar.externalId!,
+    );
+    await this.calendarEventsRepository.deleteByCalendar(calendar.id);
+    await this.calendarRepository.updateSyncToken(calendar.id, null);
   }
 
   @Transactional()

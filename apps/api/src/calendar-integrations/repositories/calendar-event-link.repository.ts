@@ -88,6 +88,22 @@ export class CalendarEventLinkRepository {
       .where(eq(calendarEventLinks.id, id));
   }
 
+  /** Drops a provider calendar's `imported` links; leaves `mirrored` ones intact. */
+  async deleteImportedByCalendar(
+    integrationId: string,
+    externalCalendarId: string,
+  ): Promise<void> {
+    await this.txHost.tx
+      .delete(calendarEventLinks)
+      .where(
+        and(
+          eq(calendarEventLinks.integrationId, integrationId),
+          eq(calendarEventLinks.externalCalendarId, externalCalendarId),
+          eq(calendarEventLinks.origin, "imported"),
+        ),
+      );
+  }
+
   private mapRow(row: LinkRow): CalendarEventLink {
     return CalendarEventLink.create({
       id: row.id,

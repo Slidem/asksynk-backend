@@ -109,6 +109,14 @@ export class CalendarEventsRepository {
       .where(eq(calendarEvents.id, eventId));
   }
 
+  /** Drops every event in a calendar (tags/exceptions cascade; links do not). */
+  async deleteByCalendar(calendarId: string): Promise<void> {
+    this.logger.info("Deleting calendar events by calendar", { calendarId });
+    await this.txHost.tx
+      .delete(calendarEvents)
+      .where(eq(calendarEvents.calendarId, calendarId));
+  }
+
   async listInWindow(
     calendarIds: string[],
     windowStart: Date,
