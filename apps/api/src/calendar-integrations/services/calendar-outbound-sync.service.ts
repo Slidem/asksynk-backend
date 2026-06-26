@@ -23,9 +23,7 @@ import { generateId } from "@/shared/id";
  */
 @Injectable()
 export class CalendarOutboundSyncService {
-  private readonly logger = new ContextLogger(
-    CalendarOutboundSyncService.name,
-  );
+  private readonly logger = new ContextLogger(CalendarOutboundSyncService.name);
 
   constructor(
     private readonly integrationService: CalendarIntegrationService,
@@ -77,9 +75,18 @@ export class CalendarOutboundSyncService {
     }
 
     const provider = this.registry.get(integration.provider);
-    const { credentials } = await this.integrationService.getFreshCredentials(
+    const result = await this.integrationService.getFreshCredentials(
       integration.id,
     );
+
+    if (result.result === "failure") {
+      this.logger.warn("Failed to refresh credentials; skipping mirror", {
+        integrationId: integration.id,
+      });
+      return;
+    }
+
+    const { credentials } = result;
 
     const link = await this.linkRepository.getByEventAndIntegration(
       eventId,
@@ -120,14 +127,34 @@ export class CalendarOutboundSyncService {
     const integration = await this.integrationRepository.getById(
       link.integrationId,
     );
+
+    if (!integration || integration.status !== "active") {
+      return;
+    }
+
     try {
-      if (integration && integration.status === "active") {
-        const { credentials } =
-          await this.integrationService.getFreshCredentials(link.integrationId);
-        await this.registry
-          .get(integration.provider)
-          .deleteEvent(credentials, link.externalCalendarId, link.externalEventId);
+      const refreshResult = await this.integrationService.getFreshCredentials(
+        link.integrationId,
+      );
+
+      if (refreshResult.result === "failure") {
+        this.logger.warn(
+          "Failed to refresh credentials; skipping mirror deletion",
+          {
+            integrationId: link.integrationId,
+          },
+        );
+        return;
       }
+
+      const { credentials } = refreshResult;
+      await this.registry
+        .get(integration.provider)
+        .deleteEvent(
+          credentials,
+          link.externalCalendarId,
+          link.externalEventId,
+        );
     } catch (err) {
       // best-effort: drop the link anyway so we don't loop forever
       this.logger.warn("Failed to delete external mirror (dropping link)", {
@@ -150,9 +177,7 @@ export class CalendarOutboundSyncService {
   }
 
   private buildInput(event: CalendarEvent): ExternalEventInput {
-    const end = new Date(
-      event.start.getTime() + event.durationSeconds * 1000,
-    );
+    const end = new Date(event.start.getTime() + event.durationSeconds * 1000);
     return {
       title: event.title,
       description: event.description,

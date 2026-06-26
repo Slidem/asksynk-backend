@@ -50,7 +50,7 @@ export class TaskSuggestionsController {
       query.role,
       query.status,
     );
-    return suggestions.map(toTaskSuggestionResponse);
+    return suggestions.map((s) => toTaskSuggestionResponse(s));
   }
 
   @Get(":id")
@@ -58,8 +58,9 @@ export class TaskSuggestionsController {
     @UuidV7Param("id") id: string,
     @AuthUser() user: AuthUserType,
   ): Promise<TaskSuggestionResponse> {
-    const suggestion = await this.suggestionsService.getSuggestion(user.id, id);
-    return toTaskSuggestionResponse(suggestion);
+    const { suggestion, materializedTasks } =
+      await this.suggestionsService.getSuggestionView(user.id, id);
+    return toTaskSuggestionResponse(suggestion, materializedTasks);
   }
 
   @Patch(":id")

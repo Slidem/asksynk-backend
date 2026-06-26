@@ -171,6 +171,7 @@ export class MessagingRepository {
     body: string;
     tagIds: string[];
     attachmentIds?: string[];
+    suggestionId?: string | null;
   }): Promise<Message> {
     const attachmentIds = _.uniq(input.attachmentIds ?? []);
     const [row] = await this.txHost.tx
@@ -182,6 +183,7 @@ export class MessagingRepository {
         senderUserId: input.sender.kind === "user" ? input.sender.userId : null,
         senderGuestId:
           input.sender.kind === "guest" ? input.sender.guestId : null,
+        suggestionId: input.suggestionId ?? null,
         body: input.body,
       })
       .returning();
@@ -249,6 +251,7 @@ export class MessagingRepository {
         parentMessageId: messages.parentMessageId,
         senderUserId: messages.senderUserId,
         senderGuestId: messages.senderGuestId,
+        suggestionId: messages.suggestionId,
         body: messages.body,
         createdAt: messages.createdAt,
         replyCount: sql<number>`(
@@ -489,6 +492,7 @@ export class MessagingRepository {
       body: row.body,
       tagIds,
       attachmentIds,
+      suggestionId: row.suggestionId,
       createdAt: row.createdAt,
     });
   }

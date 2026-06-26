@@ -4,6 +4,7 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { TagsService } from "@/api/tags/services/tags.service";
+import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskSuggestion } from "@/api/tasks/entities/task-suggestion.entity";
 import {
   CreateTaskSuggestionInput,
@@ -12,14 +13,22 @@ import {
   UpdateTaskSuggestionPayloadInput,
 } from "@/api/tasks/models/task.model";
 import { TaskSuggestionsRepository } from "@/api/tasks/repositories/task-suggestions.repository";
+import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
+import { toTaskSuggestionResponse } from "@/api/tasks/rest/mappers/task.mapper";
+import { MaterializedTask } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { TasksService } from "@/api/tasks/services/tasks.service";
+import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
+  TaskBatchUpserted,
   TaskSuggested,
+  TaskSuggestionBroadcast,
   TaskSuggestionResolved,
   TaskSuggestionUpdated,
+  TaskUpserted,
 } from "@/shared/event-registry/events.registry";
+import { EventOf } from "@/shared/event-registry/events.types";
 import { generateId } from "@/shared/id";
 
 @Injectable()
@@ -28,6 +37,7 @@ export class TaskSuggestionsService {
     private readonly suggestionsRepository: TaskSuggestionsRepository,
     private readonly tasksService: TasksService,
     private readonly taskBatchesService: TaskBatchesService,
+    private readonly tasksRepository: TasksRepository,
     private readonly eventsPublisher: EventsPublisher,
     private readonly networks: NetworksService,
     private readonly tags: TagsService,
@@ -74,6 +84,20 @@ export class TaskSuggestionsService {
     return suggestion;
   }
 
+  // GET :id view: the suggestion plus the real tasks it materialized on accept.
+  @Transactional()
+  async getSuggestionView(
+    userId: string,
+    id: string,
+  ): Promise<{
+    suggestion: TaskSuggestion;
+    materializedTasks: MaterializedTask[];
+  }> {
+    const suggestion = await this.getSuggestion(userId, id);
+    const materializedTasks = await this.materializedTasksFor(suggestion);
+    return { suggestion, materializedTasks };
+  }
+
   async list(
     userId: string,
     role: "sent" | "received",
@@ -88,15 +112,16 @@ export class TaskSuggestionsService {
   async accept(userId: string, id: string): Promise<TaskSuggestion> {
     const suggestion = await this.requirePending(userId, id, "suggestee");
 
-    await this.materialize(suggestion);
+    const materialized = await this.materialize(suggestion);
 
-    const updated = await this.suggestionsRepository.updateStatus(
+    const updated = await this.suggestionsRepository.markAccepted(
       id,
-      "accepted",
+      materialized,
     );
     await this.eventsPublisher.publish(TaskSuggestionResolved, {
       suggestionId: id,
     });
+    await this.publishUpdated(id);
     return updated ?? suggestion;
   }
 
@@ -110,6 +135,7 @@ export class TaskSuggestionsService {
     await this.eventsPublisher.publish(TaskSuggestionResolved, {
       suggestionId: id,
     });
+    await this.publishUpdated(id);
     return updated ?? suggestion;
   }
 
@@ -121,6 +147,7 @@ export class TaskSuggestionsService {
     await this.eventsPublisher.publish(TaskSuggestionResolved, {
       suggestionId: id,
     });
+    await this.publishUpdated(id);
   }
 
   // Edits a still-pending suggestion's payload. Allowed for both parties. `kind`
@@ -171,7 +198,61 @@ export class TaskSuggestionsService {
       title: merged.title,
       dueDate: merged.dueDate,
     });
+    await this.publishUpdated(input.id);
     return updated ?? suggestion;
+  }
+
+  // A materialized task changed status: rebroadcast its parent suggestion (if
+  // any) to both participants. Own consumer group so it never starves the
+  // attention-items consumer of the same events.
+  @EventHandler(TaskUpserted, { group: "suggestion-sync" })
+  async onMaterializedTaskChanged(
+    payload: EventOf<typeof TaskUpserted>,
+  ): Promise<void> {
+    const suggestion =
+      await this.suggestionsRepository.findByMaterializedTaskId(payload.taskId);
+    if (suggestion) await this.publishUpdated(suggestion.id);
+  }
+
+  @EventHandler(TaskBatchUpserted, { group: "suggestion-sync" })
+  async onMaterializedBatchChanged(
+    payload: EventOf<typeof TaskBatchUpserted>,
+  ): Promise<void> {
+    const suggestion =
+      await this.suggestionsRepository.findByMaterializedBatchId(
+        payload.taskBatchId,
+      );
+    if (suggestion) await this.publishUpdated(suggestion.id);
+  }
+
+  // Realtime broadcast of the full suggestion (incl. materialized tasks) to both
+  // participants. Drives the in-chat card both ways.
+  async publishUpdated(suggestionId: string): Promise<void> {
+    const suggestion = await this.suggestionsRepository.getById(suggestionId);
+    if (!suggestion) {
+      return;
+    }
+    const materializedTasks = await this.materializedTasksFor(suggestion);
+    await this.eventsPublisher.publish(TaskSuggestionBroadcast, {
+      suggestion: toTaskSuggestionResponse(suggestion, materializedTasks),
+    });
+  }
+
+  private async materializedTasksFor(
+    suggestion: TaskSuggestion,
+  ): Promise<MaterializedTask[]> {
+    let tasks: Task[] = [];
+    if (suggestion.materializedBatchId) {
+      tasks = await this.tasksRepository.listByBatchId(
+        suggestion.materializedBatchId,
+      );
+    } else if (suggestion.materializedTaskId) {
+      const task = await this.tasksRepository.getById(
+        suggestion.materializedTaskId,
+      );
+      if (task && !task.isDeleted) tasks = [task];
+    }
+    return tasks.map((t) => ({ id: t.id, title: t.title, status: t.status }));
   }
 
   private async requirePending(
@@ -200,14 +281,17 @@ export class TaskSuggestionsService {
 
   // Turns an accepted suggestion into real tasks created by the suggester and
   // assigned to the suggestee, with the proposed (suggestee-owned) tags. The
-  // suggestee can re-tag afterward via PATCH /tasks|/task-batches.
-  private async materialize(suggestion: TaskSuggestion): Promise<void> {
+  // suggestee can re-tag afterward via PATCH /tasks|/task-batches. Returns the
+  // materialized link to record on the suggestion.
+  private async materialize(
+    suggestion: TaskSuggestion,
+  ): Promise<{ materializedTaskId?: string; materializedBatchId?: string }> {
     const { payload } = suggestion;
     const createdBy = suggestion.suggesterUserId;
     const assigneeUserId = suggestion.suggesteeUserId;
 
     if (payload.kind === "batch") {
-      await this.taskBatchesService.create({
+      const batch = await this.taskBatchesService.create({
         createdBy,
         assigneeUserId,
         title: payload.title,
@@ -219,10 +303,10 @@ export class TaskSuggestionsService {
           description: t.description,
         })),
       });
-      return;
+      return { materializedBatchId: batch.id };
     }
 
-    await this.tasksService.create({
+    const task = await this.tasksService.create({
       createdBy,
       assigneeUserId,
       title: payload.title,
@@ -230,6 +314,7 @@ export class TaskSuggestionsService {
       dueDate: this.parseDate(payload.dueDate),
       tagIds: payload.tagIds,
     });
+    return { materializedTaskId: task.id };
   }
 
   private validatePayload(payload: TaskSuggestionPayload): void {

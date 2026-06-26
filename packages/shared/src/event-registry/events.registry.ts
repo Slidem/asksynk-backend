@@ -49,6 +49,7 @@ export const MessageCreated = defineEvent({
       body: z.string(),
       tagIds: z.optional(z.array(z.string())),
       attachmentIds: z.optional(z.array(z.string())),
+      suggestionId: z.string().nullable().optional(),
       createdAt: z.string(),
     }),
     participantUserIds: z.array(z.string()),
@@ -69,6 +70,7 @@ export const MessageUpdated = defineEvent({
       senderId: z.string(),
       body: z.string(),
       tagIds: z.optional(z.array(z.string())),
+      suggestionId: z.string().nullable().optional(),
       createdAt: z.string(),
     }),
     participantUserIds: z.array(z.string()),
@@ -146,7 +148,10 @@ export const TaskUpserted = defineEvent({
     createdAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
+  // suggestion-sync: independent queue that rebroadcasts the parent suggestion
+  // (if any) when a materialized task changes. Must NOT share attention-items'
+  // queue or events would be split between the two consumers.
+  groups: ["attention-items", "suggestion-sync"],
 });
 
 export const TaskDeleted = defineEvent({
@@ -169,7 +174,7 @@ export const TaskBatchUpserted = defineEvent({
     createdAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
+  groups: ["attention-items", "suggestion-sync"],
 });
 
 export const TaskBatchDeleted = defineEvent({
@@ -261,5 +266,45 @@ export const AttentionItemUpserted = defineEvent({
 export const AttentionItemRemoved = defineEvent({
   name: "attention.removed",
   schema: z.object({ id: z.string(), userId: z.string() }),
+  delivery: DeliveryMode.Realtime,
+});
+
+// Mirrors TaskSuggestionResponse (apps/api) + materializedTasks. Kept inline
+// because the shared package must not depend on apps/api.
+const taskSuggestionDtoSchema = z.object({
+  id: z.string(),
+  suggesterUserId: z.string(),
+  suggesteeUserId: z.string(),
+  status: z.enum(["pending", "accepted", "rejected"]),
+  payload: z.object({
+    kind: z.enum(["task", "batch"]),
+    title: z.string(),
+    description: z.string().nullable(),
+    dueDate: z.string().nullable(),
+    tagIds: z.array(z.string()),
+    tasks: z.array(
+      z.object({
+        title: z.string(),
+        description: z.string().nullable(),
+      }),
+    ),
+  }),
+  // The real tasks created on accept (empty while pending/rejected).
+  materializedTasks: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      status: z.enum(["todo", "in_progress", "completed"]),
+    }),
+  ),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// Broadcast to BOTH participants on any suggestion- or materialized-task-status
+// change. Clients keyed by suggestion.id upsert on every event.
+export const TaskSuggestionBroadcast = defineEvent({
+  name: "task.suggestion.broadcast",
+  schema: z.object({ suggestion: taskSuggestionDtoSchema }),
   delivery: DeliveryMode.Realtime,
 });

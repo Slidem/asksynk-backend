@@ -14,6 +14,7 @@ import {
 
 import { attachments } from "@/migrations/schema/attachments";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
+import { taskSuggestions } from "@/migrations/schema/taskSuggestions";
 import { users } from "@/migrations/schema/users";
 
 export const messageThreads = pgTable(
@@ -87,6 +88,12 @@ export const messages = pgTable(
       (): AnyPgColumn => messages.id,
       { onDelete: "cascade" },
     ),
+    // Set when the message embeds an inline task suggestion (suggestee = the
+    // thread's other user). The suggestion carries its own lifecycle; the
+    // message just references it.
+    suggestionId: uuid("suggestion_id").references(() => taskSuggestions.id, {
+      onDelete: "set null",
+    }),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

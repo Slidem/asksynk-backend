@@ -28,5 +28,6 @@ import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher
     TaskBatchesController,
     TaskSuggestionsController,
   ],
+  exports: [TaskSuggestionsService],
 })
 export class TasksModule {}

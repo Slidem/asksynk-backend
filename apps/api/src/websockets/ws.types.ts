@@ -7,5 +7,5 @@ export type UserNotificationPayload = {
 };
 export type Ack = { ok: true } | { ok: false; error: string };
 export type SendAck =
-  | { ok: true; messageId: string }
+  | { ok: true; messageId: string; suggestionId?: string | null }
   | { ok: false; error: string };

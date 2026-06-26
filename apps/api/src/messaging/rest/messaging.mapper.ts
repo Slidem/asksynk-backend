@@ -28,6 +28,7 @@ export function toMessageResponseDto(
     body: message.body,
     tagIds: message.tagIds,
     attachments: attachments.map(toAttachmentResponse),
+    suggestionId: message.suggestionId,
     createdAt: message.createdAt.toISOString(),
   };
 }

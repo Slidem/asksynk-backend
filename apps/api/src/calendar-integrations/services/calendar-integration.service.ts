@@ -10,7 +10,6 @@ import { CalendarIntegration } from "@/api/calendar-integrations/entities/calend
 import { IntegrationWithCalendars } from "@/api/calendar-integrations/models/integration-with-calendars.model";
 import { UpdateIntegrationInput } from "@/api/calendar-integrations/models/update-integration.model";
 import { CalendarProviderRegistry } from "@/api/calendar-integrations/providers/calendar-provider.registry";
-import { ProviderCredentials } from "@/api/calendar-integrations/providers/types";
 import { CalendarEventLinkRepository } from "@/api/calendar-integrations/repositories/calendar-event-link.repository";
 import { CalendarIntegrationRepository } from "@/api/calendar-integrations/repositories/calendar-integration.repository";
 import {
@@ -19,6 +18,8 @@ import {
 } from "@/api/calendar-integrations/utils/oauth-state.util";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { generateId } from "@/shared/id";
+
+import { RefreshCredentialsResult } from "../models/refresh-credentials-result";
 
 @Injectable()
 export class CalendarIntegrationService {
@@ -54,6 +55,7 @@ export class CalendarIntegrationService {
       state,
       this.config.getOrThrow<string>("AUTH_SECRET"),
     );
+
     if (!parsed) {
       throw AsksynkError.badRequest("Invalid OAuth state");
     }
@@ -206,18 +208,24 @@ export class CalendarIntegrationService {
   @Transactional()
   async getFreshCredentials(
     integrationId: string,
-  ): Promise<{ integration: CalendarIntegration; credentials: ProviderCredentials }> {
+  ): Promise<RefreshCredentialsResult> {
     const integration =
       await this.integrationRepository.getByIdForUpdate(integrationId);
+
     if (!integration) {
       throw AsksynkError.notFound("Calendar integration not found");
     }
 
     if (!integration.accessTokenExpired(new Date())) {
-      return { integration, credentials: integration.credentials };
+      return {
+        result: "success",
+        integration,
+        credentials: integration.credentials,
+      };
     }
 
     const provider = this.registry.get(integration.provider);
+
     try {
       const refreshed = await provider.refreshCredentials(
         integration.credentials,
@@ -227,7 +235,7 @@ export class CalendarIntegrationService {
         refreshed,
       );
       integration.credentials = refreshed;
-      return { integration, credentials: refreshed };
+      return { result: "success", integration, credentials: refreshed };
     } catch (err) {
       this.logger.error("Failed to refresh provider credentials", {
         integrationId,
@@ -238,7 +246,7 @@ export class CalendarIntegrationService {
         "error",
         "Failed to refresh credentials; reconnect required",
       );
-      throw AsksynkError.badRequest("Calendar integration needs reconnection");
+      return { result: "failure" };
     }
   }
 

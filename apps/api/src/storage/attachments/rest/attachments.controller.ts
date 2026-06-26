@@ -45,6 +45,7 @@ export class AttachmentsController {
       { userId: user.id },
       id,
     );
+
     return toAttachmentResponse(attachment);
   }
 

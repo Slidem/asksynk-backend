@@ -24,8 +24,10 @@
     "Readables",
     "responfications",
     "rrule",
+    "suggestee",
     "Syncable",
-    "tmpl"
+    "tmpl",
+    "Upserted"
   ],
   "C_Cpp.errorSquiggles": "disabled"
 }

@@ -17,12 +17,14 @@ import { MessageResponseDto } from "@/api/messaging/rest/responses/message.respo
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
+import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
   AttentionItemRemoved,
   AttentionItemUpserted,
   MessageCreated,
   MessageUpdated,
+  TaskSuggestionBroadcast,
   TimerLifecycle,
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
@@ -126,14 +128,24 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       tagIds?: string[];
       attachmentIds?: string[];
       parentMessageId?: string;
+      taskSuggestion?: {
+        kind?: string;
+        title?: string;
+        description?: string | null;
+        dueDate?: string | null;
+        tagIds?: string[];
+        tasks?: { title?: string; description?: string | null }[];
+      } | null;
     },
   ): Promise<SendAck> {
     const identity = socket.data.identity as WsIdentity | undefined;
+
     if (!identity) {
       return { ok: false, error: "unauthorized" };
     }
 
     const text = (body?.body ?? "").trim();
+
     if (!text) {
       return { ok: false, error: "body required" };
     }
@@ -163,6 +175,32 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const parentMessageId = body?.parentMessageId ?? null;
 
+    let taskSuggestion: TaskSuggestionPayload | null = null;
+    const rawSuggestion = body?.taskSuggestion;
+    if (rawSuggestion) {
+      if (rawSuggestion.kind !== "task" && rawSuggestion.kind !== "batch") {
+        return { ok: false, error: "taskSuggestion.kind must be task|batch" };
+      }
+      const suggestionTitle = (rawSuggestion.title ?? "").trim();
+      if (!suggestionTitle) {
+        return { ok: false, error: "taskSuggestion.title required" };
+      }
+      taskSuggestion = {
+        kind: rawSuggestion.kind,
+        title: suggestionTitle,
+        description: rawSuggestion.description ?? null,
+        dueDate: rawSuggestion.dueDate ?? null,
+        tagIds: Array.isArray(rawSuggestion.tagIds) ? rawSuggestion.tagIds : [],
+        tasks:
+          rawSuggestion.kind === "batch" && Array.isArray(rawSuggestion.tasks)
+            ? rawSuggestion.tasks.map((t) => ({
+                title: (t.title ?? "").trim(),
+                description: t.description ?? null,
+              }))
+            : [],
+      };
+    }
+
     try {
       if (identity.kind === "user") {
         if (!body?.threadId) {
@@ -175,8 +213,13 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           tagIds,
           parentMessageId,
           attachmentIds,
+          taskSuggestion,
         );
-        return { ok: true, messageId: message.id };
+        return {
+          ok: true,
+          messageId: message.id,
+          suggestionId: message.suggestionId,
+        };
       }
 
       if (tagIds.length > 0) {
@@ -185,6 +228,10 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       if (attachmentIds.length > 0) {
         return { ok: false, error: "Guests cannot attach files" };
+      }
+
+      if (taskSuggestion) {
+        return { ok: false, error: "Guests cannot suggest tasks" };
       }
 
       const message = await this.messagingService.sendAsGuest(
@@ -274,6 +321,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       body: payload.message.body,
       tagIds: payload.message.tagIds ?? [],
       attachments: attachments.map(toAttachmentResponse),
+      suggestionId: payload.message.suggestionId ?? null,
       createdAt: payload.message.createdAt,
     };
 
@@ -320,5 +368,20 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(userRoom(payload.userId))
       .emit("attention.removed", { id: payload.id });
+  }
+
+  // Inline task suggestion changed (status or a materialized task) — push the
+  // full suggestion to BOTH participants so each side's card stays live.
+  @EventHandler(TaskSuggestionBroadcast)
+  async onTaskSuggestionBroadcast(
+    payload: EventOf<typeof TaskSuggestionBroadcast>,
+  ): Promise<void> {
+    const { suggestion } = payload;
+    this.server
+      .to([
+        userRoom(suggestion.suggesterUserId),
+        userRoom(suggestion.suggesteeUserId),
+      ])
+      .emit("suggestion.updated", { suggestion });
   }
 }

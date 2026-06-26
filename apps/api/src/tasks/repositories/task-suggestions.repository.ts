@@ -41,6 +41,28 @@ export class TaskSuggestionsRepository {
     return row ? this.mapRow(row) : null;
   }
 
+  // Reverse lookups: trace a materialized task/batch back to its suggestion so a
+  // task-status change can rebroadcast the parent suggestion.
+  async findByMaterializedTaskId(
+    taskId: string,
+  ): Promise<TaskSuggestion | null> {
+    const [row] = await this.txHost.tx
+      .select()
+      .from(taskSuggestions)
+      .where(eq(taskSuggestions.materializedTaskId, taskId));
+    return row ? this.mapRow(row) : null;
+  }
+
+  async findByMaterializedBatchId(
+    batchId: string,
+  ): Promise<TaskSuggestion | null> {
+    const [row] = await this.txHost.tx
+      .select()
+      .from(taskSuggestions)
+      .where(eq(taskSuggestions.materializedBatchId, batchId));
+    return row ? this.mapRow(row) : null;
+  }
+
   async updateStatus(
     id: string,
     status: TaskSuggestionStatus,
@@ -48,6 +70,24 @@ export class TaskSuggestionsRepository {
     const [row] = await this.txHost.tx
       .update(taskSuggestions)
       .set({ status, updatedAt: new Date() })
+      .where(eq(taskSuggestions.id, id))
+      .returning();
+    return row ? this.mapRow(row) : null;
+  }
+
+  // Accept + record the materialized link in one write (XOR: task or batch).
+  async markAccepted(
+    id: string,
+    link: { materializedTaskId?: string; materializedBatchId?: string },
+  ): Promise<TaskSuggestion | null> {
+    const [row] = await this.txHost.tx
+      .update(taskSuggestions)
+      .set({
+        status: "accepted",
+        materializedTaskId: link.materializedTaskId ?? null,
+        materializedBatchId: link.materializedBatchId ?? null,
+        updatedAt: new Date(),
+      })
       .where(eq(taskSuggestions.id, id))
       .returning();
     return row ? this.mapRow(row) : null;
@@ -104,6 +144,8 @@ export class TaskSuggestionsRepository {
       suggesteeUserId: row.suggesteeUserId,
       status: row.status as TaskSuggestionStatus,
       payload: row.payload as unknown as TaskSuggestionPayload,
+      materializedTaskId: row.materializedTaskId,
+      materializedBatchId: row.materializedBatchId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });

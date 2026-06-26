@@ -9,6 +9,7 @@ export interface MessageResponseDto {
   body: string;
   tagIds: string[];
   attachments: AttachmentResponseDto[];
+  suggestionId: string | null;
   createdAt: string;
 }
 

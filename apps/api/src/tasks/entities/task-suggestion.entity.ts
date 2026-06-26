@@ -9,6 +9,9 @@ export interface TaskSuggestionProps {
   suggesteeUserId: string;
   status: TaskSuggestionStatus;
   payload: TaskSuggestionPayload;
+  // Set on accept (XOR): the suggestion materializes one task or one batch.
+  materializedTaskId: string | null;
+  materializedBatchId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +22,8 @@ export class TaskSuggestion {
   readonly suggesteeUserId: string;
   status: TaskSuggestionStatus;
   readonly payload: TaskSuggestionPayload;
+  readonly materializedTaskId: string | null;
+  readonly materializedBatchId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -28,6 +33,8 @@ export class TaskSuggestion {
     this.suggesteeUserId = props.suggesteeUserId;
     this.status = props.status;
     this.payload = props.payload;
+    this.materializedTaskId = props.materializedTaskId;
+    this.materializedBatchId = props.materializedBatchId;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }

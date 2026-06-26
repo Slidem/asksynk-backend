@@ -51,10 +51,15 @@ export class CalendarSyncService {
     const calendar = await this.loadSyncableCalendar(calendarId);
     if (!calendar?.integrationId || !calendar.externalId) return;
 
-    const { integration, credentials } =
-      await this.integrationService.getFreshCredentials(calendar.integrationId);
-    if (integration.status !== "active") return;
+    const refreshResult = await this.integrationService.getFreshCredentials(
+      calendar.integrationId,
+    );
 
+    if (refreshResult.result === "failure") {
+      return;
+    }
+
+    const { integration, credentials } = refreshResult;
     const provider = this.registry.get(integration.provider);
 
     let result = await provider.listEvents(
@@ -62,6 +67,7 @@ export class CalendarSyncService {
       calendar.externalId,
       calendar.syncToken,
     );
+
     if (result.tokenExpired) {
       this.logger.info("Sync token expired, performing full re-list", {
         calendarId,
@@ -128,12 +134,14 @@ export class CalendarSyncService {
       const existing = await this.calendarEventsRepository.getById(
         link.asksynkEventId,
       );
+
       if (existing) {
         this.applyFields(existing, fields);
         await this.calendarEventsRepository.update(existing);
         await this.linkRepository.updateEtag(link.id, ext.etag);
         return;
       }
+
       // dangling link (local row gone) — fall through and recreate
       await this.linkRepository.delete(link.id);
     }

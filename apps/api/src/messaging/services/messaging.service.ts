@@ -19,6 +19,8 @@ import {
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
 import { TagsService } from "@/api/tags/services/tags.service";
+import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
+import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   MessageCreated,
@@ -38,6 +40,7 @@ export class MessagingService {
     private readonly eventsPublisher: EventsPublisher,
     private readonly tagsService: TagsService,
     private readonly messageAttachmentResolver: MessageAttachmentResolver,
+    private readonly taskSuggestionsService: TaskSuggestionsService,
   ) {}
 
   async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
@@ -179,6 +182,7 @@ export class MessagingService {
     tagIds: string[],
     parentMessageId?: string | null,
     attachmentIds: string[] = [],
+    taskSuggestion?: TaskSuggestionPayload | null,
   ): Promise<Message> {
     const thread = await this.messagingRepository.getThread(threadId);
 
@@ -218,6 +222,25 @@ export class MessagingService {
       senderUserId,
     );
 
+    // Inline task suggestion → a real suggestion for the thread's other user.
+    // suggest() enforces the active network connection + tag ownership and opens
+    // the suggestee's inbox item. Same tx: message + suggestion commit together.
+    let suggestionId: string | null = null;
+    if (taskSuggestion) {
+      const recipientUserId = this.resolveRecipientUserId(sender, participants);
+      if (!recipientUserId) {
+        throw AsksynkError.badRequest(
+          "Task suggestions are not supported on this thread",
+        );
+      }
+      const suggestion = await this.taskSuggestionsService.suggest({
+        suggesterUserId: senderUserId,
+        suggesteeUserId: recipientUserId,
+        payload: taskSuggestion,
+      });
+      suggestionId = suggestion.id;
+    }
+
     const message = await this.messagingRepository.insertMessage({
       id: generateId(),
       threadId,
@@ -226,6 +249,7 @@ export class MessagingService {
       body,
       tagIds,
       attachmentIds,
+      suggestionId,
     });
 
     await this.notifyMessageCreated(message, participants);
@@ -375,6 +399,7 @@ export class MessagingService {
         body: message.body,
         tagIds: message.tagIds,
         attachmentIds: message.attachmentIds,
+        suggestionId: message.suggestionId,
         createdAt: message.createdAt.toISOString(),
       },
       participantUserIds,
@@ -410,6 +435,7 @@ export class MessagingService {
         senderId: senderId,
         body: message.body,
         tagIds: message.tagIds,
+        suggestionId: message.suggestionId,
         createdAt: message.createdAt.toISOString(),
       },
       participantUserIds,

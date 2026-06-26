@@ -10,6 +10,8 @@ export interface MessageProps {
   body: string;
   tagIds: string[];
   attachmentIds: string[];
+  // Set when the message embeds an inline task suggestion.
+  suggestionId: string | null;
   createdAt: Date;
 }
 
@@ -21,6 +23,7 @@ export class Message {
   readonly body: string;
   readonly tagIds: string[];
   readonly attachmentIds: string[];
+  readonly suggestionId: string | null;
   readonly createdAt: Date;
 
   private constructor(props: MessageProps) {
@@ -31,6 +34,7 @@ export class Message {
     this.body = props.body;
     this.tagIds = props.tagIds;
     this.attachmentIds = props.attachmentIds;
+    this.suggestionId = props.suggestionId;
     this.createdAt = props.createdAt;
   }
 

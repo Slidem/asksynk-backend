@@ -1,9 +1,12 @@
 import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskBatch } from "@/api/tasks/entities/task-batch.entity";
 import { TaskSuggestion } from "@/api/tasks/entities/task-suggestion.entity";
-import { TaskBatchResponse } from "@/api/tasks/rest/responses/task-batch.response";
-import { TaskSuggestionResponse } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskResponse } from "@/api/tasks/rest/responses/task.response";
+import { TaskBatchResponse } from "@/api/tasks/rest/responses/task-batch.response";
+import {
+  MaterializedTask,
+  TaskSuggestionResponse,
+} from "@/api/tasks/rest/responses/task-suggestion.response";
 
 export function toTaskResponse(task: Task): TaskResponse {
   return {
@@ -41,6 +44,7 @@ export function toTaskBatchResponse(
 
 export function toTaskSuggestionResponse(
   suggestion: TaskSuggestion,
+  materializedTasks: MaterializedTask[] = [],
 ): TaskSuggestionResponse {
   return {
     id: suggestion.id,
@@ -48,6 +52,7 @@ export function toTaskSuggestionResponse(
     suggesteeUserId: suggestion.suggesteeUserId,
     status: suggestion.status,
     payload: suggestion.payload,
+    materializedTasks,
     createdAt: suggestion.createdAt.toISOString(),
     updatedAt: suggestion.updatedAt.toISOString(),
   };
