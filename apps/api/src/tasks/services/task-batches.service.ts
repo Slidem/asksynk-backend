@@ -41,7 +41,6 @@ export class TaskBatchesService {
       createdBy: input.createdBy,
       assigneeUserId: input.assigneeUserId,
       title: input.title,
-      description: input.description ?? null,
       dueDate: input.dueDate ?? null,
       tagIds: input.tagIds,
     });
@@ -83,7 +82,6 @@ export class TaskBatchesService {
     const batch = await this.requireAssignee(input.userId, input.id);
 
     if (input.title !== undefined) batch.title = input.title;
-    if (input.description !== undefined) batch.description = input.description;
     if (input.dueDate !== undefined) batch.dueDate = input.dueDate;
     if (input.tagIds !== undefined) {
       await this.tags.assertOwnedBy(batch.assigneeUserId, input.tagIds);

@@ -11,10 +11,6 @@ export class PatchTaskBatchRequestDto {
   @IsNotEmpty()
   title?: string;
 
-  @IsOptional()
-  @IsString()
-  description?: string | null;
-
   /** Batch-level due date. ISO 8601 with offset, or null to clear. */
   @IsOptional()
   @IsIsoDateWithOffset()

@@ -295,7 +295,6 @@ export class TaskSuggestionsService {
         createdBy,
         assigneeUserId,
         title: payload.title,
-        description: payload.description,
         dueDate: this.parseDate(payload.dueDate),
         tagIds: payload.tagIds,
         tasks: payload.tasks.map((t) => ({

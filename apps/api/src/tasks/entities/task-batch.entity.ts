@@ -3,7 +3,6 @@ export interface TaskBatchProps {
   createdBy: string;
   assigneeUserId: string;
   title: string;
-  description: string | null;
   dueDate: Date | null;
   tagIds: string[];
   deletedAt: Date | null;
@@ -16,7 +15,6 @@ export class TaskBatch {
   readonly createdBy: string;
   readonly assigneeUserId: string;
   title: string;
-  description: string | null;
   dueDate: Date | null;
   tagIds: string[];
   readonly deletedAt: Date | null;
@@ -28,7 +26,6 @@ export class TaskBatch {
     this.createdBy = props.createdBy;
     this.assigneeUserId = props.assigneeUserId;
     this.title = props.title;
-    this.description = props.description;
     this.dueDate = props.dueDate;
     this.tagIds = props.tagIds;
     this.deletedAt = props.deletedAt;

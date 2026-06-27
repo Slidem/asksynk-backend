@@ -37,7 +37,6 @@ export interface CreateTaskBatchInput {
   createdBy: string;
   assigneeUserId: string;
   title: string;
-  description?: string | null;
   // Batch-level: applies to the whole batch (drives the single batch attention item).
   dueDate?: Date | null;
   tagIds: string[];
@@ -52,7 +51,6 @@ export interface UpdateTaskBatchInput {
   id: string;
   userId: string;
   title?: string;
-  description?: string | null;
   dueDate?: Date | null;
   tagIds?: string[];
 }

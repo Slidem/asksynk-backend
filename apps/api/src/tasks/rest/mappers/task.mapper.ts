@@ -33,7 +33,6 @@ export function toTaskBatchResponse(
     createdBy: batch.createdBy,
     assigneeUserId: batch.assigneeUserId,
     title: batch.title,
-    description: batch.description,
     dueDate: batch.dueDate ? batch.dueDate.toISOString() : null,
     tagIds: batch.tagIds,
     tasks: tasks.map(toTaskResponse),

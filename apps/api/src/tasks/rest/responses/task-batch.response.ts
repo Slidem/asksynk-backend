@@ -5,7 +5,6 @@ export class TaskBatchResponse {
   createdBy!: string;
   assigneeUserId!: string;
   title!: string;
-  description!: string | null;
   dueDate!: string | null;
   tagIds!: string[];
   tasks!: TaskResponse[];

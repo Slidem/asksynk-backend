@@ -28,10 +28,6 @@ export class CreateTaskBatchRequestDto {
   @IsNotEmpty()
   title!: string;
 
-  @IsOptional()
-  @IsString()
-  description?: string;
-
   /** Batch-level due date. ISO 8601 with offset. */
   @IsOptional()
   @IsIsoDateWithOffset()

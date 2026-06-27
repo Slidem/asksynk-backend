@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import { TaskBatch } from "@/api/tasks/entities/task-batch.entity";
-import { taskBatchTags } from "@/migrations/schema/taskBatchTags";
 import { taskBatches } from "@/migrations/schema/taskBatches";
+import { taskBatchTags } from "@/migrations/schema/taskBatchTags";
 
 type TaskBatchRow = typeof taskBatches.$inferSelect;
 
@@ -19,7 +19,6 @@ export class TaskBatchesRepository {
       createdBy: string;
       assigneeUserId: string;
       title: string;
-      description: string | null;
       dueDate: Date | null;
       tagIds: string[];
     },
@@ -31,7 +30,6 @@ export class TaskBatchesRepository {
         createdBy: input.createdBy,
         assigneeUserId: input.assigneeUserId,
         title: input.title,
-        description: input.description,
         dueDate: input.dueDate,
       })
       .returning();
@@ -56,7 +54,6 @@ export class TaskBatchesRepository {
       .update(taskBatches)
       .set({
         title: batch.title,
-        description: batch.description,
         dueDate: batch.dueDate,
         updatedAt: new Date(),
       })
@@ -100,7 +97,6 @@ export class TaskBatchesRepository {
       createdBy: row.createdBy,
       assigneeUserId: row.assigneeUserId,
       title: row.title,
-      description: row.description,
       dueDate: row.dueDate,
       tagIds,
       deletedAt: row.deletedAt,

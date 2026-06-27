@@ -36,7 +36,6 @@ export class TaskBatchesController {
       createdBy: user.id,
       assigneeUserId: user.id,
       title: body.title,
-      description: body.description ?? null,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       tagIds: body.tagIds ?? [],
       tasks: body.tasks.map((t) => ({
@@ -70,7 +69,6 @@ export class TaskBatchesController {
       id,
       userId: user.id,
       title: body.title,
-      description: body.description,
       dueDate:
         body.dueDate === undefined
           ? undefined

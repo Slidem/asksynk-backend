@@ -14,7 +14,6 @@ export const taskBatches = pgTable("task_batches", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  description: text("description"),
   dueDate: timestamp("due_date", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

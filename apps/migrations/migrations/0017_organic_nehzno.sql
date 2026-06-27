@@ -1,0 +1,1 @@
+ALTER TABLE "task_batches" DROP COLUMN "description";
