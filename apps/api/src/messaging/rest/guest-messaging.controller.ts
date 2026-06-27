@@ -1,9 +1,11 @@
 import { Controller, Get, Query } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import { AuthGuest as AuthGuestType } from "@/api/auth/auth.types";
 import { AuthGuest } from "@/api/auth/authGuest.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import { resolveAttachmentsByMessage } from "@/api/messaging/rest/message-attachments.helper";
 import {
@@ -17,6 +19,9 @@ import {
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 
+@ApiTags("Guest Messaging")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("public/thread")
 export class GuestMessagingController {
   constructor(
@@ -24,6 +29,7 @@ export class GuestMessagingController {
     private readonly attachmentService: AttachmentsService,
   ) {}
 
+  /** List messages in the guest's thread */
   @AllowGuest()
   @Get("messages")
   async listMessages(
@@ -43,6 +49,7 @@ export class GuestMessagingController {
     );
   }
 
+  /** List replies to a message in the guest's thread */
   @AllowGuest()
   @Get("messages/:messageId/replies")
   async listReplies(

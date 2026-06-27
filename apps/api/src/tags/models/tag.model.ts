@@ -9,7 +9,8 @@ export type TimeblockAnswerMode = {
 
 export type AnswerMode = ImmediateAnswerMode | TimeblockAnswerMode;
 
-export type AnswerModeType = AnswerMode["type"];
+export const ANSWER_MODE_TYPES = ["immediately", "timeblock"] as const;
+export type AnswerModeType = (typeof ANSWER_MODE_TYPES)[number];
 
 export interface NotificationsSettings {
   browserNotificationEnabled: boolean;

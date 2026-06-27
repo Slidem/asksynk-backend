@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, HttpCode, Post } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { CreatePublicViewRequestDto } from "@/api/public-views/rest/dto/create-public-view.dto";
 import {
   toGuestResponseDto,
@@ -12,10 +14,14 @@ import { PublicViewGuestResponseDto } from "@/api/public-views/rest/responses/gu
 import { PublicViewResponseDto } from "@/api/public-views/rest/responses/public-view.response";
 import { PublicViewsService } from "@/api/public-views/services/public-views.service";
 
+@ApiTags("Public Views")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("public-views")
 export class PublicViewsController {
   constructor(private readonly publicViewsService: PublicViewsService) {}
 
+  /** Create a public readonly view link for the current user's schedule */
   @Post()
   async create(
     @Body() dto: CreatePublicViewRequestDto,
@@ -28,6 +34,7 @@ export class PublicViewsController {
     return toPublicViewResponseDto({ view, url });
   }
 
+  /** List the current user's public views */
   @Get()
   async list(@AuthUser() user: AuthUserType): Promise<PublicViewResponseDto[]> {
     const rows = await this.publicViewsService.listForOwner(user.id);
@@ -40,6 +47,7 @@ export class PublicViewsController {
     );
   }
 
+  /** List guests who have signed into a public view */
   @Get(":id/guests")
   async listGuests(
     @UuidV7Param("id") id: string,
@@ -49,6 +57,7 @@ export class PublicViewsController {
     return rows.map(toGuestResponseDto);
   }
 
+  /** Revoke a public view, disabling its link */
   @Delete(":id")
   @HttpCode(204)
   async revoke(

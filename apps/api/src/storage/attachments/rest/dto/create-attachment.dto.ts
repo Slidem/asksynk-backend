@@ -1,3 +1,4 @@
+import { ApiProperty } from "@nestjs/swagger";
 import {
   IsIn,
   IsInt,
@@ -10,14 +11,20 @@ import {
 
 import {
   ALLOWED_CONTENT_TYPES,
+  ATTACHMENT_PLACEMENTS,
   AttachmentPlacement,
   MAX_ATTACHMENT_BYTES,
 } from "@/api/storage/attachments/models/attachment.model";
 
 export class CreateAttachmentDto {
-  @IsIn(["public", "message"])
+  @ApiProperty({
+    enum: [...ATTACHMENT_PLACEMENTS],
+    enumName: "AttachmentPlacement",
+  })
+  @IsIn(ATTACHMENT_PLACEMENTS)
   placement!: AttachmentPlacement;
 
+  @ApiProperty({ enum: [...ALLOWED_CONTENT_TYPES] })
   @IsIn([...ALLOWED_CONTENT_TYPES])
   contentType!: string;
 

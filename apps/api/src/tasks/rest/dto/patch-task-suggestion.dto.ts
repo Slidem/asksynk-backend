@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsArray,
@@ -17,6 +18,10 @@ import { SuggestedTaskItemDto } from "@/api/tasks/rest/dto/create-task-suggestio
 // Either a lifecycle transition (status) OR a payload edit — never both. The
 // controller rejects a mixed request with 400.
 export class PatchTaskSuggestionRequestDto {
+  @ApiPropertyOptional({
+    enum: ["accepted", "rejected"],
+    enumName: "TaskSuggestionResolution",
+  })
   @IsOptional()
   @IsIn(["accepted", "rejected"])
   status?: "accepted" | "rejected";

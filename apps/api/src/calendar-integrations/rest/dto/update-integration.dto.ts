@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsArray,
@@ -7,6 +8,10 @@ import {
   ValidateNested,
 } from "class-validator";
 
+import {
+  CALENDAR_SYNC_DIRECTIONS,
+  CalendarSyncDirection,
+} from "@/api/calendar-integrations/entities/calendar-integration.entity";
 import { IsUuidV7 } from "@/api/common/decorators/validators";
 
 export class CalendarSyncSelectionDto {
@@ -18,9 +23,13 @@ export class CalendarSyncSelectionDto {
 }
 
 export class UpdateIntegrationRequestDto {
+  @ApiPropertyOptional({
+    enum: [...CALENDAR_SYNC_DIRECTIONS],
+    enumName: "CalendarSyncDirection",
+  })
   @IsOptional()
-  @IsIn(["bidirectional", "readonly"])
-  syncDirection?: "bidirectional" | "readonly";
+  @IsIn(CALENDAR_SYNC_DIRECTIONS)
+  syncDirection?: CalendarSyncDirection;
 
   @IsOptional()
   @IsArray()

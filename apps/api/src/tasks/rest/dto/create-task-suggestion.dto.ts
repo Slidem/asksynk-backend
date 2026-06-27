@@ -1,3 +1,4 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsArray,
@@ -12,6 +13,10 @@ import {
   IsIsoDateWithOffset,
   IsUuidV7,
 } from "@/api/common/decorators/validators";
+import {
+  TASK_SUGGESTION_KINDS,
+  TaskSuggestionKind,
+} from "@/api/tasks/models/task.model";
 
 export class SuggestedTaskItemDto {
   @IsString()
@@ -24,8 +29,12 @@ export class SuggestedTaskItemDto {
 }
 
 export class TaskSuggestionPayloadDto {
-  @IsIn(["task", "batch"])
-  kind!: "task" | "batch";
+  @ApiProperty({
+    enum: [...TASK_SUGGESTION_KINDS],
+    enumName: "TaskSuggestionKind",
+  })
+  @IsIn(TASK_SUGGESTION_KINDS)
+  kind!: TaskSuggestionKind;
 
   @IsString()
   @IsNotEmpty()

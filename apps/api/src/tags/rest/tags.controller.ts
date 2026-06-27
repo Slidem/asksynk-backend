@@ -8,6 +8,7 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { pick } from "lodash";
 
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
@@ -18,6 +19,7 @@ import {
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { RequestActor } from "@/api/auth/requestActor.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { CreateTagRequestDto } from "@/api/tags/rest/dto/create-tag.dto";
@@ -27,6 +29,9 @@ import { TagResponseDto } from "@/api/tags/rest/responses/tag.response";
 import { toTagResponseDto } from "@/api/tags/rest/tag.mapper";
 import { TagsService } from "@/api/tags/services/tags.service";
 
+@ApiTags("Tags")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("tags")
 export class TagsController {
   constructor(
@@ -34,6 +39,7 @@ export class TagsController {
     private readonly networksService: NetworksService,
   ) {}
 
+  /** Create a tag for the current user */
   @Post()
   async createTag(
     @Body() createTag: CreateTagRequestDto,
@@ -47,6 +53,7 @@ export class TagsController {
     return toTagResponseDto(tag);
   }
 
+  /** List tags for a user (self, or a network member via userId) */
   @Get()
   @AllowGuest()
   async listTags(
@@ -69,6 +76,7 @@ export class TagsController {
     return tags.map(toTagResponseDto);
   }
 
+  /** Update a tag */
   @Patch(":id")
   async updateTag(
     @UuidV7Param("id") tagId: string,
@@ -84,6 +92,7 @@ export class TagsController {
     return toTagResponseDto(tag);
   }
 
+  /** Delete a tag */
   @Delete(":id")
   @HttpCode(204)
   async deleteTag(

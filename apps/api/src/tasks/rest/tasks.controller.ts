@@ -8,10 +8,12 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 import { CreateTaskRequestDto } from "@/api/tasks/rest/dto/create-task.dto";
 import { ListTasksQueryDto } from "@/api/tasks/rest/dto/list-tasks-query.dto";
@@ -20,10 +22,14 @@ import { toTaskResponse } from "@/api/tasks/rest/mappers/task.mapper";
 import { TaskResponse } from "@/api/tasks/rest/responses/task.response";
 import { TasksService } from "@/api/tasks/services/tasks.service";
 
+@ApiTags("Tasks")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("tasks")
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
+  /** Create a task for the current user */
   @Post()
   async createTask(
     @Body() body: CreateTaskRequestDto,
@@ -42,6 +48,7 @@ export class TasksController {
     return toTaskResponse(task);
   }
 
+  /** List tasks created by or assigned to the current user */
   @Get()
   async listTasks(
     @Query() query: ListTasksQueryDto,
@@ -57,6 +64,7 @@ export class TasksController {
     return tasks.map(toTaskResponse);
   }
 
+  /** Get a task by id */
   @Get(":id")
   async getTask(
     @UuidV7Param("id") id: string,
@@ -66,6 +74,7 @@ export class TasksController {
     return toTaskResponse(task);
   }
 
+  /** Update a task */
   @Patch(":id")
   async updateTask(
     @UuidV7Param("id") id: string,
@@ -90,6 +99,7 @@ export class TasksController {
     return toTaskResponse(task);
   }
 
+  /** Delete a task */
   @Delete(":id")
   @HttpCode(204)
   async deleteTask(

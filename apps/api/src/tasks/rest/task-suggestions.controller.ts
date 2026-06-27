@@ -8,10 +8,12 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { CreateTaskSuggestionRequestDto } from "@/api/tasks/rest/dto/create-task-suggestion.dto";
@@ -21,12 +23,14 @@ import { toTaskSuggestionResponse } from "@/api/tasks/rest/mappers/task.mapper";
 import { TaskSuggestionResponse } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
 
+@ApiTags("Task Suggestions")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("task-suggestions")
 export class TaskSuggestionsController {
-  constructor(
-    private readonly suggestionsService: TaskSuggestionsService,
-  ) {}
+  constructor(private readonly suggestionsService: TaskSuggestionsService) {}
 
+  /** Suggest a task (or batch) to another user */
   @Post()
   async createSuggestion(
     @Body() body: CreateTaskSuggestionRequestDto,
@@ -40,6 +44,7 @@ export class TaskSuggestionsController {
     return toTaskSuggestionResponse(suggestion);
   }
 
+  /** List task suggestions sent or received by the current user */
   @Get()
   async listSuggestions(
     @Query() query: ListTaskSuggestionsQueryDto,
@@ -53,6 +58,7 @@ export class TaskSuggestionsController {
     return suggestions.map((s) => toTaskSuggestionResponse(s));
   }
 
+  /** Get a task suggestion by id */
   @Get(":id")
   async getSuggestion(
     @UuidV7Param("id") id: string,
@@ -63,6 +69,7 @@ export class TaskSuggestionsController {
     return toTaskSuggestionResponse(suggestion, materializedTasks);
   }
 
+  /** Accept/reject a suggestion, or edit its pending payload */
   @Patch(":id")
   async updateSuggestion(
     @UuidV7Param("id") id: string,
@@ -109,6 +116,7 @@ export class TaskSuggestionsController {
     return toTaskSuggestionResponse(suggestion);
   }
 
+  /** Rescind a task suggestion */
   @Delete(":id")
   @HttpCode(204)
   async deleteSuggestion(

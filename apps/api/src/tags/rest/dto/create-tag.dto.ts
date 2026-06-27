@@ -1,3 +1,4 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsBoolean,
@@ -11,7 +12,11 @@ import {
 } from "class-validator";
 
 import { IsUuidV7 } from "@/api/common/decorators/validators";
-import { AnswerMode, AnswerModeType } from "@/api/tags/models/tag.model";
+import {
+  ANSWER_MODE_TYPES,
+  AnswerMode,
+  AnswerModeType,
+} from "@/api/tags/models/tag.model";
 
 export class NotificationsSettingsDto {
   @IsBoolean()
@@ -22,7 +27,8 @@ export class NotificationsSettingsDto {
 }
 
 export class AnswerModeDto {
-  @IsIn(["immediately", "timeblock"])
+  @ApiProperty({ enum: [...ANSWER_MODE_TYPES], enumName: "AnswerModeType" })
+  @IsIn(ANSWER_MODE_TYPES)
   type!: AnswerModeType;
 
   @ValidateIf((o: AnswerModeDto) => o.type === "immediately")

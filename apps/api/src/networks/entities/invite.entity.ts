@@ -1,4 +1,5 @@
-export type InviteStatus = "pending" | "accepted" | "rejected";
+export const INVITE_STATUSES = ["pending", "accepted", "rejected"] as const;
+export type InviteStatus = (typeof INVITE_STATUSES)[number];
 
 export interface InviteProps {
   id: string;

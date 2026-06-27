@@ -1,11 +1,19 @@
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import { IsArray, IsIn, IsOptional, IsString } from "class-validator";
 
-import { AttentionItemStatus } from "@/api/attention-items/models/attention-item.model";
+import {
+  ATTENTION_ITEM_STATUSES,
+  AttentionItemStatus,
+} from "@/api/attention-items/models/attention-item.model";
 import { IsUuidV7 } from "@/api/common/decorators/validators";
 
 export class PatchAttentionItemDto {
+  @ApiPropertyOptional({
+    enum: [...ATTENTION_ITEM_STATUSES],
+    enumName: "AttentionItemStatus",
+  })
   @IsOptional()
-  @IsIn(["created", "in_progress", "resolved"])
+  @IsIn(ATTENTION_ITEM_STATUSES)
   status?: AttentionItemStatus;
 
   @IsOptional()

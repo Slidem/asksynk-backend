@@ -1,11 +1,18 @@
-export type TimerStatus =
-  | "idle"
-  | "running"
-  | "paused"
-  | "completed"
-  | "stopped";
+export const TIMER_STATUSES = [
+  "idle",
+  "running",
+  "paused",
+  "completed",
+  "stopped",
+] as const;
+export type TimerStatus = (typeof TIMER_STATUSES)[number];
 
-export type TimerSessionType = "focus" | "short_break" | "long_break";
+export const TIMER_SESSION_TYPES = [
+  "focus",
+  "short_break",
+  "long_break",
+] as const;
+export type TimerSessionType = (typeof TIMER_SESSION_TYPES)[number];
 
 export type TimerEventType =
   | "started"
@@ -15,7 +22,12 @@ export type TimerEventType =
   | "completed";
 
 /** Subset of TimerStatus a client may request via PATCH /timers. */
-export type TimerTransitionStatus = "running" | "paused" | "stopped";
+export const TIMER_TRANSITION_STATUSES = [
+  "running",
+  "paused",
+  "stopped",
+] as const;
+export type TimerTransitionStatus = (typeof TIMER_TRANSITION_STATUSES)[number];
 
 export interface TransitionTimerInput {
   status: TimerTransitionStatus;

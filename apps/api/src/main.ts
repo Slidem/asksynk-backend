@@ -8,12 +8,14 @@ import { IoAdapter } from "@nestjs/platform-socket.io";
 
 import { AppModule } from "@/api/app.module";
 import { getCorsOptions } from "@/api/common/config/cors.config";
+import { setupSwagger } from "@/api/common/config/swagger.config";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
   app.enableCors(getCorsOptions(config));
+  setupSwagger(app, config);
   app.useWebSocketAdapter(new IoAdapter(app));
   await app.listen(3000);
 }

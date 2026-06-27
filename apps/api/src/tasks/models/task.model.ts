@@ -1,6 +1,8 @@
-export type TaskStatus = "todo" | "in_progress" | "completed";
+export const TASK_STATUSES = ["todo", "in_progress", "completed"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export type TaskListScope = "created_by_me" | "assigned_to_me";
+export const TASK_LIST_SCOPES = ["created_by_me", "assigned_to_me"] as const;
+export type TaskListScope = (typeof TASK_LIST_SCOPES)[number];
 
 export interface CreateTaskInput {
   createdBy: string;
@@ -55,14 +57,22 @@ export interface UpdateTaskBatchInput {
   tagIds?: string[];
 }
 
-export type TaskSuggestionStatus = "pending" | "accepted" | "rejected";
+export const TASK_SUGGESTION_STATUSES = [
+  "pending",
+  "accepted",
+  "rejected",
+] as const;
+export type TaskSuggestionStatus = (typeof TASK_SUGGESTION_STATUSES)[number];
+
+export const TASK_SUGGESTION_KINDS = ["task", "batch"] as const;
+export type TaskSuggestionKind = (typeof TASK_SUGGESTION_KINDS)[number];
 
 // Stored as jsonb in task_suggestions.payload. Materialized tasks are always
 // assigned to the suggestee, so assignees are not part of the payload. Tags MUST
 // belong to the suggestee (they drive the suggestee's attention once accepted);
 // the suggester pre-assigns them and the suggestee may adjust before/after accept.
 export interface TaskSuggestionPayload {
-  kind: "task" | "batch";
+  kind: TaskSuggestionKind;
   title: string;
   description: string | null;
   // Task due date (kind="task") or batch-level due date (kind="batch").

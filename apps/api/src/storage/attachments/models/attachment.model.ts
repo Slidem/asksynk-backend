@@ -1,6 +1,7 @@
 import { StorageBucket } from "@/api/storage/object-storage";
 
-export type AttachmentPlacement = "public" | "message";
+export const ATTACHMENT_PLACEMENTS = ["public", "message"] as const;
+export type AttachmentPlacement = (typeof ATTACHMENT_PLACEMENTS)[number];
 export type AttachmentStatus = "pending" | "active";
 
 /** Who is acting; resolvers authorize against this. */

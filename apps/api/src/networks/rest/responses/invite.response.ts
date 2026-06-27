@@ -1,10 +1,18 @@
-import { InviteStatus } from "@/api/networks/entities/invite.entity";
+import { ApiProperty } from "@nestjs/swagger";
 
-export interface InviteResponseDto {
-  id: string;
-  inviterUserId: string;
-  inviteeEmail: string;
-  status: InviteStatus;
-  createdAt: string;
-  updatedAt: string;
+import {
+  INVITE_STATUSES,
+  InviteStatus,
+} from "@/api/networks/entities/invite.entity";
+
+export class InviteResponseDto {
+  id!: string;
+  inviterUserId!: string;
+  inviteeEmail!: string;
+
+  @ApiProperty({ enum: [...INVITE_STATUSES], enumName: "InviteStatus" })
+  status!: InviteStatus;
+
+  createdAt!: string;
+  updatedAt!: string;
 }

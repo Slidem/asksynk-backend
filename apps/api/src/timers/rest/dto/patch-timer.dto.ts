@@ -1,16 +1,27 @@
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsIn, IsInt, IsOptional, Max, Min } from "class-validator";
 
 import {
+  TIMER_SESSION_TYPES,
+  TIMER_TRANSITION_STATUSES,
   TimerSessionType,
   TimerTransitionStatus,
 } from "@/api/timers/models/timer.model";
 
 export class PatchTimerDto {
-  @IsIn(["running", "paused", "stopped"])
+  @ApiProperty({
+    enum: [...TIMER_TRANSITION_STATUSES],
+    enumName: "TimerTransitionStatus",
+  })
+  @IsIn(TIMER_TRANSITION_STATUSES)
   status!: TimerTransitionStatus;
 
+  @ApiPropertyOptional({
+    enum: [...TIMER_SESSION_TYPES],
+    enumName: "TimerSessionType",
+  })
   @IsOptional()
-  @IsIn(["focus", "short_break", "long_break"])
+  @IsIn(TIMER_SESSION_TYPES)
   sessionType?: TimerSessionType;
 
   @IsOptional()

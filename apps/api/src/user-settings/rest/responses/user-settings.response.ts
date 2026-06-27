@@ -1,4 +1,4 @@
-export interface UserSettingsResponse {
-  attentionItemNotifications: boolean;
-  timerNotifications: boolean;
+export class UserSettingsResponse {
+  attentionItemNotifications!: boolean;
+  timerNotifications!: boolean;
 }

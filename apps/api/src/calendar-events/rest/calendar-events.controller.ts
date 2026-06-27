@@ -8,6 +8,7 @@ import {
   Put,
   Query,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import {
@@ -30,10 +31,14 @@ import {
   IsoDateWithOffsetParam,
   UuidV7Param,
 } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { NetworksService } from "@/api/networks/services/networks.service";
 
-import { CalendarEventInstance } from "../models/calendar-event-instance.model";
+import { CalendarEventInstanceResponse } from "@/api/calendar-events/rest/responses/calendar-event-instance.response";
 
+@ApiTags("Calendar Events")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller()
 export class CalendarEventsController {
   constructor(
@@ -41,6 +46,7 @@ export class CalendarEventsController {
     private readonly networksService: NetworksService,
   ) {}
 
+  /** Ensure the current user has a native calendar, creating it if missing */
   @Post("calendars")
   async ensureCalendar(
     @AuthUser() user: AuthUserType,
@@ -49,6 +55,7 @@ export class CalendarEventsController {
     return toCalendarResponseDto(calendar);
   }
 
+  /** Get the current user's native calendar */
   @Get("calendars")
   async getCalendar(
     @AuthUser() user: AuthUserType,
@@ -57,11 +64,12 @@ export class CalendarEventsController {
     return toCalendarResponseDto(calendar);
   }
 
+  /** Create a calendar event for the current user */
   @Post("calendar-events")
   async createCalendarEvent(
     @Body() dto: CreateCalendarEventRequestDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<CalendarEventInstance> {
+  ): Promise<CalendarEventInstanceResponse> {
     return this.calendarEventsService.createCalendarEvent(user.id, {
       id: dto.id,
       title: dto.title,
@@ -78,12 +86,13 @@ export class CalendarEventsController {
     });
   }
 
+  /** List calendar event instances in a time window (self or a network connection) */
   @AllowGuest()
   @Get("calendar-events")
   async listCalendarEvents(
     @Query() query: ListCalendarEventsQueryDto,
     @RequestActor() actor: RequestActorType,
-  ): Promise<CalendarEventInstance[]> {
+  ): Promise<CalendarEventInstanceResponse[]> {
     const targetUserId = await this.networksService.resolveTargetUserId(
       actor,
       query.userId,
@@ -97,20 +106,22 @@ export class CalendarEventsController {
     });
   }
 
+  /** Get a single calendar event instance by id */
   @Get("calendar-events/:id")
   async getCalendarEvent(
     @UuidV7Param("id") id: string,
     @AuthUser() user: AuthUserType,
-  ): Promise<CalendarEventInstance> {
+  ): Promise<CalendarEventInstanceResponse> {
     return this.calendarEventsService.getCalendarEventInstance(user.id, id);
   }
 
+  /** Update a calendar event (whole series for recurring events) */
   @Put("calendar-events/:id")
   async updateCalendarEvent(
     @UuidV7Param("id") id: string,
     @Body() dto: UpdateCalendarEventRequestDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<CalendarEventInstance> {
+  ): Promise<CalendarEventInstanceResponse> {
     return this.calendarEventsService.updateCalendarEvent(user.id, {
       eventId: id,
       title: dto.title,
@@ -130,6 +141,7 @@ export class CalendarEventsController {
     });
   }
 
+  /** Delete a calendar event (whole series for recurring events) */
   @Delete("calendar-events/:id")
   @HttpCode(204)
   async deleteCalendarEvent(
@@ -139,6 +151,7 @@ export class CalendarEventsController {
     await this.calendarEventsService.deleteCalendarEvent(user.id, id);
   }
 
+  /** Cancel a single occurrence of a recurring event */
   @Post("calendar-events/:id/exceptions")
   @HttpCode(204)
   async addException(
@@ -153,13 +166,14 @@ export class CalendarEventsController {
     );
   }
 
+  /** Update a single occurrence of a recurring event, detaching it from the series */
   @Put("calendar-events/:id/instances/:start")
   async updateCalendarEventInstance(
     @UuidV7Param("id") id: string,
     @IsoDateWithOffsetParam("start") start: string,
     @Body() dto: UpdateCalendarEventInstanceRequestDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<CalendarEventInstance> {
+  ): Promise<CalendarEventInstanceResponse> {
     return this.calendarEventsService.detachInstance(user.id, id, start, {
       title: dto.title,
       description: dto.description,
@@ -176,13 +190,14 @@ export class CalendarEventsController {
     });
   }
 
+  /** Split a recurring series at an occurrence into a new series going forward */
   @Put("calendar-events/:id/split/:start")
   async splitSeries(
     @UuidV7Param("id") id: string,
     @IsoDateWithOffsetParam("start") start: string,
     @Body() dto: SplitCalendarEventSeriesRequestDto,
     @AuthUser() user: AuthUserType,
-  ): Promise<CalendarEventInstance> {
+  ): Promise<CalendarEventInstanceResponse> {
     return this.calendarEventsService.splitSeries(user.id, id, start, {
       title: dto.title,
       description: dto.description,

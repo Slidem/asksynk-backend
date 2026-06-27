@@ -3,8 +3,16 @@ import {
   CalendarIntegrationProviderData,
 } from "@/migrations/schema/calendarIntegrations";
 
-export type CalendarIntegrationStatus = "active" | "error" | "revoked";
-export type CalendarSyncDirection = "bidirectional" | "readonly";
+export const CALENDAR_INTEGRATION_STATUSES = [
+  "active",
+  "error",
+  "revoked",
+] as const;
+export type CalendarIntegrationStatus =
+  (typeof CALENDAR_INTEGRATION_STATUSES)[number];
+
+export const CALENDAR_SYNC_DIRECTIONS = ["bidirectional", "readonly"] as const;
+export type CalendarSyncDirection = (typeof CALENDAR_SYNC_DIRECTIONS)[number];
 
 // refresh the access token this many ms before it actually expires
 const REFRESH_SKEW_MS = 60_000;

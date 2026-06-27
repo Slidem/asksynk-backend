@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import {
   toAttachmentResponse,
   toUploadResponse,
@@ -14,10 +16,14 @@ import {
 } from "@/api/storage/attachments/rest/responses/attachment.response";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 
+@ApiTags("Attachments")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("attachments")
 export class AttachmentsController {
   constructor(private readonly attachmentsService: AttachmentsService) {}
 
+  /** Start an upload: returns a presigned URL + the pending attachment id */
   @Post()
   async create(
     @Body() body: CreateAttachmentDto,
@@ -35,6 +41,7 @@ export class AttachmentsController {
     return toUploadResponse(created);
   }
 
+  /** Finalize an uploaded attachment, marking it ready */
   @Patch(":id")
   async finalize(
     @Param("id") id: string,
@@ -49,6 +56,7 @@ export class AttachmentsController {
     return toAttachmentResponse(attachment);
   }
 
+  /** Get an attachment with a fresh readable url */
   @Get(":id")
   async getOne(
     @Param("id") id: string,

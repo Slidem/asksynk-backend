@@ -1,36 +1,64 @@
-export type ThreadOtherParticipantDto =
-  | {
-      kind: "user";
-      userId: string;
-      name: string | null;
-      firstName: string | null;
-      lastName: string | null;
-      email: string;
-      image: string | null;
-      isActiveConnection: boolean;
-    }
-  | {
-      kind: "guest";
-      guestId: string;
-      displayName: string;
-      publicViewId: string;
-      publicViewName: string | null;
-      publicViewExpired: boolean;
-    };
+import { ApiExtraModels, ApiProperty, getSchemaPath } from "@nestjs/swagger";
 
-export interface ThreadListItemResponseDto {
-  threadId: string;
-  publicViewId: string | null;
-  other: ThreadOtherParticipantDto;
-  lastMessage: {
-    body: string;
-    createdAt: string;
-    senderKind: "user" | "guest";
-  } | null;
-  frozen: boolean;
-  createdAt: string;
+import {
+  SENDER_KINDS,
+  SenderKind,
+} from "@/api/messaging/rest/responses/message.response";
+
+export class ThreadUserParticipantDto {
+  @ApiProperty({ enum: ["user"] })
+  kind!: "user";
+  userId!: string;
+  name!: string | null;
+  firstName!: string | null;
+  lastName!: string | null;
+  email!: string;
+  image!: string | null;
+  isActiveConnection!: boolean;
 }
 
-export interface CreateThreadResponseDto {
-  threadId: string;
+export class ThreadGuestParticipantDto {
+  @ApiProperty({ enum: ["guest"] })
+  kind!: "guest";
+  guestId!: string;
+  displayName!: string;
+  publicViewId!: string;
+  publicViewName!: string | null;
+  publicViewExpired!: boolean;
+}
+
+export type ThreadOtherParticipantDto =
+  | ThreadUserParticipantDto
+  | ThreadGuestParticipantDto;
+
+export class ThreadLastMessageDto {
+  body!: string;
+  createdAt!: string;
+
+  @ApiProperty({ enum: [...SENDER_KINDS], enumName: "SenderKind" })
+  senderKind!: SenderKind;
+}
+
+@ApiExtraModels(ThreadUserParticipantDto, ThreadGuestParticipantDto)
+export class ThreadListItemResponseDto {
+  threadId!: string;
+  publicViewId!: string | null;
+
+  @ApiProperty({
+    oneOf: [
+      { $ref: getSchemaPath(ThreadUserParticipantDto) },
+      { $ref: getSchemaPath(ThreadGuestParticipantDto) },
+    ],
+    discriminator: { propertyName: "kind" },
+  })
+  other!: ThreadOtherParticipantDto;
+
+  lastMessage!: ThreadLastMessageDto | null;
+
+  frozen!: boolean;
+  createdAt!: string;
+}
+
+export class CreateThreadResponseDto {
+  threadId!: string;
 }

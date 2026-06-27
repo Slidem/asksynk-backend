@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { CreateThreadRequestDto } from "@/api/messaging/rest/dto/create-thread.dto";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import { resolveAttachmentsByMessage } from "@/api/messaging/rest/message-attachments.helper";
@@ -22,6 +24,9 @@ import {
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 
+@ApiTags("Threads")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("threads")
 export class ThreadsController {
   constructor(
@@ -29,6 +34,7 @@ export class ThreadsController {
     private readonly attachmentService: AttachmentsService,
   ) {}
 
+  /** List the current user's threads */
   @Get()
   async list(
     @AuthUser() user: AuthUserType,
@@ -37,6 +43,7 @@ export class ThreadsController {
     return items.map(toThreadListItemResponseDto);
   }
 
+  /** Create or get the 1:1 thread with another user */
   @Post()
   async createOrGet(
     @Body() dto: CreateThreadRequestDto,
@@ -49,6 +56,7 @@ export class ThreadsController {
     return { threadId: thread.id };
   }
 
+  /** List messages in a thread (newest first, cursor via `before`) */
   @Get(":id/messages")
   async listMessages(
     @UuidV7Param("id") threadId: string,
@@ -77,6 +85,7 @@ export class ThreadsController {
     );
   }
 
+  /** List replies to a message in a thread */
   @Get(":id/messages/:messageId/replies")
   async listReplies(
     @UuidV7Param("id") threadId: string,

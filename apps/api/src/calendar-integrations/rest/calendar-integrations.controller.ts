@@ -8,6 +8,11 @@ import {
   Query,
   Res,
 } from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiExcludeEndpoint,
+  ApiTags,
+} from "@nestjs/swagger";
 import { Response } from "express";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
@@ -20,14 +25,19 @@ import {
   CalendarIntegrationResponseDto,
 } from "@/api/calendar-integrations/rest/responses/calendar-integration.response";
 import { CalendarIntegrationService } from "@/api/calendar-integrations/services/calendar-integration.service";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 
+@ApiTags("Calendar Integrations")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller()
 export class CalendarIntegrationsController {
   constructor(
     private readonly integrationService: CalendarIntegrationService,
   ) {}
 
+  /** Get the provider OAuth authorization URL to start connecting a calendar */
   @Get("calendar-integrations/auth-url")
   getAuthUrl(
     @Query("provider") provider: string,
@@ -36,6 +46,7 @@ export class CalendarIntegrationsController {
     return { url: this.integrationService.getAuthUrl(user.id, provider) };
   }
 
+  @ApiExcludeEndpoint()
   @Public()
   @Get("calendar-integrations/:provider/callback")
   async handleCallback(
@@ -50,6 +61,7 @@ export class CalendarIntegrationsController {
     res.redirect(redirectUrl);
   }
 
+  /** List the current user's connected calendar integrations */
   @Get("calendar-integrations")
   async list(
     @AuthUser() user: AuthUserType,
@@ -60,6 +72,7 @@ export class CalendarIntegrationsController {
     return integrations.map(toCalendarIntegrationResponseDto);
   }
 
+  /** Get a single calendar integration by id */
   @Get("calendar-integrations/:id")
   async get(
     @UuidV7Param("id") id: string,
@@ -72,6 +85,7 @@ export class CalendarIntegrationsController {
     return toCalendarIntegrationResponseDto(integration);
   }
 
+  /** Update an integration's sync direction or per-calendar sync selection */
   @Patch("calendar-integrations/:id")
   async update(
     @UuidV7Param("id") id: string,
@@ -87,6 +101,7 @@ export class CalendarIntegrationsController {
     return toCalendarIntegrationResponseDto(integration);
   }
 
+  /** Disconnect (delete) a calendar integration */
   @Delete("calendar-integrations/:id")
   @HttpCode(204)
   async disconnect(

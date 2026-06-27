@@ -7,6 +7,7 @@ import {
   Patch,
   Query,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { toAttentionItemResponse } from "@/api/attention-items/rest/attention-item.mapper";
@@ -16,12 +17,17 @@ import { AttentionItemResponse } from "@/api/attention-items/rest/responses/atte
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 
+@ApiTags("Attention Items")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
 @Controller("attention-items")
 export class AttentionItemsController {
   constructor(private readonly attentionItemsService: AttentionItemsService) {}
 
+  /** List the current user's attention items, optionally filtered by status/type */
   @Get()
   async listAttentionItems(
     @Query() query: ListAttentionItemsQueryDto,
@@ -36,6 +42,7 @@ export class AttentionItemsController {
     return items.map(toAttentionItemResponse);
   }
 
+  /** Get a single attention item by id */
   @Get(":id")
   async getAttentionItem(
     @UuidV7Param("id") id: string,
@@ -45,6 +52,7 @@ export class AttentionItemsController {
     return toAttentionItemResponse(item);
   }
 
+  /** Update an attention item's status, note, or tags */
   @Patch(":id")
   async updateAttentionItem(
     @UuidV7Param("id") id: string,
@@ -61,6 +69,7 @@ export class AttentionItemsController {
     return toAttentionItemResponse(item);
   }
 
+  /** Delete an attention item */
   @Delete(":id")
   @HttpCode(204)
   async deleteAttentionItem(

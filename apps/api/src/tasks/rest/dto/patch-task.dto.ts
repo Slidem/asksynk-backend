@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   ArrayNotEmpty,
   IsArray,
@@ -11,7 +12,7 @@ import {
   IsIsoDateWithOffset,
   IsUuidV7,
 } from "@/api/common/decorators/validators";
-import { TaskStatus } from "@/api/tasks/models/task.model";
+import { TASK_STATUSES, TaskStatus } from "@/api/tasks/models/task.model";
 
 export class PatchTaskRequestDto {
   @IsOptional()
@@ -28,8 +29,9 @@ export class PatchTaskRequestDto {
   @IsIsoDateWithOffset()
   dueDate?: string | null;
 
+  @ApiPropertyOptional({ enum: [...TASK_STATUSES], enumName: "TaskStatus" })
   @IsOptional()
-  @IsIn(["todo", "in_progress", "completed"])
+  @IsIn(TASK_STATUSES)
   status?: TaskStatus;
 
   @IsOptional()

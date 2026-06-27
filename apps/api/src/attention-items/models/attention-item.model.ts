@@ -1,13 +1,20 @@
-export type AttentionItemType =
-  | "tagged_message"
-  | "incoming_email"
-  | "slack_message"
-  | "whatsapp_message"
-  | "suggested_timeblock"
-  | "suggested_task"
-  | "task";
+export const ATTENTION_ITEM_TYPES = [
+  "tagged_message",
+  "incoming_email",
+  "slack_message",
+  "whatsapp_message",
+  "suggested_timeblock",
+  "suggested_task",
+  "task",
+] as const;
+export type AttentionItemType = (typeof ATTENTION_ITEM_TYPES)[number];
 
-export type AttentionItemStatus = "created" | "in_progress" | "resolved";
+export const ATTENTION_ITEM_STATUSES = [
+  "created",
+  "in_progress",
+  "resolved",
+] as const;
+export type AttentionItemStatus = (typeof ATTENTION_ITEM_STATUSES)[number];
 
 export type TaggedMessageMetadata = {
   type: "tagged_message";

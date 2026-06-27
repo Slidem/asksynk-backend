@@ -22,6 +22,7 @@
     "@nestjs/core": "^10.3.10",
     "@nestjs/platform-express": "^10.3.10",
     "@nestjs/platform-socket.io": "^11.1.19",
+    "@nestjs/swagger": "^7.4.2",
     "@nestjs/websockets": "^11.1.19",
     "@types/lodash": "^4.17.24",
     "better-auth": "^1.2.5",

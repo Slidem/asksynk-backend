@@ -1,22 +1,28 @@
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import { IsIn, IsOptional, IsString } from "class-validator";
 
-import { AttentionItemStatus, AttentionItemType } from "@/api/attention-items/models/attention-item.model";
+import {
+  ATTENTION_ITEM_STATUSES,
+  ATTENTION_ITEM_TYPES,
+  AttentionItemStatus,
+  AttentionItemType,
+} from "@/api/attention-items/models/attention-item.model";
 
 export class ListAttentionItemsQueryDto {
+  @ApiPropertyOptional({
+    enum: [...ATTENTION_ITEM_STATUSES],
+    enumName: "AttentionItemStatus",
+  })
   @IsOptional()
-  @IsIn(["created", "in_progress", "resolved"])
+  @IsIn(ATTENTION_ITEM_STATUSES)
   status?: AttentionItemStatus;
 
+  @ApiPropertyOptional({
+    enum: [...ATTENTION_ITEM_TYPES],
+    enumName: "AttentionItemType",
+  })
   @IsOptional()
-  @IsIn([
-    "tagged_message",
-    "incoming_email",
-    "slack_message",
-    "whatsapp_message",
-    "suggested_timeblock",
-    "suggested_task",
-    "task",
-  ])
+  @IsIn(ATTENTION_ITEM_TYPES)
   type?: AttentionItemType;
 
   @IsOptional()
