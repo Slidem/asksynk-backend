@@ -26,7 +26,7 @@ export abstract class ScheduledJobService {
    * Transactional: like {@link schedule}, joins the caller's transaction if
    * active, else opens a new one — so the cancel commits/rolls back with it.
    */
-  abstract cancel(queue: string, ref: string): Promise<void>;
+  abstract cancel(queue: string, jobId: string): Promise<void>;
 
   /** Register a handler that runs when a scheduled job on `queue` fires. */
   abstract process<T extends object>(

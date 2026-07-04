@@ -22,7 +22,7 @@ import { ScheduledJobService } from "@/shared/scheduled-job/scheduled-job.servic
 
 interface PersistResult {
   entity: UserTimer;
-  jobRefToCancel: string | null;
+  jobIdToCancel: string | null;
 }
 
 @Injectable()
@@ -124,15 +124,15 @@ export class TimersService {
     sessionType: TimerSessionType,
     durationSeconds: number,
   ): Promise<UserTimer> {
-    const { entity, jobRefToCancel } = await this.persistStart(
+    const { entity, jobIdToCancel } = await this.persistStart(
       userId,
       sessionType,
       durationSeconds,
     );
     // Cancel the overridden session's job before scheduling the new one so the
     // `timer:<userId>` singleton key is free.
-    if (jobRefToCancel) {
-      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobRefToCancel);
+    if (jobIdToCancel) {
+      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobIdToCancel);
     }
     await this.scheduleCompletion(entity);
     return entity;
@@ -145,17 +145,17 @@ export class TimersService {
   }
 
   private async pauseSession(userId: string): Promise<UserTimer> {
-    const { entity, jobRefToCancel } = await this.persistPause(userId);
-    if (jobRefToCancel) {
-      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobRefToCancel);
+    const { entity, jobIdToCancel } = await this.persistPause(userId);
+    if (jobIdToCancel) {
+      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobIdToCancel);
     }
     return entity;
   }
 
   private async stopSession(userId: string): Promise<UserTimer> {
-    const { entity, jobRefToCancel } = await this.persistStop(userId);
-    if (jobRefToCancel) {
-      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobRefToCancel);
+    const { entity, jobIdToCancel } = await this.persistStop(userId);
+    if (jobIdToCancel) {
+      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobIdToCancel);
     }
     return entity;
   }
@@ -171,8 +171,9 @@ export class TimersService {
     // Direct switch from a running session: complete the current one first
     // (counts toward the long-break cadence + fires the completion notification),
     // then start the new session and cancel the old completion job.
-    const jobRefToCancel =
+    const jobIdToCancel =
       current.status === "running" ? current.pendingCompletionJobRef : null;
+
     if (current.status === "running") {
       await this.complete(current, now);
     }
@@ -192,7 +193,7 @@ export class TimersService {
       remainingSeconds: durationSeconds,
       occurredAt: now,
     });
-    return { entity: updated, jobRefToCancel };
+    return { entity: updated, jobIdToCancel };
   }
 
   private async persistResume(userId: string): Promise<UserTimer> {
@@ -220,13 +221,13 @@ export class TimersService {
     if (current.status !== "running") {
       throw AsksynkError.badRequest("Timer not running");
     }
-    const jobRefToCancel = current.pendingCompletionJobRef;
+    const jobIdToCancel = current.pendingCompletionJobRef;
     const remaining = current.remainingSeconds(now) ?? 0;
 
     // Past due → complete instead of leaving a "paused at 0" zombie.
     if (remaining <= 0) {
       const completed = await this.complete(current, now);
-      return { entity: completed ?? current, jobRefToCancel };
+      return { entity: completed ?? current, jobIdToCancel };
     }
 
     const updated = await this.timersRepo.pause(userId, remaining, now);
@@ -239,7 +240,7 @@ export class TimersService {
       remainingSeconds: remaining,
       occurredAt: now,
     });
-    return { entity: updated, jobRefToCancel };
+    return { entity: updated, jobIdToCancel };
   }
 
   private async persistStop(userId: string): Promise<PersistResult> {
@@ -250,7 +251,7 @@ export class TimersService {
       throw AsksynkError.badRequest("No active timer");
     }
 
-    const jobRefToCancel = current.pendingCompletionJobRef;
+    const jobIdToCancel = current.pendingCompletionJobRef;
     const remaining = current.remainingSeconds(now) ?? 0;
     const updated = await this.timersRepo.stop(userId, remaining, now);
 
@@ -266,7 +267,7 @@ export class TimersService {
       remainingSeconds: remaining,
       occurredAt: now,
     });
-    return { entity: updated, jobRefToCancel };
+    return { entity: updated, jobIdToCancel };
   }
 
   // --- shared helpers ---

@@ -441,8 +441,10 @@ export class MessagingRepository {
         isActiveConnection: removedA === null && removedB === null,
       };
     } else {
-      const expiresAt = r.pv_expires_at as Date;
-      const revokedAt = r.pv_revoked_at as Date | null;
+      const expiresAt = new Date(r.pv_expires_at as string);
+      const revokedAt = r.pv_revoked_at
+        ? new Date(r.pv_revoked_at as string)
+        : null;
       other = {
         kind: "guest",
         guestId: r.other_guest_id as string,
