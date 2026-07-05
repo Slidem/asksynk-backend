@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -16,6 +17,13 @@ import { attachments } from "@/migrations/schema/attachments";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { taskSuggestions } from "@/migrations/schema/taskSuggestions";
 import { users } from "@/migrations/schema/users";
+
+// Present only on tagged messages (those that open a recipient attention item);
+// mirrors the attention item's status so chat can render it inline.
+type ManagedStatus = {
+  type: "tagged_message";
+  status: "created" | "in_progress" | "resolved";
+};
 
 export const messageThreads = pgTable(
   "message_threads",
@@ -94,6 +102,7 @@ export const messages = pgTable(
     suggestionId: uuid("suggestion_id").references(() => taskSuggestions.id, {
       onDelete: "set null",
     }),
+    managedStatus: jsonb("managed_status").$type<ManagedStatus>(),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

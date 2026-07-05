@@ -6,6 +6,8 @@ import { AuthGuest } from "@/api/auth/auth.types";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import {
+  ManagedMessageStatus,
+  ManagedStatus,
   Message,
   MessageSender,
 } from "@/api/messaging/entities/message.entity";
@@ -24,6 +26,7 @@ import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.se
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   MessageCreated,
+  MessageManagedStatusChanged,
   MessageUpdated,
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
@@ -250,6 +253,7 @@ export class MessagingService {
       tagIds,
       attachmentIds,
       suggestionId,
+      managedStatus: this.initialManagedStatus(tagIds),
     });
 
     await this.notifyMessageCreated(message, participants);
@@ -261,8 +265,14 @@ export class MessagingService {
   async sendAsGuest(
     guest: AuthGuest,
     body: string,
+    tagIds: string[],
     parentMessageId?: string | null,
   ): Promise<Message> {
+    // Guest tags the owner's own tags — they drive the owner's attention item.
+    if (tagIds.length > 0) {
+      await this.tagsService.assertOwnedBy(guest.ownerUserId, tagIds);
+    }
+
     let thread = await this.messagingRepository.findGuestThread(guest.id);
     if (!thread) {
       thread = await this.messagingRepository.insertThread({
@@ -285,7 +295,8 @@ export class MessagingService {
       parentMessageId: parentMessageId ?? null,
       sender: { kind: "guest", guestId: guest.id },
       body,
-      tagIds: [],
+      tagIds,
+      managedStatus: this.initialManagedStatus(tagIds),
     });
 
     const participants = await this.messagingRepository.getParticipants(
@@ -332,6 +343,7 @@ export class MessagingService {
 
     await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
     await this.messagingRepository.replaceMessageTags(messageId, tagIds);
+    await this.reconcileManagedStatus(message.managedStatus, messageId, tagIds);
 
     const updated = await this.messagingRepository.getMessageById(messageId);
     if (!updated) {
@@ -341,6 +353,165 @@ export class MessagingService {
     await this.notifyMessageUpdated(updated, participants);
 
     return updated;
+  }
+
+  @Transactional()
+  async tagMessageAsGuest(
+    guest: AuthGuest,
+    messageId: string,
+    tagIds: string[],
+  ): Promise<Message> {
+    const message = await this.messagingRepository.getMessageById(messageId);
+    if (!message) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    const thread = await this.messagingRepository.findGuestThread(guest.id);
+    if (!thread || thread.id !== message.threadId) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    // Guests re-tag only their own messages; the owner's own messages have no
+    // attention-item recipient in a guest thread.
+    if (
+      message.sender.kind !== "guest" ||
+      message.sender.guestId !== guest.id
+    ) {
+      throw AsksynkError.forbidden("Cannot tag this message");
+    }
+
+    await this.tagsService.assertOwnedBy(guest.ownerUserId, tagIds);
+    await this.messagingRepository.replaceMessageTags(messageId, tagIds);
+    await this.reconcileManagedStatus(message.managedStatus, messageId, tagIds);
+
+    const updated = await this.messagingRepository.getMessageById(messageId);
+    if (!updated) {
+      throw AsksynkError.notFound("Message not found");
+    }
+
+    const participants = await this.messagingRepository.getParticipants(
+      message.threadId,
+    );
+
+    await this.notifyMessageUpdated(updated, participants);
+
+    return updated;
+  }
+
+  /**
+   * Forward sync: the recipient sets a managed message's status. Publishes
+   * `MessageManagedStatusChanged` (durable leg mirrors the attention item,
+   * realtime leg pushes to the thread). Recipient-only — the sender cannot
+   * resolve their own tagged message.
+   */
+  @Transactional()
+  async updateManagedStatus(
+    userId: string,
+    messageId: string,
+    status: ManagedMessageStatus,
+  ): Promise<Message> {
+    const message = await this.messagingRepository.getMessageById(messageId);
+    if (!message) {
+      throw AsksynkError.notFound("Message not found");
+    }
+    if (!message.managedStatus) {
+      throw AsksynkError.badRequest("Message is not manageable");
+    }
+
+    const isParticipant = await this.messagingRepository.isUserParticipant(
+      message.threadId,
+      userId,
+    );
+    if (!isParticipant) {
+      throw AsksynkError.notFound("Thread not found");
+    }
+    if (message.sender.kind === "user" && message.sender.userId === userId) {
+      throw AsksynkError.forbidden(
+        "Only the recipient can update this message's status",
+      );
+    }
+
+    if (message.managedStatus.status === status) {
+      return message; // idempotent — no event
+    }
+
+    const managedStatus: ManagedStatus = { ...message.managedStatus, status };
+    await this.messagingRepository.updateManagedStatus(
+      messageId,
+      managedStatus,
+    );
+    await this.publishManagedStatusChanged(
+      message.threadId,
+      messageId,
+      managedStatus,
+    );
+
+    return Message.create({ ...message, managedStatus });
+  }
+
+  /**
+   * Reverse sync: a tagged_message attention item was resolved from the inbox.
+   * Reflects the status back onto the message. Idempotent so the re-published
+   * `MessageManagedStatusChanged` no-ops on the attention side (no loop).
+   */
+  @Transactional()
+  async applyManagedStatusFromAttention(
+    messageId: string,
+    status: ManagedMessageStatus,
+  ): Promise<void> {
+    const message = await this.messagingRepository.getMessageById(messageId);
+    if (!message?.managedStatus) {
+      return; // message not managed — nothing to reflect
+    }
+    if (message.managedStatus.status === status) {
+      return; // already in sync
+    }
+
+    const managedStatus: ManagedStatus = { ...message.managedStatus, status };
+    await this.messagingRepository.updateManagedStatus(
+      messageId,
+      managedStatus,
+    );
+    await this.publishManagedStatusChanged(
+      message.threadId,
+      messageId,
+      managedStatus,
+    );
+  }
+
+  private initialManagedStatus(tagIds: string[]): ManagedStatus | null {
+    return tagIds.length > 0
+      ? { type: "tagged_message", status: "created" }
+      : null;
+  }
+
+  /** Keep managed_status in lockstep with tagged state across a re-tag. */
+  private async reconcileManagedStatus(
+    prior: ManagedStatus | null,
+    messageId: string,
+    tagIds: string[],
+  ): Promise<void> {
+    let next = prior;
+    if (tagIds.length === 0) {
+      next = null;
+    } else if (!prior) {
+      next = { type: "tagged_message", status: "created" };
+    }
+    if (next !== prior) {
+      await this.messagingRepository.updateManagedStatus(messageId, next);
+    }
+  }
+
+  private async publishManagedStatusChanged(
+    threadId: string,
+    messageId: string,
+    managedStatus: ManagedStatus,
+  ): Promise<void> {
+    await this.eventsPublisher.publish(MessageManagedStatusChanged, {
+      threadId,
+      messageId,
+      managedStatus,
+    });
   }
 
   private resolveRecipientUserId(
@@ -400,6 +571,7 @@ export class MessagingService {
         tagIds: message.tagIds,
         attachmentIds: message.attachmentIds,
         suggestionId: message.suggestionId,
+        managedStatus: message.managedStatus ?? undefined,
         createdAt: message.createdAt.toISOString(),
       },
       participantUserIds,
@@ -436,6 +608,7 @@ export class MessagingService {
         body: message.body,
         tagIds: message.tagIds,
         suggestionId: message.suggestionId,
+        managedStatus: message.managedStatus ?? undefined,
         createdAt: message.createdAt.toISOString(),
       },
       participantUserIds,

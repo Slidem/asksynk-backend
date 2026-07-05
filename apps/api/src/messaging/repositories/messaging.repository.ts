@@ -5,6 +5,7 @@ import _ from "lodash";
 
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import {
+  ManagedStatus,
   Message,
   MessageSender,
 } from "@/api/messaging/entities/message.entity";
@@ -172,6 +173,7 @@ export class MessagingRepository {
     tagIds: string[];
     attachmentIds?: string[];
     suggestionId?: string | null;
+    managedStatus?: ManagedStatus | null;
   }): Promise<Message> {
     const attachmentIds = _.uniq(input.attachmentIds ?? []);
     const [row] = await this.txHost.tx
@@ -184,6 +186,7 @@ export class MessagingRepository {
         senderGuestId:
           input.sender.kind === "guest" ? input.sender.guestId : null,
         suggestionId: input.suggestionId ?? null,
+        managedStatus: input.managedStatus ?? null,
         body: input.body,
       })
       .returning();
@@ -234,6 +237,16 @@ export class MessagingRepository {
     }
   }
 
+  async updateManagedStatus(
+    messageId: string,
+    managedStatus: ManagedStatus | null,
+  ): Promise<void> {
+    await this.txHost.tx
+      .update(messages)
+      .set({ managedStatus })
+      .where(eq(messages.id, messageId));
+  }
+
   async listMessages(
     threadId: string,
     options: { before?: Date; limit: number },
@@ -252,6 +265,7 @@ export class MessagingRepository {
         senderUserId: messages.senderUserId,
         senderGuestId: messages.senderGuestId,
         suggestionId: messages.suggestionId,
+        managedStatus: messages.managedStatus,
         body: messages.body,
         createdAt: messages.createdAt,
         replyCount: sql<number>`(
@@ -495,6 +509,7 @@ export class MessagingRepository {
       tagIds,
       attachmentIds,
       suggestionId: row.suggestionId,
+      managedStatus: row.managedStatus,
       createdAt: row.createdAt,
     });
   }

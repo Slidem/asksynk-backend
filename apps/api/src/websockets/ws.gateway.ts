@@ -13,6 +13,10 @@ import { Server, Socket } from "socket.io";
 import { MAX_ATTACHMENTS_PER_MESSAGE } from "src/messaging/attachments/message-attachment.constants";
 
 import { AsksynkError } from "@/api/common/errors/errors.model";
+import {
+  MANAGED_MESSAGE_STATUSES,
+  ManagedMessageStatus,
+} from "@/api/messaging/entities/message.entity";
 import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
@@ -23,6 +27,7 @@ import {
   AttentionItemRemoved,
   AttentionItemUpserted,
   MessageCreated,
+  MessageManagedStatusChanged,
   MessageUpdated,
   TaskSuggestionBroadcast,
   TimerLifecycle,
@@ -222,10 +227,6 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         };
       }
 
-      if (tagIds.length > 0) {
-        return { ok: false, error: "Guests cannot tag" };
-      }
-
       if (attachmentIds.length > 0) {
         return { ok: false, error: "Guests cannot attach files" };
       }
@@ -237,6 +238,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const message = await this.messagingService.sendAsGuest(
         identity.guest,
         text,
+        tagIds,
         parentMessageId,
       );
       return { ok: true, messageId: message.id };
@@ -260,15 +262,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: false, error: "unauthorized" };
     }
 
-    if (identity.kind !== "user") {
-      return { ok: false, error: "forbidden" };
-    }
-
     if (!body?.messageId) {
       return { ok: false, error: "messageId required" };
     }
 
-    const tagIds = body?.tagIds ?? [];
+    const tagIds = _.uniq(body?.tagIds ?? []);
 
     if (
       !Array.isArray(tagIds) ||
@@ -278,17 +276,72 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      await this.messagingService.tagMessage(
-        identity.user.id,
-        body.messageId,
-        tagIds,
-      );
+      if (identity.kind === "user") {
+        await this.messagingService.tagMessage(
+          identity.user.id,
+          body.messageId,
+          tagIds,
+        );
+      } else {
+        await this.messagingService.tagMessageAsGuest(
+          identity.guest,
+          body.messageId,
+          tagIds,
+        );
+      }
       return { ok: true };
     } catch (error) {
       if (error instanceof AsksynkError) {
         return { ok: false, error: error.message };
       }
       this.logger.error("message.tag failed", { error });
+      return { ok: false, error: "internal_error" };
+    }
+  }
+
+  @SubscribeMessage("message.updateStatus")
+  async onUpdateMessageStatus(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { messageId?: string; status?: string },
+  ): Promise<Ack> {
+    const identity = socket.data.identity as WsIdentity | undefined;
+
+    if (!identity) {
+      return { ok: false, error: "unauthorized" };
+    }
+
+    // Only the recipient (a user) manages a tagged message's status.
+    if (identity.kind !== "user") {
+      return { ok: false, error: "forbidden" };
+    }
+
+    if (!body?.messageId) {
+      return { ok: false, error: "messageId required" };
+    }
+
+    const status = body?.status;
+    if (
+      !status ||
+      !MANAGED_MESSAGE_STATUSES.includes(status as ManagedMessageStatus)
+    ) {
+      return {
+        ok: false,
+        error: `status must be one of ${MANAGED_MESSAGE_STATUSES.join(", ")}`,
+      };
+    }
+
+    try {
+      await this.messagingService.updateManagedStatus(
+        identity.user.id,
+        body.messageId,
+        status as ManagedMessageStatus,
+      );
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof AsksynkError) {
+        return { ok: false, error: error.message };
+      }
+      this.logger.error("message.updateStatus failed", { error });
       return { ok: false, error: "internal_error" };
     }
   }
@@ -322,6 +375,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       tagIds: payload.message.tagIds ?? [],
       attachments: attachments.map(toAttachmentResponse),
       suggestionId: payload.message.suggestionId ?? null,
+      managedStatus: payload.message.managedStatus,
       createdAt: payload.message.createdAt,
     };
 
@@ -339,6 +393,19 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       threadId: payload.threadId,
       message: payload.message,
     });
+  }
+
+  @EventHandler(MessageManagedStatusChanged)
+  async onMessageManagedStatusChanged(
+    payload: EventOf<typeof MessageManagedStatusChanged>,
+  ): Promise<void> {
+    this.server
+      .to(threadRoom(payload.threadId))
+      .emit("message.status.updated", {
+        threadId: payload.threadId,
+        messageId: payload.messageId,
+        managedStatus: payload.managedStatus,
+      });
   }
 
   @EventHandler(TimerLifecycle)

@@ -171,14 +171,12 @@ export class AttentionItemsRepository {
       .where(eq(attentionItemTags.attentionItemId, input.id));
 
     if (input.tagIds.length > 0) {
-      await this.txHost.tx
-        .insert(attentionItemTags)
-        .values(
-          input.tagIds.map((tagId) => ({
-            attentionItemId: input.id,
-            tagId,
-          })),
-        );
+      await this.txHost.tx.insert(attentionItemTags).values(
+        input.tagIds.map((tagId) => ({
+          attentionItemId: input.id,
+          tagId,
+        })),
+      );
     }
 
     return this.mapRowToItem(updated, input.tagIds);

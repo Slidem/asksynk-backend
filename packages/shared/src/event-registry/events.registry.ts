@@ -3,6 +3,13 @@ import z from "zod";
 import { defineEvent } from "./events.registration";
 import { DeliveryMode } from "./events.types";
 
+// A managed message's status mirrors the attention-item status 1:1.
+const managedStatusEnum = z.enum(["created", "in_progress", "resolved"]);
+const managedStatusSchema = z.object({
+  type: z.literal("tagged_message"),
+  status: managedStatusEnum,
+});
+
 export const TagCreated = defineEvent({
   name: "tag.created",
   schema: z.object({
@@ -50,6 +57,7 @@ export const MessageCreated = defineEvent({
       tagIds: z.optional(z.array(z.string())),
       attachmentIds: z.optional(z.array(z.string())),
       suggestionId: z.string().nullable().optional(),
+      managedStatus: managedStatusSchema.optional(),
       createdAt: z.string(),
     }),
     participantUserIds: z.array(z.string()),
@@ -71,6 +79,7 @@ export const MessageUpdated = defineEvent({
       body: z.string(),
       tagIds: z.optional(z.array(z.string())),
       suggestionId: z.string().nullable().optional(),
+      managedStatus: managedStatusSchema.optional(),
       createdAt: z.string(),
     }),
     participantUserIds: z.array(z.string()),
@@ -78,6 +87,34 @@ export const MessageUpdated = defineEvent({
   }),
   delivery: DeliveryMode.Dual,
   groups: ["attention-items"],
+});
+
+// Recipient changed a tagged message's managed_status (WS message.updateStatus)
+// or it was synced from the inbox. Durable leg mirrors it onto the linked
+// attention item; realtime leg pushes message.status.updated to the thread.
+export const MessageManagedStatusChanged = defineEvent({
+  name: "message.status.changed",
+  schema: z.object({
+    threadId: z.string(),
+    messageId: z.string(),
+    managedStatus: managedStatusSchema,
+  }),
+  delivery: DeliveryMode.Dual,
+  groups: ["attention-items"],
+});
+
+// Reverse sync: a tagged_message attention item's status was changed from the
+// inbox (PATCH /attention-items/:id). The messaging consumer reflects it back
+// onto the message. Published only from the user PATCH, never from the forward
+// sync, so the two directions cannot loop.
+export const AttentionMessageStatusChanged = defineEvent({
+  name: "attention.message.synced",
+  schema: z.object({
+    messageId: z.string(),
+    status: managedStatusEnum,
+  }),
+  delivery: DeliveryMode.Durable,
+  groups: ["messaging"],
 });
 
 export const CalendarEventCreated = defineEvent({

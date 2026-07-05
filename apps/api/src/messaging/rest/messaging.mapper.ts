@@ -29,6 +29,9 @@ export function toMessageResponseDto(
     tagIds: message.tagIds,
     attachments: attachments.map(toAttachmentResponse),
     suggestionId: message.suggestionId,
+    ...(message.managedStatus
+      ? { managedStatus: message.managedStatus }
+      : {}),
     createdAt: message.createdAt.toISOString(),
   };
 }

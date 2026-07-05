@@ -9,6 +9,7 @@ import {
   AttentionSource,
   CreateAttentionItemInput,
   ListAttentionItemsInput,
+  TaggedMessageMetadata,
   UpdateAttentionItemInput,
   UpsertAttentionFromSourceInput,
 } from "@/api/attention-items/models/attention-item.model";
@@ -18,6 +19,7 @@ import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   AttentionItemRemoved,
   AttentionItemUpserted,
+  AttentionMessageStatusChanged,
 } from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
 
@@ -76,6 +78,18 @@ export class AttentionItemsService {
     await this.eventsPublisher.publish(AttentionItemUpserted, {
       item: toAttentionItemResponse(updated),
     });
+
+    // Reverse sync: reflect an inbox status change back onto the tagged message.
+    // Only fires from this user-driven path, never from syncSourceStatus, so the
+    // message↔attention directions cannot loop.
+    if (updated.type === "tagged_message" && input.status !== undefined) {
+      const metadata = updated.metadata as TaggedMessageMetadata;
+      await this.eventsPublisher.publish(AttentionMessageStatusChanged, {
+        messageId: metadata.messageId,
+        status: updated.status,
+      });
+    }
+
     return updated;
   }
 
@@ -208,6 +222,9 @@ export class AttentionItemsService {
       return this.attentionItemsRepository.findByTaskBatchId(
         source.taskBatchId,
       );
+    }
+    if ("messageId" in source) {
+      return this.attentionItemsRepository.findByMessageId(source.messageId);
     }
     return this.attentionItemsRepository.findBySuggestionId(
       source.suggestionId,

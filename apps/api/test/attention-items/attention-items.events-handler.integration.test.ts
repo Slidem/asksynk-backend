@@ -11,7 +11,7 @@ import request from "supertest";
 
 import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
-import { AuthUser } from "@/api/auth/auth.types";
+import { AuthGuest, AuthUser } from "@/api/auth/auth.types";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import { ClockModule } from "@/api/common/clock/clock.module";
 import { EventsModule } from "@/api/events/events.module";
@@ -35,6 +35,7 @@ import {
   threadParticipants,
 } from "@/migrations/schema/messaging";
 import { eventsOutbox } from "@/migrations/schema/outbox";
+import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { tags as tagsTable } from "@/migrations/schema/tags";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
@@ -84,6 +85,9 @@ describe("AttentionItemsEventHandler (integration)", () => {
   let recipient: AuthUser;
   let sender: AuthUser;
   let threadId: string;
+  let guest: AuthGuest;
+  let guestThreadId: string;
+  let publicViewId: string;
 
   beforeAll(async () => {
     recipient = makeTestUser();
@@ -152,6 +156,40 @@ describe("AttentionItemsEventHandler (integration)", () => {
       { threadId, userId: recipient.id, guestId: null },
       { threadId, userId: sender.id, guestId: null },
     ]);
+
+    // Public view owned by recipient + a guest, plus the guest<->owner thread.
+    publicViewId = generateId();
+    const guestId = generateId();
+    const farFuture = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await db.insert(publicViews).values({
+      id: publicViewId,
+      ownerUserId: recipient.id,
+      slug: `slug-${publicViewId}`,
+      expiresAt: farFuture,
+    });
+    await db.insert(publicViewGuests).values({
+      id: guestId,
+      publicViewId,
+      displayName: "Guest",
+      token: `token-${guestId}`,
+      expiresAt: farFuture,
+    });
+
+    guestThreadId = generateId();
+    await db.insert(messageThreads).values({ id: guestThreadId, publicViewId });
+    await db.insert(threadParticipants).values([
+      { threadId: guestThreadId, userId: recipient.id, guestId: null },
+      { threadId: guestThreadId, userId: null, guestId },
+    ]);
+
+    guest = {
+      id: guestId,
+      publicViewId,
+      ownerUserId: recipient.id,
+      displayName: "Guest",
+      expiresAt: farFuture,
+    };
   });
 
   afterAll(async () => {
@@ -159,6 +197,9 @@ describe("AttentionItemsEventHandler (integration)", () => {
       .delete(threadParticipants)
       .where(eq(threadParticipants.threadId, threadId));
     await db.delete(messageThreads).where(eq(messageThreads.id, threadId));
+    // Guest thread cascades participants + messages; public view cascades guests.
+    await db.delete(messageThreads).where(eq(messageThreads.id, guestThreadId));
+    await db.delete(publicViews).where(eq(publicViews.id, publicViewId));
     await db.delete(calendars).where(eq(calendars.userId, recipient.id));
     await db.delete(calendars).where(eq(calendars.userId, sender.id));
     await db
@@ -175,6 +216,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       .delete(attentionItems)
       .where(eq(attentionItems.userId, recipient.id));
     await db.delete(messages).where(eq(messages.threadId, threadId));
+    await db.delete(messages).where(eq(messages.threadId, guestThreadId));
     await db
       .delete(calendarEvents)
       .where(
@@ -342,6 +384,43 @@ describe("AttentionItemsEventHandler (integration)", () => {
     return rows[0].payload as { item: AttentionItemResponse };
   }
 
+  async function getMessageManaged(
+    messageId: string,
+  ): Promise<{ type: string; status: string } | null> {
+    const [row] = await db
+      .select({ managedStatus: messages.managedStatus })
+      .from(messages)
+      .where(eq(messages.id, messageId));
+    return (row?.managedStatus as { type: string; status: string }) ?? null;
+  }
+
+  async function awaitMessageManagedStatus(
+    messageId: string,
+    status: string,
+  ): Promise<void> {
+    await pollUntil(
+      () => getMessageManaged(messageId),
+      (m) => m?.status === status,
+      { timeoutMs: POLL_TIMEOUT_MS },
+    );
+  }
+
+  async function countOutboxForMessage(
+    eventType: string,
+    messageId: string,
+  ): Promise<number> {
+    const rows = await db
+      .select({ id: eventsOutbox.id })
+      .from(eventsOutbox)
+      .where(
+        and(
+          eq(eventsOutbox.eventType, eventType),
+          sql`${eventsOutbox.payload}->>'messageId' = ${messageId}`,
+        ),
+      );
+    return rows.length;
+  }
+
   function approxEqual(actual: string | null, expected: Date): boolean {
     if (!actual) return false;
 
@@ -367,6 +446,56 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(item.tagIds).toEqual([tagId]);
       expect(item.userId).toBe(recipient.id);
       expect(item.type).toBe("tagged_message");
+    });
+
+    it("should create an attention item for the owner from a guest tagged message", async () => {
+      const start = new Date(Date.now() + 60 * 60 * 1000);
+      const tagId = await createTag({ type: "timeblock" });
+      const tbId = await createTimeblock({ start, tagIds: [tagId] });
+
+      const msg = await messagingService.sendAsGuest(guest, "hi from guest", [
+        tagId,
+      ]);
+
+      const item = await awaitItem(
+        (i) => msgMeta(i).messageId === msg.id && i.dueDate !== null,
+      );
+
+      expect(item.userId).toBe(recipient.id);
+      expect(item.type).toBe("tagged_message");
+      expect(msgMeta(item).senderType).toBe("guest");
+      expect(msgMeta(item).senderId).toBe(guest.id);
+      expect(item.sourceCalendarEventId).toBe(tbId);
+      expect(item.tagIds).toEqual([tagId]);
+      expect(approxEqual(item.dueDate, start)).toBe(true);
+    });
+
+    it("should update the owner's attention item when a guest re-tags their own message", async () => {
+      const tagA = await createTag({
+        type: "immediately",
+        responseTimeMillis: 30 * 60 * 1000,
+      });
+      const tagB = await createTag({
+        type: "immediately",
+        responseTimeMillis: 30 * 60 * 1000,
+      });
+      const msg = await messagingService.sendAsGuest(guest, "hi", [tagA]);
+
+      const item = await awaitItem((i) => msgMeta(i).messageId === msg.id);
+      expect(item.tagIds).toEqual([tagA]);
+
+      await messagingService.tagMessageAsGuest(guest, msg.id, [tagB]);
+
+      await awaitItemState(
+        item.id,
+        (i) => i.tagIds.length === 1 && i.tagIds[0] === tagB,
+      );
+    });
+
+    it("should reject a guest tagging with a tag the owner does not own", async () => {
+      await expect(
+        messagingService.sendAsGuest(guest, "hi", [generateId()]),
+      ).rejects.toThrow();
     });
 
     it("should publish a realtime attention.upserted event identical to the GET response", async () => {
@@ -737,6 +866,145 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
       expect(updated.dueDate).not.toBeNull();
       expect(updated.dueDate).toBe(isoToTruncatedMillis(startB));
+    });
+  });
+
+  describe("managed status sync (message <-> attention item)", () => {
+    function immediateTag(): Promise<string> {
+      return createTag({ type: "immediately", responseTimeMillis: 60 * 1000 });
+    }
+
+    it("sets managed_status on tagged messages and leaves untagged ones unmanaged", async () => {
+      const tagId = await immediateTag();
+      const taggedId = await sendTaggedMessage("tagged", [tagId]);
+      const untagged = await messagingService.sendAsUser(
+        sender.id,
+        threadId,
+        "plain",
+        [],
+      );
+
+      expect(await getMessageManaged(taggedId)).toEqual({
+        type: "tagged_message",
+        status: "created",
+      });
+      expect(await getMessageManaged(untagged.id)).toBeNull();
+    });
+
+    it("forward: the recipient resolving the message resolves the linked attention item", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("resolve me", [tagId]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await messagingService.updateManagedStatus(
+        recipient.id,
+        msgId,
+        "resolved",
+      );
+
+      expect((await getMessageManaged(msgId))?.status).toBe("resolved");
+      await awaitItemState(item.id, (i) => i.status === "resolved");
+    });
+
+    it("reverse: resolving the attention item from the inbox resolves the message", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("inbox resolve", [tagId]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await updateItemStatus(item.id, "resolved");
+
+      await awaitMessageManagedStatus(msgId, "resolved");
+    });
+
+    it("rejects a non-recipient (the sender) resolving the message", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("mine", [tagId]);
+      await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await expect(
+        messagingService.updateManagedStatus(sender.id, msgId, "resolved"),
+      ).rejects.toThrow();
+    });
+
+    it("rejects managing status on an untagged (unmanaged) message", async () => {
+      const msg = await messagingService.sendAsUser(
+        sender.id,
+        threadId,
+        "plain",
+        [],
+      );
+
+      await expect(
+        messagingService.updateManagedStatus(recipient.id, msg.id, "resolved"),
+      ).rejects.toThrow();
+    });
+
+    it("tracks managed_status across re-tagging (gains on tag, drops on untag)", async () => {
+      const tagId = await immediateTag();
+      const msg = await messagingService.sendAsUser(
+        sender.id,
+        threadId,
+        "plain",
+        [],
+      );
+      expect(await getMessageManaged(msg.id)).toBeNull();
+
+      await messagingService.tagMessage(sender.id, msg.id, [tagId]);
+      expect(await getMessageManaged(msg.id)).toEqual({
+        type: "tagged_message",
+        status: "created",
+      });
+
+      await messagingService.tagMessage(sender.id, msg.id, []);
+      expect(await getMessageManaged(msg.id)).toBeNull();
+    });
+
+    it("forward sync terminates: one status event, never triggers the reverse event", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("fwd", [tagId]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await messagingService.updateManagedStatus(
+        recipient.id,
+        msgId,
+        "resolved",
+      );
+      await awaitItemState(item.id, (i) => i.status === "resolved");
+
+      // Let any (erroneous) follow-on events flush before counting.
+      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
+
+      expect(await countOutboxForMessage("message.status.changed", msgId)).toBe(
+        1,
+      );
+      // The forward path uses syncSourceStatus, which never emits the reverse
+      // event — so it cannot loop back onto the message.
+      expect(
+        await countOutboxForMessage("attention.message.synced", msgId),
+      ).toBe(0);
+    });
+
+    it("reverse sync terminates: one reverse event, one status event, item stays resolved", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("rev", [tagId]);
+      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+
+      await updateItemStatus(item.id, "resolved");
+      await awaitMessageManagedStatus(msgId, "resolved");
+
+      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
+
+      // The inbox PATCH publishes exactly one reverse event...
+      expect(
+        await countOutboxForMessage("attention.message.synced", msgId),
+      ).toBe(1);
+      // ...and the message publishes exactly one status event; the durable
+      // re-sync no-ops on the idempotency guard, so nothing loops.
+      expect(await countOutboxForMessage("message.status.changed", msgId)).toBe(
+        1,
+      );
+      const finalItem = (await getItems()).find((i) => i.id === item.id);
+      expect(finalItem?.status).toBe("resolved");
     });
   });
 });

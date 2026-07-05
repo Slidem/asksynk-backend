@@ -10,6 +10,7 @@ import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-it
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
   MessageCreated,
+  MessageManagedStatusChanged,
   MessageUpdated,
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
@@ -91,6 +92,20 @@ export class MessageAttentionHandler {
     }
 
     await this.dueDateService.recomputeForItems(existing);
+  }
+
+  // Forward sync: the recipient changed a tagged message's managed_status →
+  // mirror it onto the linked attention item(s). syncSourceStatus is idempotent,
+  // so a re-published event (from the reverse path) no-ops here.
+  @Transactional()
+  @EventHandler(MessageManagedStatusChanged, { group: "attention-items" })
+  async onMessageManagedStatusChanged(
+    payload: EventOf<typeof MessageManagedStatusChanged>,
+  ): Promise<void> {
+    await this.attentionItemsService.syncSourceStatus(
+      { messageId: payload.messageId },
+      payload.managedStatus.status,
+    );
   }
 
   private async createAttentionItemsForMessage(

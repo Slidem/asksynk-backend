@@ -74,11 +74,12 @@ export interface ListAttentionItemsInput {
   cursor?: string;
 }
 
-// A non-message domain object an attention item mirrors, found via metadata.
+// A domain object an attention item mirrors, found via metadata.
 export type AttentionSource =
   | { taskId: string }
   | { taskBatchId: string }
-  | { suggestionId: string };
+  | { suggestionId: string }
+  | { messageId: string };
 
 // Create-or-update a single "task" item mirrored from a task or batch. The
 // service creates when none exists (and tags present), updates in place
