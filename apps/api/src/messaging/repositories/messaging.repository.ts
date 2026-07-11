@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import _ from "lodash";
 
 import { TxAdapter } from "@/api/infrastructure/db/tx.module";
@@ -60,6 +60,12 @@ export type ThreadListItem = {
 export type ThreadMessageListItem = {
   message: Message;
   replyCount: number;
+};
+
+export type ThreadStats = {
+  created: number;
+  inProgress: number;
+  resolved: number;
 };
 
 @Injectable()
@@ -290,6 +296,64 @@ export class MessagingRepository {
       ),
       replyCount: r.replyCount,
     }));
+  }
+
+  async listTaggedMessages(
+    threadId: string,
+  ): Promise<ThreadMessageListItem[]> {
+    const rows = await this.txHost.tx
+      .select({
+        id: messages.id,
+        threadId: messages.threadId,
+        parentMessageId: messages.parentMessageId,
+        senderUserId: messages.senderUserId,
+        senderGuestId: messages.senderGuestId,
+        suggestionId: messages.suggestionId,
+        managedStatus: messages.managedStatus,
+        body: messages.body,
+        createdAt: messages.createdAt,
+        replyCount: sql<number>`(
+          SELECT COUNT(*)::int FROM "messages" AS replies
+          WHERE replies.parent_message_id = "messages"."id"
+        )`,
+      })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.threadId, threadId),
+          isNotNull(messages.managedStatus),
+        ),
+      )
+      .orderBy(desc(messages.createdAt));
+
+    const tagMap = await this.fetchTagIdsForMessages(rows.map((r) => r.id));
+    const attachmentMap = await this.fetchAttachmentIdsForMessages(
+      rows.map((r) => r.id),
+    );
+    return rows.map((r) => ({
+      message: this.mapMessage(
+        r,
+        tagMap.get(r.id) ?? [],
+        attachmentMap.get(r.id) ?? [],
+      ),
+      replyCount: r.replyCount,
+    }));
+  }
+
+  async countManagedStatuses(threadId: string): Promise<ThreadStats> {
+    const [row] = await this.txHost.tx
+      .select({
+        created: sql<number>`COUNT(*) FILTER (WHERE ${messages.managedStatus} ->> 'status' = 'created')::int`,
+        inProgress: sql<number>`COUNT(*) FILTER (WHERE ${messages.managedStatus} ->> 'status' = 'in_progress')::int`,
+        resolved: sql<number>`COUNT(*) FILTER (WHERE ${messages.managedStatus} ->> 'status' = 'resolved')::int`,
+      })
+      .from(messages)
+      .where(eq(messages.threadId, threadId));
+    return {
+      created: row?.created ?? 0,
+      inProgress: row?.inProgress ?? 0,
+      resolved: row?.resolved ?? 0,
+    };
   }
 
   async listReplies(

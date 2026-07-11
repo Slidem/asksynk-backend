@@ -20,6 +20,7 @@ import {
 import {
   CreateThreadResponseDto,
   ThreadListItemResponseDto,
+  ThreadStatsResponseDto,
 } from "@/api/messaging/rest/responses/thread.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
@@ -54,6 +55,37 @@ export class ThreadsController {
       dto.recipientUserId,
     );
     return { threadId: thread.id };
+  }
+
+  /** Get tagged-message status counts for a thread */
+  @Get(":id/stats")
+  async getStats(
+    @UuidV7Param("id") threadId: string,
+    @AuthUser() user: AuthUserType,
+  ): Promise<ThreadStatsResponseDto> {
+    return this.messagingService.getThreadStats(user.id, threadId);
+  }
+
+  /** List all tagged messages in a thread (not paginated) */
+  @Get(":id/tagged-messages")
+  async listTaggedMessages(
+    @UuidV7Param("id") threadId: string,
+    @AuthUser() user: AuthUserType,
+  ): Promise<ThreadMessageResponseDto[]> {
+    const items = await this.messagingService.listThreadTaggedMessages(
+      user.id,
+      threadId,
+    );
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentService,
+      items.map((i) => i.message),
+    );
+    return items.map((item) =>
+      toThreadMessageResponseDto(
+        item,
+        attachmentsByMessage.get(item.message.id) ?? [],
+      ),
+    );
   }
 
   /** List messages in a thread (newest first, cursor via `before`) */

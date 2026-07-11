@@ -17,6 +17,7 @@ import {
   ThreadListItem,
   ThreadMessageListItem,
   ThreadParticipantRow,
+  ThreadStats,
 } from "@/api/messaging/repositories/messaging.repository";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
@@ -88,6 +89,33 @@ export class MessagingService {
     if (!threadId) throw AsksynkError.notFound("Message not found");
     await this.assertReplyParent(threadId, messageId);
     return this.messagingRepository.listReplies(messageId, this.paged(options));
+  }
+
+  async getThreadStats(userId: string, threadId: string): Promise<ThreadStats> {
+    await this.assertUserParticipant(threadId, userId);
+    return this.messagingRepository.countManagedStatuses(threadId);
+  }
+
+  async getGuestThreadStats(guest: AuthGuest): Promise<ThreadStats> {
+    const threadId = await this.resolveGuestThreadId(guest.id);
+    if (!threadId) return { created: 0, inProgress: 0, resolved: 0 };
+    return this.messagingRepository.countManagedStatuses(threadId);
+  }
+
+  async listThreadTaggedMessages(
+    userId: string,
+    threadId: string,
+  ): Promise<ThreadMessageListItem[]> {
+    await this.assertUserParticipant(threadId, userId);
+    return this.messagingRepository.listTaggedMessages(threadId);
+  }
+
+  async listGuestThreadTaggedMessages(
+    guest: AuthGuest,
+  ): Promise<ThreadMessageListItem[]> {
+    const threadId = await this.resolveGuestThreadId(guest.id);
+    if (!threadId) return [];
+    return this.messagingRepository.listTaggedMessages(threadId);
   }
 
   private paged(options: { before?: Date; limit?: number }) {

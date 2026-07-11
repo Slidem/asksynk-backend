@@ -62,3 +62,9 @@ export class ThreadListItemResponseDto {
 export class CreateThreadResponseDto {
   threadId!: string;
 }
+
+export class ThreadStatsResponseDto {
+  created!: number;
+  inProgress!: number;
+  resolved!: number;
+}

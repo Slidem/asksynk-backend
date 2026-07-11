@@ -16,6 +16,7 @@ import {
   MessageResponseDto,
   ThreadMessageResponseDto,
 } from "@/api/messaging/rest/responses/message.response";
+import { ThreadStatsResponseDto } from "@/api/messaging/rest/responses/thread.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 
@@ -45,7 +46,39 @@ export class GuestMessagingController {
       items.map((i) => i.message),
     );
     return items.map((i) =>
-      toThreadMessageResponseDto(i, attachmentsByMessage.get(i.message.id) ?? []),
+      toThreadMessageResponseDto(
+        i,
+        attachmentsByMessage.get(i.message.id) ?? [],
+      ),
+    );
+  }
+
+  /** Get tagged-message status counts for the guest's thread */
+  @AllowGuest()
+  @Get("stats")
+  async getStats(
+    @AuthGuest() guest: AuthGuestType,
+  ): Promise<ThreadStatsResponseDto> {
+    return this.messagingService.getGuestThreadStats(guest);
+  }
+
+  /** List all tagged messages in the guest's thread (not paginated) */
+  @AllowGuest()
+  @Get("tagged-messages")
+  async listTaggedMessages(
+    @AuthGuest() guest: AuthGuestType,
+  ): Promise<ThreadMessageResponseDto[]> {
+    const items =
+      await this.messagingService.listGuestThreadTaggedMessages(guest);
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentService,
+      items.map((i) => i.message),
+    );
+    return items.map((i) =>
+      toThreadMessageResponseDto(
+        i,
+        attachmentsByMessage.get(i.message.id) ?? [],
+      ),
     );
   }
 
