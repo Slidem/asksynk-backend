@@ -8,9 +8,9 @@
   },
   "scripts": {
     "dev": "pnpm --filter @asksynk/api dev",
-    "dev:migrate": "pnpm --filter @asksynk/migrations db:migrate",
-    "dev:generate-migrations": "pnpm --filter @asksynk/migrations db:generate",
-    "dev:new-custom-migration": "pnpm --filter @asksynk/migrations db:generate-custom",
+    "migrate": "pnpm --filter @asksynk/migrations db:migrate",
+    "generate-migrations": "pnpm --filter @asksynk/migrations db:generate",
+    "new-custom-migration": "pnpm --filter @asksynk/migrations db:generate-custom",
     "localdev:up": "bash localdev/up.sh",
     "localdev:down": "bash localdev/down.sh",
     "localdev:reset": "bash localdev/reset.sh",

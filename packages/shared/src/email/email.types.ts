@@ -28,3 +28,10 @@ export type EmailTemplate =
 export type EmailMessage =
   | { to: string; subject: string; text?: string; html?: string }
   | { to: string; template: EmailTemplate };
+
+export type RawEmailMessage = {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+};

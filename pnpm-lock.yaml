@@ -77,6 +77,9 @@ importers:
       '@types/lodash':
         specifier: ^4.17.24
         version: 4.17.24
+      agentmail:
+        specifier: ^0.5.14
+        version: 0.5.14
       better-auth:
         specifier: ^1.2.5
         version: 1.4.18(drizzle-kit@0.31.8)(drizzle-orm@0.44.7(@types/pg@8.16.0)(kysely@0.28.11)(pg@8.18.0))(pg@8.18.0)
@@ -205,6 +208,9 @@ importers:
       '@nestjs/core':
         specifier: ^10.3.10
         version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@10.4.22)(@nestjs/websockets@11.1.19)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      agentmail:
+        specifier: ^0.5.14
+        version: 0.5.14
       drizzle-orm:
         specifier: ^0.44.4
         version: 0.44.7(@types/pg@8.16.0)(kysely@0.28.11)(pg@8.18.0)
@@ -1679,6 +1685,10 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
+
+  agentmail@0.5.14:
+    resolution: {integrity: sha512-2vp2W1abVvEGlM0/JgYHFEeX6MoJf3S/0oIEvxSU8/Lz7YkvOGo3v882lX8NOv2ZTpJMshATLIJrlNIIoo5uvA==}
+    engines: {node: '>=18.0.0'}
 
   ajv-formats@2.1.1:
     resolution: {integrity: sha512-Wx0Kx52hxE7C18hkMEggYlEifqWZtYaRgouJor+WMdPnQyEK13vgEWyVNup7SoeeoLMsr4kf5h6dOW11I15MUA==}
@@ -4261,6 +4271,18 @@ packages:
       utf-8-validate:
         optional: true
 
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xml-naming@0.1.0:
     resolution: {integrity: sha512-k8KO9hrMyNk6tUWqUfkTEZbezRRpONVOzUTnc97VnCvyj6Tf9lyUR9EDAIeiVLv56jsMcoXEwjW8Kv5yPY52lw==}
     engines: {node: '>=16.0.0'}
@@ -5910,6 +5932,13 @@ snapshots:
   acorn@8.15.0: {}
 
   agent-base@7.1.4: {}
+
+  agentmail@0.5.14:
+    dependencies:
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   ajv-formats@2.1.1(ajv@8.12.0):
     optionalDependencies:
@@ -8697,6 +8726,8 @@ snapshots:
       signal-exit: 3.0.7
 
   ws@8.18.3: {}
+
+  ws@8.21.0: {}
 
   xml-naming@0.1.0: {}
 

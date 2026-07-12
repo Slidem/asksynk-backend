@@ -16,6 +16,7 @@
   "jest.shell": { "path": "/bin/zsh", "args": ["-i"] },
   "jest.runMode": "on-demand",
   "cSpell.words": [
+    "agentmail",
     "Asksynk",
     "docorators",
     "hashid",
