@@ -22,7 +22,8 @@
     "format": "prettier -w .",
     "format:check": "prettier --check .",
     "test": "pnpm -r test",
-    "secret:better-auth": "pnpm --filter @asksynk/scripts generate-secret"
+    "secret:better-auth": "pnpm --filter @asksynk/scripts generate-secret",
+    "prepare-storage": "pnpm --filter @asksynk/scripts prepare-storage"
   },
   "devDependencies": {
     "@eslint/js": "^9.7.0",

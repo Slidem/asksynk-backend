@@ -247,13 +247,17 @@ importers:
         version: 8.16.0
 
   scripts:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.730.0
+        version: 3.1063.0
+      tsx:
+        specifier: ^4.20.5
+        version: 4.21.0
     devDependencies:
       '@types/node':
         specifier: ^20.19.30
         version: 20.19.30
-      tsx:
-        specifier: ^4.20.5
-        version: 4.21.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
