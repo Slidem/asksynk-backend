@@ -54,6 +54,7 @@ async function admin<T>(
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
   if (!res.ok) {
     throw new Error(
       `garage admin ${method} ${path} -> ${res.status} ${await res.text()}`,
@@ -132,9 +133,24 @@ async function main(): Promise<void> {
   log("asksynk buckets ready");
 }
 
+// Print the whole error chain: undici `fetch` throws a generic "fetch failed"
+// and hides the real cause (ECONNREFUSED / DNS / TLS) in `err.cause`.
+function formatError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  let out = err.stack ?? `${err.name}: ${err.message}`;
+  let cause: unknown = (err as { cause?: unknown }).cause;
+  while (cause instanceof Error) {
+    out += `\ncaused by: ${cause.stack ?? `${cause.name}: ${cause.message}`}`;
+    cause = (cause as { cause?: unknown }).cause;
+  }
+  if (cause !== undefined) out += `\ncaused by: ${String(cause)}`;
+  return out;
+}
+
 main().catch((err: unknown) => {
-  console.error(
-    `prepare-storage failed: ${err instanceof Error ? err.message : String(err)}`,
-  );
-  process.exit(1);
+  console.error(`prepare-storage failed:\n${formatError(err)}`);
+  // Set exitCode instead of process.exit(1): on Railway stdout is an async
+  // pipe, and an immediate exit() truncates the buffered log above before it
+  // flushes. Letting the event loop drain naturally guarantees the log lands.
+  process.exitCode = 1;
 });
