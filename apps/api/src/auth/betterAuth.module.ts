@@ -31,7 +31,7 @@ export class BetterAuthModule {
             return createAuth({
               databaseUrl: config.getOrThrow<string>("DATABASE_URL"),
               secret: config.getOrThrow<string>("AUTH_SECRET"),
-              baseUrl: config.get<string>("APP_BASE_URL"),
+              baseUrl: config.getOrThrow<string>("AUTH_URL"),
               trustedOrigins,
               sendMagicLink: async ({ email, url }) => {
                 await emailService.send({
