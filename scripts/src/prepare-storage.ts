@@ -26,6 +26,11 @@ const SECRET_ACCESS_KEY = env("S3_SECRET_ACCESS_KEY");
 const BUCKET_PRIVATE = env("S3_BUCKET_PRIVATE");
 const BUCKET_PUBLIC = env("S3_BUCKET_PUBLIC");
 
+// Garage's web endpoint resolves the bucket by matching the request Host against a
+// bucket global alias. Railway has no wildcard subdomains, so we register the public
+// base url's host (e.g. the custom domain) as a global alias on the public bucket.
+const PUBLIC_HOST = new URL(env("S3_PUBLIC_BASE_URL")).hostname;
+
 // Origins the browser is allowed to hit the S3 API from (presigned POST upload,
 // signed GET). Trailing slash / path stripped so it matches the browser Origin header.
 const ORIGINS = [
@@ -94,6 +99,24 @@ async function enableWebsite(bucketId: string): Promise<void> {
   log("website enabled on public bucket");
 }
 
+// Register the public base url's host as a global alias so Garage web serves the
+// bucket for that domain. Idempotent: skips if the alias already exists.
+async function ensureWebAlias(bucketId: string): Promise<void> {
+  const bucket = await admin<{ globalAliases?: string[] }>(
+    "GET",
+    `/bucket?id=${bucketId}`,
+  );
+  if (bucket?.globalAliases?.includes(PUBLIC_HOST)) {
+    log(`web alias ${PUBLIC_HOST} already set`);
+    return;
+  }
+  await admin(
+    "PUT",
+    `/bucket/alias/global?id=${bucketId}&alias=${encodeURIComponent(PUBLIC_HOST)}`,
+  );
+  log(`web alias ${PUBLIC_HOST} added to public bucket`);
+}
+
 // CORS via the S3 API. One CORSRule per origin: Garage collapses multiple
 // AllowedOrigins in a single rule into one invalid header that browsers reject.
 async function setCors(buckets: string[]): Promise<void> {
@@ -129,6 +152,7 @@ async function main(): Promise<void> {
   await ensureBucket(BUCKET_PRIVATE);
   const publicId = await ensureBucket(BUCKET_PUBLIC);
   await enableWebsite(publicId);
+  await ensureWebAlias(publicId);
   await setCors([BUCKET_PRIVATE, BUCKET_PUBLIC]);
   log("asksynk buckets ready");
 }
