@@ -32,6 +32,12 @@ export class BetterAuthModule {
               databaseUrl: config.getOrThrow<string>("DATABASE_URL"),
               secret: config.getOrThrow<string>("AUTH_SECRET"),
               baseUrl: config.getOrThrow<string>("AUTH_URL"),
+              advanced: {
+                defaultCookieAttributes: {
+                  sameSite: "none",
+                  secure: true,
+                },
+              },
               trustedOrigins,
               sendMagicLink: async ({ email, url }) => {
                 await emailService.send({

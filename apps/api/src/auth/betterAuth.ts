@@ -25,6 +25,12 @@ export type AuthConfig = {
     url: string;
     userName?: string;
   }) => Promise<void>;
+  advanced?: {
+    defaultCookieAttributes?: {
+      sameSite?: "strict" | "lax" | "none";
+      secure?: boolean;
+    };
+  };
 };
 
 export const createAuth = (config: AuthConfig) => {
@@ -94,6 +100,7 @@ export const createAuth = (config: AuthConfig) => {
     basePath: "/api/auth",
     baseURL: config.baseUrl,
     trustedOrigins: config.trustedOrigins,
+    advanced: config.advanced,
   });
 };
 
