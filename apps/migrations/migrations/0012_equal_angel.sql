@@ -1,1 +1,0 @@
-ALTER TABLE "calendars" ADD COLUMN "name" text;

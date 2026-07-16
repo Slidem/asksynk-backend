@@ -1,1 +1,0 @@
-ALTER TABLE "calendar_event_links" DROP CONSTRAINT "calendar_event_links_asksynk_event_id_calendar_events_id_fk";

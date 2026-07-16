@@ -2419,3 +2419,6 @@ BEGIN
     RETURN FOUND;
 END;
 $$ LANGUAGE plpgsql STABLE;
+
+-- reset session search_path so later migrations create tables in public, not rrule
+RESET search_path;

@@ -1,2 +1,0 @@
-ALTER TABLE "attention_items" ADD COLUMN "source_calendar_event_id" uuid;--> statement-breakpoint
-CREATE INDEX "idx_attention_items_source_calendar_event" ON "attention_items" USING btree ("source_calendar_event_id") WHERE deleted_at IS NULL AND status != 'resolved' AND source_calendar_event_id IS NOT NULL;
