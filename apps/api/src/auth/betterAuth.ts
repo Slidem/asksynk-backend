@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
 import { bearer } from "better-auth/plugins/bearer";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -19,6 +20,8 @@ export type AuthConfig = {
   secret: string;
   baseUrl?: string;
   trustedOrigins?: string[];
+  // Exact emails or "@domain.com" suffixes. Empty = no restriction.
+  whitelistSignupEmails?: string[];
   sendMagicLink?: (params: { email: string; url: string }) => Promise<void>;
   sendVerificationEmail?: (params: {
     email: string;
@@ -42,6 +45,20 @@ export const createAuth = (config: AuthConfig) => {
 
   const db = drizzle(pool, { schema: { ...authSchema, users } });
 
+  const whitelistSignupEmails = (config.whitelistSignupEmails ?? []).map(
+    (entry) => entry.trim().toLowerCase(),
+  );
+
+  const isWhitelistingEnabled = whitelistSignupEmails.length > 0;
+
+  const isEmailWhitelisted = (email: string): boolean => {
+    if (whitelistSignupEmails.length === 0) return true;
+    const normalized = email.trim().toLowerCase();
+    return whitelistSignupEmails.some((entry) =>
+      entry.startsWith("@") ? normalized.endsWith(entry) : normalized === entry,
+    );
+  };
+
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -64,6 +81,25 @@ export const createAuth = (config: AuthConfig) => {
           url,
           userName: user.name,
         }) ?? Promise.resolve());
+      },
+    },
+
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            if (!isWhitelistingEnabled) {
+              return { data: user };
+            }
+
+            if (!isEmailWhitelisted(user.email)) {
+              throw new APIError("FORBIDDEN", {
+                message: "This email is not allowed to register",
+              });
+            }
+            return { data: user };
+          },
+        },
       },
     },
 

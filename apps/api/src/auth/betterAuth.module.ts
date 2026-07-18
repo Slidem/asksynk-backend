@@ -28,6 +28,13 @@ export class BetterAuthModule {
               .map((origin) => origin.trim())
               .filter(Boolean);
 
+            const whitelistSignupEmails = (
+              config.get<string>("WHITELIST_SIGNUP_EMAILS") ?? ""
+            )
+              .split(",")
+              .map((email) => email.trim())
+              .filter(Boolean);
+
             return createAuth({
               databaseUrl: config.getOrThrow<string>("DATABASE_URL"),
               secret: config.getOrThrow<string>("AUTH_SECRET"),
@@ -39,6 +46,7 @@ export class BetterAuthModule {
                 },
               },
               trustedOrigins,
+              whitelistSignupEmails,
               sendMagicLink: async ({ email, url }) => {
                 await emailService.send({
                   to: email,
