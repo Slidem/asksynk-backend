@@ -25,6 +25,7 @@ import { SplitCalendarEventSeriesRequestDto } from "@/api/calendar-events/rest/d
 import { UpdateCalendarEventRequestDto } from "@/api/calendar-events/rest/dto/update-calendar-event.dto";
 import { UpdateCalendarEventInstanceRequestDto } from "@/api/calendar-events/rest/dto/update-calendar-event-instance.dto";
 import { CalendarResponseDto } from "@/api/calendar-events/rest/responses/calendar.response";
+import { CalendarEventInstanceResponse } from "@/api/calendar-events/rest/responses/calendar-event-instance.response";
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
 import { parseIsoWallClockInTimezone } from "@/api/calendar-events/utils/recurrence.utils";
 import {
@@ -33,8 +34,6 @@ import {
 } from "@/api/common/decorators/param.decorators";
 import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { NetworksService } from "@/api/networks/services/networks.service";
-
-import { CalendarEventInstanceResponse } from "@/api/calendar-events/rest/responses/calendar-event-instance.response";
 
 @ApiTags("Calendar Events")
 @ApiBearerAuth("bearer")

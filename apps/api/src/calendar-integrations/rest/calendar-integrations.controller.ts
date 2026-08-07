@@ -8,11 +8,7 @@ import {
   Query,
   Res,
 } from "@nestjs/common";
-import {
-  ApiBearerAuth,
-  ApiExcludeEndpoint,
-  ApiTags,
-} from "@nestjs/swagger";
+import { ApiBearerAuth, ApiExcludeEndpoint, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
@@ -25,8 +21,8 @@ import {
   CalendarIntegrationResponseDto,
 } from "@/api/calendar-integrations/rest/responses/calendar-integration.response";
 import { CalendarIntegrationService } from "@/api/calendar-integrations/services/calendar-integration.service";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { UuidV7Param } from "@/api/common/decorators/param.decorators";
+import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 
 @ApiTags("Calendar Integrations")
 @ApiBearerAuth("bearer")
