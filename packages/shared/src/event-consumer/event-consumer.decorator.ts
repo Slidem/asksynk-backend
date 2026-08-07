@@ -19,11 +19,13 @@ export function EventHandler<T extends EventDef>(
     const ctor = target.constructor;
     const list: EventHandlerMeta[] =
       Reflect.getOwnMetadata(EVENT_HANDLERS_METADATA, ctor) ?? [];
+
     list.push({
       propertyKey: propertyKey as string,
       event,
       options,
     });
+
     Reflect.defineMetadata(EVENT_HANDLERS_METADATA, list, ctor);
 
     return descriptor;
