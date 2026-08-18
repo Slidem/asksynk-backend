@@ -7,7 +7,9 @@ export default async function globalSetup() {
   dotenv.config({ path: path.resolve(__dirname, "../../.env.test") });
   const migrationsDir = path.resolve(__dirname, "../../../migrations");
   const drizzleKit = path.join(migrationsDir, "node_modules/.bin/drizzle-kit");
-  const result = spawnSync(drizzleKit, ["push", "--force"], {
+  // migrate, not push: push diffs the TS schema only, so custom SQL migrations
+  // (rrule plpgsql schema, events_outbox NOTIFY triggers) would never run.
+  const result = spawnSync(drizzleKit, ["migrate"], {
     cwd: migrationsDir,
     env: {
       ...process.env,
@@ -21,10 +23,13 @@ export default async function globalSetup() {
   if (result.stderr) process.stderr.write(result.stderr);
 
   if (result.status !== 0) {
-    throw new Error(`db:push failed with exit code ${result.status}`);
+    throw new Error(
+      `db:migrate failed with exit code ${result.status}. If an already-applied ` +
+        `migration was edited or regenerated, run: pnpm test:integration:reset`,
+    );
   }
 
-  // drizzle-kit push only syncs schema; rows + pg-boss jobs survive across runs.
+  // migrate only applies schema changes; rows + pg-boss jobs survive across runs.
   // Orphaned durable events (whose user was later deleted) would be re-dispatched
   // every run and fail the user FK forever. Start from a clean slate instead.
   const client = new Client({ connectionString: process.env.DATABASE_URL });

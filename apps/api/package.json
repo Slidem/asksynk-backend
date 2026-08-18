@@ -7,7 +7,9 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "lint": "pnpm -w eslint .",
-    "test": "jest --config jest.config.ts"
+    "test:unit": "jest --config jest.config.ts --selectProjects unit --passWithNoTests",
+    "test:integration": "jest --config jest.config.ts --selectProjects integration",
+    "test:all": "jest --config jest.config.ts"
   },
   "dependencies": {
     "@asksynk/migrations": "workspace:*",
