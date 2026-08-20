@@ -13,12 +13,11 @@ import { RequestHeaders, RequestWithAuth } from "@/api/auth/auth.types";
 import { GuestAuthService } from "@/api/auth/guest-auth.service";
 import { IS_PUBLIC_KEY } from "@/api/auth/public.decorator";
 
-import { CalendarEventsRepository } from "../calendar-events/repositories/calendar-events.repository";
 import { extractBearerToken } from "../common/utils/token";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  private readonly logger = new ContextLogger(CalendarEventsRepository.name);
+  private readonly logger = new ContextLogger(AuthGuard.name);
 
   constructor(
     private readonly reflector: Reflector,

@@ -11,7 +11,7 @@ import {
   ValidateNested,
 } from "class-validator";
 
-import { IsUuidV7 } from "@/api/common/decorators/validators";
+import { IsUuidV7 } from "@/api/platform/decorators/fieldValidators.decorators";
 import {
   ANSWER_MODE_TYPES,
   AnswerMode,

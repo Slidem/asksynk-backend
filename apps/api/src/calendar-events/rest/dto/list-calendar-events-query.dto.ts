@@ -4,7 +4,7 @@ import { IsOptional, IsUUID } from "class-validator";
 import {
   IsIanaTimezone,
   IsIsoDateWithOffset,
-} from "@/api/common/decorators/validators";
+} from "@/api/platform/decorators/fieldValidators.decorators";
 
 export class ListCalendarEventsQueryDto {
   /** ISO 8601 with offset window start: "2026-03-15T00:00:00+02:00" */

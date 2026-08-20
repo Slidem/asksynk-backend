@@ -297,8 +297,10 @@ focus/contract/focus.events.ts
 attention/contract/attention.events.ts
 ```
 
-`defineEvent`, `DeliveryMode` and the registry types **stay in `packages/shared`** —
-that is infrastructure, and it is fine there.
+`defineEvent`, `DeliveryMode` and the registry types **stay together as
+infrastructure** — they move to `platform/events/registry/` when `packages/shared`
+dissolves ([04-layering.md §1b](04-layering.md)). Only the _catalogue_ of event
+definitions is per-context.
 
 This is safe because neither runtime component needs the central file: the dispatcher
 works off database rows, and the consumer works off decorator metadata gathered at

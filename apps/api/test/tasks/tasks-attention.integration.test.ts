@@ -11,7 +11,6 @@ import request from "supertest";
 import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
 import { AuthUser } from "@/api/auth/auth.types";
-import { ClockModule } from "@/api/common/clock/clock.module";
 import { EventsModule } from "@/api/events/events.module";
 import {
   DB_CLIENT_PROVIDER,
@@ -19,6 +18,7 @@ import {
 } from "@/api/infrastructure/db/db.module";
 import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { NetworksModule } from "@/api/networks/networks.module";
+import { ClockModule } from "@/api/platform/clock/clock.module";
 import { TagsModule } from "@/api/tags/tags.module";
 import { TaskResponse } from "@/api/tasks/rest/responses/task.response";
 import { TaskBatchResponse } from "@/api/tasks/rest/responses/task-batch.response";

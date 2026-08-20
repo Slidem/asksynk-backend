@@ -11,7 +11,6 @@ import request from "supertest";
 import { uuidv7 } from "uuidv7";
 
 import { AuthUser } from "@/api/auth/auth.types";
-import { ClockModule } from "@/api/common/clock/clock.module";
 import {
   DB_CLIENT_PROVIDER,
   DbModule,
@@ -20,6 +19,7 @@ import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { MessageAttachmentRepository } from "@/api/messaging/attachments/message-attachment.repository";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import { MessagingRepository } from "@/api/messaging/repositories/messaging.repository";
+import { ClockModule } from "@/api/platform/clock/clock.module";
 import { StorageModule } from "@/api/storage/storage.module";
 import {
   messageAttachments,

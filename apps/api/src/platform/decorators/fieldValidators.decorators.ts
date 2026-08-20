@@ -3,8 +3,14 @@ import { registerDecorator, ValidationOptions } from "class-validator";
 import {
   isIsoDateWithOffset,
   isValidIanaTimezone,
-} from "@/api/calendar-events/utils/recurrence.utils";
+} from "@/api/kernel/time/iso";
 import { isValidId } from "@/shared/id";
+
+/**
+ * Class validator decorator to validate that a string is a valid UUIDv7.
+ * @param validationOptions Optional validation options.
+ * @returns A property decorator function.
+ */
 
 export function IsUuidV7(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
@@ -25,6 +31,12 @@ export function IsUuidV7(validationOptions?: ValidationOptions) {
     });
   };
 }
+/**
+ * Class validator decorator to validate that a string is a valid IANA timezone.
+ *
+ * @param validationOptions
+ * @returns A property decorator function.
+ */
 
 export function IsIanaTimezone(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
@@ -45,6 +57,12 @@ export function IsIanaTimezone(validationOptions?: ValidationOptions) {
     });
   };
 }
+/**
+ * Class validator decorator to validate that a string is an ISO 8601 date with offset.
+ *
+ * @param validationOptions
+ * @returns A property decorator function.
+ */
 
 export function IsIsoDateWithOffset(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {

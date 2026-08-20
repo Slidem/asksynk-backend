@@ -1,7 +1,7 @@
 # 04 — Layering
 
-Every context has the same four layers and the same dependency rule. The rule is
-enforced by lint, not by discipline.
+Every context has the same four layers and the same dependency rule, over two shared
+tiers (`kernel/` and `platform/`). The rule is enforced by lint, not by discipline.
 
 ---
 
@@ -26,24 +26,256 @@ enforced by lint, not by discipline.
         └──────────────────────────────────────────────┘
 ```
 
-| Layer             | May import                                                                    |
-| ----------------- | ----------------------------------------------------------------------------- |
-| `domain/`         | `kernel/` only                                                                |
-| `application/`    | own `domain/`, own `application/`, `kernel/`, **other contexts' `contract/`** |
-| `infrastructure/` | own `domain/`, own `application/`, `kernel/`, Drizzle, SDKs                   |
-| `presentation/`   | own `application/`, own `domain/` (types), `kernel/`                          |
-| `contract/`       | `kernel/` only                                                                |
-| `kernel/`         | **nothing from any context**                                                  |
+| Layer             | May import                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| `domain/`         | `kernel/` only                                                                             |
+| `contract/`       | `kernel/` only                                                                             |
+| `application/`    | own `domain/`, own `application/`, `kernel/`, `platform/`, **other contexts' `contract/`** |
+| `infrastructure/` | own `domain/`, own `application/`, `kernel/`, `platform/`, Drizzle, SDKs                   |
+| `presentation/`   | own `application/`, own `domain/` (types), `kernel/`, `platform/`                          |
+| `kernel/`         | **nothing** — not a context, not `platform/`                                               |
+| `platform/`       | `kernel/` only — never a context                                                           |
 
 **No context ever imports another context's `domain/`, `application/`,
 `infrastructure/` or `presentation/`. Only `contract/`.**
 
-Two corollaries worth spelling out:
+Three corollaries worth spelling out:
 
 - `domain/` imports no `@nestjs/*`, no `drizzle-orm`, no `class-validator`, no
   `socket.io`, no `pg-boss`. It is plain TypeScript that would run in a browser.
+- **`domain/` may import `kernel/` but never `platform/`** — that is the whole reason
+  the two are separate. See §1a.
 - `presentation/` never talks to `infrastructure/` directly. A controller does not
   touch a repository — which is already true today and must stay true.
+
+---
+
+## 1a. `kernel/` vs `platform/` — the two shared tiers
+
+Today's `common/` and `infrastructure/` hold two genuinely different kinds of thing,
+and merging them into one shared folder breaks the rule above.
+
+|                   | `kernel/`                                                   | `platform/`                                                                                                                       |
+| ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Contains          | pure domain vocabulary                                      | framework-aware shared infrastructure                                                                                             |
+| Imports           | nothing                                                     | `kernel/`, plus any framework                                                                                                     |
+| Who may import it | **everything, including `domain/`**                         | `application/`, `infrastructure/`, `presentation/` — **never `domain/`**                                                          |
+| Examples          | `Actor`, `generateId`, `DomainError`, `isValidIanaTimezone` | `Clock` + `SystemClock`, `EventsPublisher`, the exception filter, DTO validation decorators, the db module, `RealtimeBroadcaster` |
+
+### The placement test — two questions, both must be yes
+
+For `kernel/`:
+
+1. **Is it pure?** No framework import, directly or transitively.
+2. **Does `domain/` actually reference it?** In a method signature, a constructor
+   invariant, or a factory.
+
+Question 2 is the one that gets forgotten. Purity is _necessary_ but not _sufficient_ —
+otherwise `kernel/` slowly accumulates every dependency-free file in the codebase and
+becomes `common/` again.
+
+Applying it to the four kernel files: `Actor` appears in domain signatures
+(`message.changeManagedStatus(actor, …)`); `generateId` is called by aggregate
+factories; `DomainError` is thrown by aggregates; `isValidIanaTimezone` is called by
+`RecurrenceRule`'s constructor. All four pass both questions.
+
+### Ports: the abstract/impl split does **not** run along the kernel/platform seam
+
+The natural instinct is: _abstract class → `kernel/`, implementation → `platform/`._
+That is the wrong axis. **A port lives with the layer that declares the need**, and both
+halves live together.
+
+Worked example — `EventsPublisher`, the port that most invites the split:
+
+```ts
+// today: packages/shared/src/event-publisher/events-publisher.ts
+export abstract class EventsPublisher {
+  abstract publish<T extends EventDef>(
+    def: T,
+    payload: EventOf<T>,
+  ): Promise<void>;
+}
+```
+
+Both questions fail:
+
+1. **Not pure.** `EventDef` and `EventOf` come from `events.types.ts`, which is
+   `import z from "zod"` — `EventOf<T> = z.infer<T["schema"]>`. The abstract class's
+   _signature_ depends on zod, so moving it to `kernel/` would drag zod in and trip the
+   `boundaries/external` rule in §8.
+2. **Domain does not need it.** All 14 files injecting `EventsPublisher` are services.
+   Zero are entities. Aggregates _return_ what happened (`timer.pause(now)` returns a
+   `TimerTransition`; `item.transitionTo(…)` returns a boolean) and the **application
+   layer** publishes it. That is the design in §4 — and it is why the domain never needs
+   a publisher.
+
+So **both halves go to `platform/events/publisher/`.** Same for `ScheduledJobService`
+(whose abstract is, notably, 100% import-free — it passes question 1 and still fails
+question 2), `RealtimeBroadcaster`, and `ObjectStorage`.
+
+The abstract/impl split is real and valuable — it is [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md).
+It just runs **port vs adapter**, not **kernel vs platform**:
+
+| Port                                                                     | Abstract lives in     | Adapter lives in                       |
+| ------------------------------------------------------------------------ | --------------------- | -------------------------------------- |
+| `TagRepository`, `AttentionItemsRepository`, …                           | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/`    |
+| `TagCatalogPort`, `CalendarOccurrencePort`, …                            | `<ctx>/contract/`     | the owning context's `infrastructure/` |
+| `EventsPublisher`, `ScheduledJobService`, `RealtimeBroadcaster`, `Clock` | `platform/<area>/`    | `platform/<area>/`                     |
+
+Repository ports **do** split by layer — but _within a context_, `domain/ports/` →
+`infrastructure/`. That is the split the instinct is reaching for; it just does not
+involve `kernel/`.
+
+**`Clock` is the instructive borderline.** Its abstract is trivially pure, so question 1
+passes — but no domain signature takes a `Clock`. Time reaches the domain as a plain
+`now: Date` argument passed down by the application layer (§4), which is precisely what
+makes the policies deterministic and testable. So `Clock` is `platform/`, both halves.
+If a domain signature ever genuinely needs a clock, that is the signal to revisit — and
+also a signal the design has drifted.
+
+**Why this is not over-engineering.** `kernel/time/decorators.ts` — the file created
+when `common/decorators/*` was first moved — imports `@nestjs/common` and
+`class-validator`. If `domain/` may import `kernel/`, then `domain/` can transitively
+reach Nest, and the most important rule in this document is unenforceable. All 27 of
+that file's consumers are controllers and DTOs, so it was never kernel material.
+
+Two folders means two lint rules, both trivially expressible. One folder means a
+purity carve-out that no linter can state.
+
+### Target contents
+
+```
+apps/api/"@/api/kernel/                # pure. four files — this is what domain/ can see.
+  actor.ts                          # Actor VO — appears in domain method signatures
+  id.ts                             # generateId — called by aggregate factories
+  errors/domain-error.ts            # DomainError base — thrown by aggregates
+  time/iso.ts                       # isValidIanaTimezone — called by RecurrenceRule's ctor
+
+apps/api/src/platform/              # framework-aware. domain/ may NOT import this.
+  clock/clock.ts                    # abstract Clock  — see §1a "ports"
+  clock/system-clock.ts             # @Injectable
+  clock/clock.module.ts
+  db/{db.ts,db.module.ts,tx.module.ts}
+  db/pg-error-codes.ts              # ex packages/shared
+  errors/errors.filter.ts           # AllExceptionsFilter
+  errors/http-status.ts             # DomainError -> HTTP status
+  errors/api-error-responses.decorator.ts
+  validation/decorators.ts          # IsUuidV7, IsIanaTimezone, UuidV7Param, …
+  http/query-parsers.ts             # toOptionalBoolean, toOptionalDate, …
+  http/bearer-token.ts
+  realtime/realtime-broadcaster.ts  # the port the WS transport implements
+  logger/logger.config.ts           # ex packages/shared
+  config/{cors,swagger}.config.ts
+  events/                           # ex packages/shared — the outbox machinery
+    publisher/                      #   abstract EventsPublisher + impl
+    dispatcher/                     #   outbox -> pg-boss drain
+    consumer/                       #   @EventHandler decorator, discovery, realtime listener
+    registry/                       #   defineEvent + event types  (NOT the event catalogue)
+  jobs/                             # ex packages/shared
+    message-bus/                    #   pg-boss wrapper
+    scheduled-job/                  #   abstract port + pg-boss impl
+  email/                            # ex packages/shared — sender, providers, templates
+```
+
+`common/`, `infrastructure/` **and `packages/shared` all disappear.** See §1b.
+
+### Where each current file lands
+
+| Today                                            | Goes to                                                                        | Why                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `kernel/time/iso.ts`                             | **stays**                                                                      | pure predicates, zero imports                                                          |
+| `kernel/time/decorators.ts`                      | `platform/validation/decorators.ts`                                            | Nest + class-validator; 27/27 consumers are `rest/`                                    |
+| `common/clock/clock.ts` → `abstract Clock`       | `platform/clock/clock.ts`                                                      | pure, but no domain signature takes a `Clock` — time reaches domain as `now: Date`     |
+| `common/clock/clock.ts` → `SystemClock`          | `platform/clock/system-clock.ts`                                               | `@Injectable`                                                                          |
+| `common/clock/clock.module.ts`                   | `platform/clock/`                                                              | Nest module                                                                            |
+| `common/errors/errors.model.ts`                  | **split** → `kernel/errors/domain-error.ts` + `platform/errors/http-status.ts` | `AsksynkError.statusCode` is an HTTP concern — see §7                                  |
+| `common/errors/errors.filter.ts`                 | `platform/errors/`                                                             | Nest exception filter                                                                  |
+| `common/errors/api-error-responses.decorator.ts` | `platform/errors/`                                                             | Swagger                                                                                |
+| `common/config/{cors,swagger}.config.ts`         | `platform/config/`                                                             | bootstrap wiring                                                                       |
+| `common/utils/inputs.ts`                         | `platform/http/query-parsers.ts`                                               | every function takes `string \| undefined` — query-string parsing                      |
+| `common/utils/token.ts`                          | `platform/http/bearer-token.ts`                                                | reads HTTP headers                                                                     |
+| `common/logger/logger.config.ts`                 | **delete**                                                                     | a one-line re-export of `@/shared/logger.config` — a barrel, which `CLAUDE.md` forbids |
+| `infrastructure/db/*`                            | `platform/db/*`                                                                | same tier; no reason for a third folder                                                |
+
+---
+
+## 1b. `packages/shared` dissolves into the same two tiers
+
+`packages/shared` (36 files, 2,180 LOC) is a package in name only:
+
+- **It has no `src/index.ts`.** `package.json` declares `main: "dist/index.js"`, but
+  nothing imports the built artifact — every consumer goes through the `@/shared/*`
+  path alias straight into `src/`.
+- **`apps/api/tsconfig.json` already `include`s `../../packages/shared/src/**/\*.ts`\*\*,
+  so the two compile as one TypeScript program. There is no compile-time boundary today.
+- **`apps/api/package.json` already declares 12 of its 15 dependencies.** The only ones
+  unique to it are `nodemailer`, `pg-boss` and `zod` (plus `@types/nodemailer`). That is
+  the entire extent of the "sharing".
+- **There is only one application.** Nothing else consumes it.
+
+So it is 2,180 lines of framework infrastructure behind a workspace boundary that costs
+configuration and buys nothing. It becomes `platform/` — and one file becomes `kernel/`.
+
+### Where each piece lands
+
+| `packages/shared/src/…`                                     | LOC | Goes to                                                   |
+| ----------------------------------------------------------- | --: | --------------------------------------------------------- |
+| `id.ts`                                                     |  10 | **`kernel/id.ts`** — see below                            |
+| `event-consumer/`                                           | 508 | `platform/events/consumer/`                               |
+| `event-dispatcher/`                                         | 285 | `platform/events/dispatcher/`                             |
+| `event-publisher/`                                          |  63 | `platform/events/publisher/`                              |
+| `event-registry/events.registration.ts` + `events.types.ts` | 134 | `platform/events/registry/`                               |
+| `event-registry/events.registry.ts`                         | 348 | **splits per context** → `<ctx>/contract/<ctx>.events.ts` |
+| `message-bus/`                                              | 278 | `platform/jobs/message-bus/`                              |
+| `scheduled-job/`                                            | 154 | `platform/jobs/scheduled-job/`                            |
+| `email/`                                                    | 340 | `platform/email/` — kept whole, see below                 |
+| `logger.config.ts`                                          |  44 | `platform/logger/`                                        |
+| `pg-error-codes.ts`                                         |  16 | `platform/db/`                                            |
+
+**`id.ts` is the one file that must be `kernel/`, not `platform/`.** Domain aggregates
+generate their own ids in `static open()` / `static schedule()`, so `generateId` has to
+be importable from `domain/`. It imports only `uuidv7` — a library, not a framework — so
+it passes the purity ban in §8.
+
+**`events.registry.ts` goes to neither tier.** The 348-line catalogue of 24 event
+definitions is not infrastructure; it is every context's published language collected in
+one file. It splits into `<ctx>/contract/<ctx>.events.ts` — see
+[05-integration.md §4](05-integration.md). Only the `defineEvent` machinery is platform.
+
+### `email/` stays whole — a deliberate exception
+
+`renderTemplate` in `email.templates.ts` is a `switch` over a three-arm discriminated
+union, one arm per consuming context (`magic-link` and `verify-email` → identity,
+`network-invite` → network). Purist DDD says each context should own its template and
+register it, inverting the switch — the `AttachmentPermissionResolver` pattern.
+
+**Don't.** That is roughly 40 lines of registry machinery to relocate 51 lines of HTML
+strings. `platform/email/` is a fine home for all of it.
+
+_The trigger to revisit:_ when a context needs to add a template without editing
+`platform/`. Invert it then, not now. This is `YAGNI` applied honestly — the same
+reasoning that makes the `attention` source columns worth changing makes this one not.
+
+### What dissolving it costs
+
+| File                                               | Change                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `apps/api/tsconfig.json`                           | drop the `@/shared/*` path and the `include` entry                              |
+| `apps/api/jest.config.ts`                          | drop `^@/shared/(.*)$` from `moduleNameMapper` (both projects)                  |
+| `apps/api/package.json`                            | drop `@asksynk/shared`; add `nodemailer`, `pg-boss`, `zod`, `@types/nodemailer` |
+| `eslint.config.js`                                 | drop `./packages/shared/tsconfig.json` from `parserOptions.project`             |
+| `pnpm-workspace.yaml`                              | the `packages/*` glob becomes empty — keep it for future packages, or remove it |
+| 76 imports in `apps/api/src`, 4 in `apps/api/test` | `@/shared/x` → `@/api/platform/x`, or `@/api/kernel/id`                         |
+
+**The one genuine loss, stated plainly.** Today `packages/shared/tsconfig.json` has no
+`@/api/*` path, so shared _cannot_ import a bounded context — a directional guarantee
+the compiler enforces, and one that currently holds (zero `@/api` imports from shared).
+After the merge, `platform/ → context` is prevented only by lint.
+
+Two things make that acceptable: the `platform-imports-no-context` rule in
+[08-roadmap.md](08-roadmap.md) states exactly that constraint, and the guarantee was
+already weaker than it looked — `apps/api/tsconfig.json` compiles shared's sources into
+the same program, so this was never real isolation.
 
 ---
 
@@ -257,8 +489,9 @@ it("prefers the earliest candidate across mixed tag modes", () => {
 ```
 
 **Clock rule:** the domain never calls `new Date()`. Time is an argument. The existing
-`common/clock/` module becomes `kernel/clock` and is injected in the application
-layer, which passes `now` down. This is what makes the policies deterministic.
+`Clock` and `SystemClock` both move to `platform/clock/`, and `Clock` is injected in the
+**application** layer, which passes `now` down as a plain `Date`. This is what makes the
+policies deterministic — and why the domain never needs the `Clock` port itself (§1a).
 
 ### `application/` — orchestration
 
@@ -352,7 +585,7 @@ they belong to.
 **The transport exposes one narrow port:**
 
 ```ts
-// kernel/realtime/realtime-broadcaster.ts
+// platform/realtime/realtime-broadcaster.ts
 export abstract class RealtimeBroadcaster {
   abstract toUser(userId: string, event: string, payload: unknown): void;
   abstract toGuest(guestId: string, event: string, payload: unknown): void;
@@ -495,8 +728,13 @@ export class RuleViolation extends DomainError {
 ```
 
 Contexts subclass with meaningful names — `TimerNotRunning`, `SuggestionNotPending`,
-`ThreadFrozen`, `AttentionItemNotFound`. The existing `AllExceptionsFilter` maps
-`DomainError` → HTTP at the edge, where that translation belongs.
+`ThreadFrozen`, `AttentionItemNotFound`. The status mapping moves to
+`platform/errors/http-status.ts`, and the existing `AllExceptionsFilter` — itself
+moving to `platform/errors/` — applies it at the edge, where that translation belongs.
+
+This is the concrete reason `AsksynkError` splits across the two shared tiers: the
+error _type_ is domain vocabulary (`kernel/`), the _status code_ is transport
+(`platform/`).
 
 The one genuinely leaky file is
 [`attachments.service.ts`](../../apps/api/src/storage/attachments/services/attachments.service.ts):
@@ -513,7 +751,8 @@ Nothing above survives without lint. `eslint-plugin-boundaries`, added in Wave 3
 // eslint.config.js (additions)
 settings: {
   "boundaries/elements": [
-    { type: "kernel",         pattern: "apps/api/src/kernel/**" },
+    { type: "kernel",         pattern: "apps/api/"@/api/kernel/**" },
+    { type: "platform",       pattern: "apps/api/src/platform/**" },
     { type: "contract",       pattern: "apps/api/src/*/contract/**",       capture: ["context"] },
     { type: "domain",         pattern: "apps/api/src/*/domain/**",         capture: ["context"] },
     { type: "application",    pattern: "apps/api/src/*/application/**",    capture: ["context"] },
@@ -525,38 +764,45 @@ rules: {
   "boundaries/element-types": ["error", {
     default: "disallow",
     rules: [
-      { from: "kernel",   allow: ["kernel"] },
+      { from: "kernel",   allow: ["kernel"] },                       // kernel imports NOTHING else
+      { from: "platform", allow: ["kernel", "platform"] },           // platform may use kernel, never a context
       { from: "contract", allow: ["kernel", "contract"] },
       { from: "domain",   allow: ["kernel", ["domain", { context: "${from.context}" }]] },
+                                                                     // ^ note: no "platform"
       { from: "application", allow: [
-        "kernel", "contract",
+        "kernel", "platform", "contract",
         ["domain",      { context: "${from.context}" }],
         ["application", { context: "${from.context}" }],
       ]},
       { from: "infrastructure", allow: [
-        "kernel", "contract",
+        "kernel", "platform", "contract",
         ["domain",      { context: "${from.context}" }],
         ["application", { context: "${from.context}" }],
       ]},
       { from: "presentation", allow: [
-        "kernel", "contract",
+        "kernel", "platform", "contract",
         ["domain",      { context: "${from.context}" }],
         ["application", { context: "${from.context}" }],
       ]},
     ],
   }],
 
-  // the domain stays framework-free
+  // the domain stays framework-free — kernel is held to the same bar,
+  // which is exactly what stops it drifting back into a `common/` dumping ground
   "boundaries/external": ["error", {
     default: "allow",
     rules: [{
-      from: ["domain", "contract"],
+      from: ["domain", "contract", "kernel"],
       disallow: ["@nestjs/*", "drizzle-orm", "drizzle-orm/*", "class-validator",
                  "class-transformer", "socket.io", "pg-boss", "@nestjs-cls/*"],
     }],
   }],
 },
 ```
+
+The two rules that carry the weight: **`domain` does not list `platform`**, and
+**`kernel` is subject to the same external-import ban as `domain`**. Together they
+make it impossible for a framework import to reach `domain/` by any path.
 
 > **Pin this to the installed version.** `eslint-plugin-boundaries` v7 reworked parts
 > of the options object — the docs show both `rules` and `policies` as the key for

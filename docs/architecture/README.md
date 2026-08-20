@@ -25,18 +25,18 @@ supporting machinery.
 
 ## Read in this order
 
-| Doc                                          | What it answers                                                               |
-| -------------------------------------------- | ----------------------------------------------------------------------------- |
-| [01-current-state.md](01-current-state.md)   | What is actually in the repo today, with numbers                              |
-| [02-why-not-ddd.md](02-why-not-ddd.md)       | Why the current shape is not DDD, argued against named sources                |
-| [03-context-map.md](03-context-map.md)       | The target bounded contexts and why each boundary sits where it does          |
-| [04-layering.md](04-layering.md)             | The layer template every context follows, and the NestJS mechanics            |
-| [05-integration.md](05-integration.md)       | How contexts talk — decision table plus a verdict for every current violation |
-| [06-persistence.md](06-persistence.md)       | Schema-per-context, foreign key policy, repository ports, read models         |
-| [07-attention-core.md](07-attention-core.md) | The heart of the product, designed for the channels that are coming           |
-| [08-roadmap.md](08-roadmap.md)               | Eight waves, each independently shippable                                     |
-| [09-references.md](09-references.md)         | Every source, and what specifically it justifies                              |
-| [adr/](adr/)                                 | The four decisions that are expensive to reverse                              |
+| Doc                                          | What it answers                                                                  |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| [01-current-state.md](01-current-state.md)   | What is actually in the repo today, with numbers                                 |
+| [02-why-not-ddd.md](02-why-not-ddd.md)       | Why the current shape is not DDD, argued against named sources                   |
+| [03-context-map.md](03-context-map.md)       | The target bounded contexts and why each boundary sits where it does             |
+| [04-layering.md](04-layering.md)             | The layer template, the `kernel/` vs `platform/` tiers, and the NestJS mechanics |
+| [05-integration.md](05-integration.md)       | How contexts talk — decision table plus a verdict for every current violation    |
+| [06-persistence.md](06-persistence.md)       | Schema-per-context, foreign key policy, repository ports, read models            |
+| [07-attention-core.md](07-attention-core.md) | The heart of the product, designed for the channels that are coming              |
+| [08-roadmap.md](08-roadmap.md)               | Eight waves, each independently shippable                                        |
+| [09-references.md](09-references.md)         | Every source, and what specifically it justifies                                 |
+| [adr/](adr/)                                 | The five decisions that are expensive to reverse                                 |
 
 ---
 
@@ -91,7 +91,7 @@ starting with the one that makes everything else safe: turning unit tests on.
 
 ## The decisions
 
-Four choices shape everything else. Each has an ADR.
+Five choices shape everything else. Each has an ADR.
 
 | Decision              | Choice                                                              | ADR                                                                 |
 | --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -99,11 +99,13 @@ Four choices shape everything else. Each has an ADR.
 | Repository ports      | `abstract class` as both contract and DI token                      | [0002](adr/0002-repository-ports-as-abstract-classes.md)            |
 | Calendar boundary     | `calendar-events` + `calendar-integrations` merge into `scheduling` | [0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
 | Attention shape       | Aggregate whose _content_ is a projection; typed source columns     | [0004](adr/0004-attention-as-projection-with-typed-source.md)       |
+| Shared code           | Two tiers — `kernel/` (pure) and `platform/` (framework-aware)      | [0005](adr/0005-kernel-and-platform-tiers.md)                       |
 
 Code structure stays **in place** — `apps/api/src/<context>/` with layered
-subfolders — enforced by `eslint-plugin-boundaries` rather than by extracting
-packages. Domain models get rich **only where a state machine exists**; everything
-else stays a typed record. Both choices follow the `YAGNI` rule in `CLAUDE.md`.
+subfolders — enforced by `eslint-plugin-boundaries` and `dependency-cruiser` rather
+than by extracting packages. Domain models get rich **only where a state machine
+exists**; everything else stays a typed record. Both choices follow the `YAGNI` rule
+in `CLAUDE.md`.
 
 ---
 

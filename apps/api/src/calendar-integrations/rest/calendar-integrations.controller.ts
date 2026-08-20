@@ -21,8 +21,8 @@ import {
   CalendarIntegrationResponseDto,
 } from "@/api/calendar-integrations/rest/responses/calendar-integration.response";
 import { CalendarIntegrationService } from "@/api/calendar-integrations/services/calendar-integration.service";
-import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
+import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 
 @ApiTags("Calendar Integrations")
 @ApiBearerAuth("bearer")

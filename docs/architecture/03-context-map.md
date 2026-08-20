@@ -57,7 +57,7 @@ problem. **The classification decides how much modelling each context earns.**
 | **focus**         | `timers`                                        | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
 | **files**         | `storage`                                       | Generic    | `attachments`                                                                                                                       |
 | **identity**      | `auth` + `user-profile` + `user-settings`       | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
-| _(platform)_      | `packages/shared`                               | —          | `events_outbox`                                                                                                                     |
+| _(platform)_      | `packages/shared` — **dissolves**, see [04 §1b](04-layering.md) | —          | `events_outbox`                                                                                                     |
 
 All 33 tables are assigned; none appears twice.
 
@@ -266,7 +266,8 @@ five-state machine (`idle | running | paused | completed | stopped`) that is cur
 implemented with string-compare guards. Prime candidate for a rich aggregate.
 
 The pg-boss coupling — `TimersService` injects `ScheduledJobService` — moves to the
-application layer, behind the port that already exists in `packages/shared`.
+application layer, behind the `ScheduledJobService` port that already exists (moving to
+`platform/jobs/scheduled-job/`).
 
 ---
 
@@ -313,12 +314,25 @@ integration re-implements them.
 
 ## 6. What deliberately does _not_ become a context
 
-- **`common` / `infrastructure`** → a `kernel/` folder, not a context. It holds
-  `UserId`, the `Clock`, time utilities and the domain error base. **Rule: `kernel`
-  imports nothing from any context.** This is what cures the current
-  `common → calendar-events` inversion.
-- **`websockets`** → transport, not a context. See [04-layering.md §4](04-layering.md).
-- **`events`** → platform wiring.
+- **`common` / `infrastructure`** → split across **two shared tiers**, neither of them
+  a context:
+  - **`kernel/`** — pure domain vocabulary: `Actor`, `generateId`, the domain error
+    base, time predicates. **Imports nothing at all**, not even a framework — and every
+    file in it is genuinely referenced by `domain/`. This is the only shared code
+    `domain/` may see, and keeping it pure is what cures the current
+    `common → calendar-events` inversion.
+  - **`platform/`** — framework-aware shared infrastructure: the db and transaction
+    modules, the outbox publisher/dispatcher/consumer, pg-boss, email, the exception
+    filter, DTO validation decorators, `Clock`/`SystemClock`, `RealtimeBroadcaster`,
+    bootstrap config. **`domain/` may never import it.** Note that infrastructure
+    *ports* live here too, next to their adapters — the abstract/adapter split does not
+    run along this seam ([04 §1a](04-layering.md)).
+
+  Full rationale and the per-file mapping in
+  [04-layering.md §1a](04-layering.md) and [ADR 0005](adr/0005-kernel-and-platform-tiers.md).
+
+- **`websockets`** → transport, not a context. See [04-layering.md §5](04-layering.md).
+- **`events`** → `platform/` wiring.
 - **`health`** → one endpoint; it can stay where it is.
 
 ---

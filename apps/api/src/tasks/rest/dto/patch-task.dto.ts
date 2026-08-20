@@ -1,6 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
-  ArrayNotEmpty,
   IsArray,
   IsIn,
   IsNotEmpty,
@@ -11,7 +10,7 @@ import {
 import {
   IsIsoDateWithOffset,
   IsUuidV7,
-} from "@/api/common/decorators/validators";
+} from "@/api/platform/decorators/fieldValidators.decorators";
 import { TASK_STATUSES, TaskStatus } from "@/api/tasks/models/task.model";
 
 export class PatchTaskRequestDto {

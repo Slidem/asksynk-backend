@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { Clock } from "src/platform/clock/clock";
 
-import { Clock } from "@/api/common/clock/clock";
 import { AsksynkError } from "@/api/common/errors/errors.model";
 import { UserTimer } from "@/api/timers/entities/user-timer.entity";
 import { UserTimerSettings } from "@/api/timers/entities/user-timer-settings.entity";

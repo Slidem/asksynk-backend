@@ -7,17 +7,17 @@ import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { and, eq, inArray } from "drizzle-orm";
 import * as path from "path";
+import { Clock } from "src/platform/clock/clock";
 import request from "supertest";
 
 import { AuthUser } from "@/api/auth/auth.types";
-import { Clock } from "@/api/common/clock/clock";
-import { ClockModule } from "@/api/common/clock/clock.module";
 import { EventsModule } from "@/api/events/events.module";
 import {
   DB_CLIENT_PROVIDER,
   DbModule,
 } from "@/api/infrastructure/db/db.module";
 import { TxModule } from "@/api/infrastructure/db/tx.module";
+import { ClockModule } from "@/api/platform/clock/clock.module";
 import { TimersModule } from "@/api/timers/timers.module";
 import { users } from "@/migrations/schema/users";
 import { userTimerEvents } from "@/migrations/schema/userTimerEvents";

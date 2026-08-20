@@ -8,8 +8,8 @@ import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Clock } from "src/platform/clock/clock";
 
-import { Clock } from "@/api/common/clock/clock";
 import {
   ObjectHead,
   ObjectStorage,

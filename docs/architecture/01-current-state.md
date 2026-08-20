@@ -24,6 +24,17 @@ The three workspaces are **one TypeScript program**, not built artifacts —
 `apps/api/tsconfig.json` `include`s `../migrations/src/**` and
 `../../packages/shared/src/**`. There is no compile-time boundary between them.
 
+> **`packages/shared` is a package in name only.** It has no `src/index.ts`; its
+> declared `main: "dist/index.js"` is never imported — all 76 consumer imports go
+> through the `@/shared/*` path alias directly into `src/`. `apps/api/package.json`
+> already declares **12 of its 15 dependencies**; only `nodemailer`, `pg-boss` and
+> `zod` are unique to it. There is one application consuming it. It is 2,180 lines of
+> framework infrastructure behind a workspace boundary that costs configuration and
+> buys nothing — see [04-layering.md §1b](04-layering.md).
+>
+> To its credit, it imports **zero** from `apps/api`, so the dependency direction is
+> clean. That is the one property worth preserving when it dissolves.
+
 ```
 "@/api/*"        -> apps/api/src/*
 "@/migrations/*" -> apps/migrations/src/*
@@ -58,8 +69,11 @@ The three workspaces are **one TypeScript program**, not built artifacts —
 | `events`                          |     1 |    26 |  0.2% |
 | `health`                          |     1 |    16 |  0.1% |
 
-Plus `packages/shared/src` 2,144 LOC, `apps/migrations` 1,269 LOC, `apps/api/test`
+Plus `packages/shared/src` 2,180 LOC, `apps/migrations` 1,269 LOC, `apps/api/test`
 3,044 LOC.
+
+_(Line counts are physical lines including blanks and comments. Figures elsewhere in
+these docs use the same measure, so they sum consistently.)_
 
 Note the top five — `tasks`, the two calendar modules, `messaging`,
 `attention-items` — are **61% of the codebase**. They are also where every

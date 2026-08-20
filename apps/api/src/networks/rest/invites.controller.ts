@@ -3,12 +3,12 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { CreateInviteRequestDto } from "@/api/networks/rest/dto/create-invite.dto";
 import { toInviteResponseDto } from "@/api/networks/rest/networks.mapper";
 import { InviteResponseDto } from "@/api/networks/rest/responses/invite.response";
 import { NetworksService } from "@/api/networks/services/networks.service";
+import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 
 @ApiTags("Invites")
 @ApiBearerAuth("bearer")

@@ -12,7 +12,7 @@ import {
   IsIanaTimezone,
   IsIsoDateWithOffset,
   IsUuidV7,
-} from "@/api/common/decorators/validators";
+} from "@/api/platform/decorators/fieldValidators.decorators";
 
 export class CreateCalendarEventRequestDto {
   @IsUuidV7()

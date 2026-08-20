@@ -5,7 +5,7 @@ import {
   ATTENTION_ITEM_STATUSES,
   AttentionItemStatus,
 } from "@/api/attention-items/models/attention-item.model";
-import { IsUuidV7 } from "@/api/common/decorators/validators";
+import { IsUuidV7 } from "@/api/platform/decorators/fieldValidators.decorators";
 
 export class PatchAttentionItemDto {
   @ApiPropertyOptional({

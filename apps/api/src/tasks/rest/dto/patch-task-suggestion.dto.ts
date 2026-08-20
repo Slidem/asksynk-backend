@@ -12,7 +12,7 @@ import {
 import {
   IsIsoDateWithOffset,
   IsUuidV7,
-} from "@/api/common/decorators/validators";
+} from "@/api/platform/decorators/fieldValidators.decorators";
 import { SuggestedTaskItemDto } from "@/api/tasks/rest/dto/create-task-suggestion.dto";
 
 // Either a lifecycle transition (status) OR a payload edit — never both. The

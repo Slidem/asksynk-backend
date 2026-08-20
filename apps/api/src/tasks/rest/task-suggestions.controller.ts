@@ -12,9 +12,9 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { AsksynkError } from "@/api/common/errors/errors.model";
+import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { CreateTaskSuggestionRequestDto } from "@/api/tasks/rest/dto/create-task-suggestion.dto";
 import { ListTaskSuggestionsQueryDto } from "@/api/tasks/rest/dto/list-task-suggestions-query.dto";

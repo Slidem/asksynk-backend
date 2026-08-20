@@ -68,22 +68,6 @@ function getUtcOffsetMs(utc: Date, timezone: string): number {
   return parseOffsetString(offsetPart) * 60 * 1000;
 }
 
-export function isIsoDateWithOffset(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$/.test(value)) {
-    return false;
-  }
-  return !isNaN(new Date(value).getTime());
-}
-
-export function isValidIanaTimezone(tz: string): boolean {
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Converts a true UTC Date + IANA timezone to an ISO 8601 string with offset,
  * e.g. "2026-03-15T10:00:00+02:00".

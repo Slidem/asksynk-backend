@@ -18,10 +18,10 @@ import {
 } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { RequestActor } from "@/api/auth/requestActor.decorator";
-import { UuidV7Param } from "@/api/common/decorators/param.decorators";
 import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 import { NetworksService } from "@/api/networks/services/networks.service";
+import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { CreateTagRequestDto } from "@/api/tags/rest/dto/create-tag.dto";
 import { ListTagsQueryDto } from "@/api/tags/rest/dto/list-tags-query.dto";
 import { UpdateTagRequestDto } from "@/api/tags/rest/dto/update-tag.dto";

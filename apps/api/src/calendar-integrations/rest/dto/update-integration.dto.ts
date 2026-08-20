@@ -12,7 +12,7 @@ import {
   CALENDAR_SYNC_DIRECTIONS,
   CalendarSyncDirection,
 } from "@/api/calendar-integrations/entities/calendar-integration.entity";
-import { IsUuidV7 } from "@/api/common/decorators/validators";
+import { IsUuidV7 } from "@/api/platform/decorators/fieldValidators.decorators";
 
 export class CalendarSyncSelectionDto {
   @IsUuidV7()

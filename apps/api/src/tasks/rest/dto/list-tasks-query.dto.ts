@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsIn, IsOptional, IsString } from "class-validator";
 
-import { IsUuidV7 } from "@/api/common/decorators/validators";
+import { IsUuidV7 } from "@/api/platform/decorators/fieldValidators.decorators";
 import {
   TASK_LIST_SCOPES,
   TASK_STATUSES,

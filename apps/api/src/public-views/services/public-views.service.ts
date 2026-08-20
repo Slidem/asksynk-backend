@@ -64,7 +64,9 @@ export class PublicViewsService {
         });
         return { view, url: this.buildUrl(view.slug) };
       } catch (err) {
-        if (!this.isUniqueViolation(err)) throw err;
+        if (!this.isUniqueViolation(err)) {
+          throw err;
+        }
         this.logger.warn("Slug collision, retrying", { attempt });
       }
     }

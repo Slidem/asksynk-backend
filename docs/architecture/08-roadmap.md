@@ -13,15 +13,18 @@ very first step is one line of jest config.
 
 **~1 day. Risk: near zero. Do this even if nothing else in this plan ever happens.**
 
-| #   | Step                                                                                                                                                                          | Effort | Risk       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- |
-| 0.1 | **Split the jest config so unit tests run** (§Guardrails below)                                                                                                               | 1h     | none       |
-| 0.2 | Delete the `CalendarEventsRepository` import in `auth.guard.ts:16`; use `new ContextLogger(AuthGuard.name)`                                                                   | 5min   | none       |
-| 0.3 | Move `isIsoDateWithOffset` / `isValidIanaTimezone` → `kernel/time/iso.ts`; kills the `common → calendar-events` inversion                                                     | 30min  | none       |
-| 0.4 | `tags.name` → `uniqueIndex(userId, lower(name))` — **the migration must dedupe existing rows first**                                                                          | 30min  | **medium** |
-| 0.5 | Delete the orphan `tag.created` event and the handler-less `email` group                                                                                                      | 15min  | none       |
-| 0.6 | Outbox: index on `dispatched_at`; retention job deleting realtime-only rows older than 30 days                                                                                | 1h     | low        |
-| 0.7 | Write the first `.spec.ts` files against code that is **already pure** — `recurrence.utils.ts`, `task-status.util.ts`, `oauth-state.util.ts`, `slug.util.ts`, all 20 entities | 3h     | none       |
+| #    | Step                                                                                                                                                                                                                                      | Effort | Risk       |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- |
+| 0.1  | **Split the jest config so unit tests run** (§Guardrails below)                                                                                                                                                                           | 1h     | none       |
+| 0.2  | Delete the `CalendarEventsRepository` import in `auth.guard.ts:16`; use `new ContextLogger(AuthGuard.name)`                                                                                                                               | 5min   | none       |
+| 0.3  | Move `isIsoDateWithOffset` / `isValidIanaTimezone` → `kernel/time/iso.ts`; kills the `common → calendar-events` inversion **✅ done**                                                                                                     | 30min  | none       |
+| 0.3b | **Split `common/` + `infrastructure/` into `kernel/` + `platform/`** per [04 §1a](04-layering.md). Includes moving `kernel/time/decorators.ts` → `platform/validation/`, splitting `AsksynkError`, deleting the `logger.config.ts` barrel | 2h     | low        |
+| 0.3c | Rewrite the 26 IDE-generated `"@/api/kernel/...` imports to `@/api/kernel/...`, and add the `no-restricted-imports` rule for `src/*` so it cannot recur                                                                                   | 30min  | none       |
+| 0.3d | **Dissolve `packages/shared` into `platform/` + `kernel/id.ts`** per [04 §1b](04-layering.md). 80 imports, 5 config files. Leave `events.registry.ts` in place for now — it splits per context in Wave 8.1                                | 3h     | low        |
+| 0.4  | `tags.name` → `uniqueIndex(userId, lower(name))` — **the migration must dedupe existing rows first**                                                                                                                                      | 30min  | **medium** |
+| 0.5  | Delete the orphan `tag.created` event and the handler-less `email` group                                                                                                                                                                  | 15min  | none       |
+| 0.6  | Outbox: index on `dispatched_at`; retention job deleting realtime-only rows older than 30 days                                                                                                                                            | 1h     | low        |
+| 0.7  | Write the first `.spec.ts` files against code that is **already pure** — `recurrence.utils.ts`, `task-status.util.ts`, `oauth-state.util.ts`, `slug.util.ts`, all 20 entities                                                             | 3h     | none       |
 
 **Verification:** `pnpm --filter @asksynk/api test` runs unit tests **with no
 Postgres**, in milliseconds. The existing integration suite still passes.
@@ -104,7 +107,7 @@ the template before the 2,000-line ones.
 
 | #   | Step                                                                                    | Effort | Risk            |
 | --- | --------------------------------------------------------------------------------------- | ------ | --------------- |
-| 4.1 | `kernel/realtime/realtime-broadcaster.ts` port; the gateway implements it               | 2h     | low             |
+| 4.1 | `platform/realtime/realtime-broadcaster.ts` port; the gateway implements it             | 2h     | low             |
 | 4.2 | Move the 7 `@EventHandler`s into 4 per-context broadcasters                             | 4h     | low             |
 | 4.3 | **Collapse `conversations`' 17 methods to ~8 using `Actor`**                            | 1 day  | **medium-high** |
 | 4.4 | Move the 5 `@SubscribeMessage` commands into the owning contexts, reusing the REST DTOs | 3h     | low             |
@@ -180,13 +183,13 @@ integration suite. Then the same against a restored copy of production data.
 
 **~half a day.**
 
-| #   | Step                                                                                                                       |
-| --- | -------------------------------------------------------------------------------------------------------------------------- |
-| 8.1 | Split `events.registry.ts` (347 LOC) into per-context `contract/<ctx>.events.ts`. `defineEvent` stays in `packages/shared` |
-| 8.2 | `attachments.placement` → `visibility` + `owner_context`                                                                   |
-| 8.3 | Merge `user-profile` + `user-settings` → `identity`                                                                        |
-| 8.4 | Fix `CLAUDE.md`'s stale `apps/background-worker` reference; add the architecture rules (below)                             |
-| 8.5 | Replace the 11 Nest HTTP exceptions in `attachments.service.ts` with domain errors                                         |
+| #   | Step                                                                                                                                                       |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8.1 | Split `events.registry.ts` (347 LOC) into per-context `contract/<ctx>.events.ts`. `defineEvent` and the registry types stay in `platform/events/registry/` |
+| 8.2 | `attachments.placement` → `visibility` + `owner_context`                                                                                                   |
+| 8.3 | Merge `user-profile` + `user-settings` → `identity`                                                                                                        |
+| 8.4 | Fix `CLAUDE.md`'s stale `apps/background-worker` reference; add the architecture rules (below)                                                             |
+| 8.5 | Replace the 11 Nest HTTP exceptions in `attachments.service.ts` with domain errors                                                                         |
 
 ---
 
@@ -199,6 +202,7 @@ integration suite. Then the same against a restored copy of production data.
 const moduleNameMapper = {
   "^@/api/(.*)$": "<rootDir>/src/$1",
   "^@/migrations/(.*)$": "<rootDir>/../migrations/src/$1",
+  // drop this line once step 0.3d dissolves packages/shared
   "^@/shared/(.*)$": "<rootDir>/../../packages/shared/src/$1",
   "^@/test/(.*)$": "<rootDir>/test/$1",
 };
@@ -296,16 +300,38 @@ module.exports = {
     },
     {
       name: "kernel-is-a-leaf",
-      comment: "kernel/ must not import any bounded context.",
+      comment:
+        "kernel/ imports nothing — not a context, not platform/, no framework.",
       severity: "error",
-      from: { path: "^apps/api/src/kernel/" },
+      from: { path: "^apps/api/"@/api/kernel/" },
       to: { path: "^apps/api/src/(?!kernel/)" },
     },
     {
-      name: "shared-never-imports-api",
+      name: "kernel-is-framework-free",
+      comment:
+        "kernel/ is the only shared code domain/ may import, so it must stay pure.",
       severity: "error",
-      from: { path: "^packages/shared/" },
-      to: { path: "^apps/api/" },
+      from: { path: "^apps/api/"@/api/kernel/" },
+      to: {
+        path: "^(node_modules/)?(@nestjs|drizzle-orm|class-validator|class-transformer|zod|socket\\.io|pg-boss|@nestjs-cls)",
+      },
+    },
+    {
+      name: "platform-imports-no-context",
+      // Replaces the old `shared-never-imports-api` rule: packages/shared's tsconfig
+      // enforced this by omitting the @/api path. After step 0.3d it is stated here.
+      comment:
+        "platform/ is shared infrastructure; it may use kernel/ but never a context.",
+      severity: "error",
+      from: { path: "^apps/api/src/platform/" },
+      to: { path: "^apps/api/src/(?!kernel/|platform/)" },
+    },
+    {
+      name: "domain-never-imports-platform",
+      comment: "platform/ is framework-aware. domain/ must reach only kernel/.",
+      severity: "error",
+      from: { path: "^apps/api/src/[^/]+/domain/" },
+      to: { path: "^apps/api/src/platform/" },
     },
     {
       name: "no-barrels",
@@ -326,7 +352,7 @@ module.exports = {
 
 ```jsonc
 // root package.json
-"lint:boundaries": "depcruise apps/api/src packages/shared/src --config .dependency-cruiser.js",
+"lint:boundaries": "depcruise apps/api/src --config .dependency-cruiser.js",
 "graph": "depcruise apps/api/src --config .dependency-cruiser.js --output-type dot | dot -Tsvg > deps.svg"
 ```
 
@@ -378,6 +404,21 @@ been a reliable smell detector in this codebase.**
 
 - Bounded contexts live at `apps/api/src/<context>/`.
   Layers: `contract / domain / application / infrastructure / presentation`.
+- Two shared tiers, neither a context:
+  - **`kernel/`** — pure domain vocabulary (`Actor`, `generateId`, `DomainError`, time
+    predicates). **Imports nothing, including frameworks.** The only shared code
+    `domain/` may import. A file earns a place here only if it passes both tests: it is
+    pure **and** `domain/` actually references it.
+  - **`platform/`** — framework-aware shared infra (db, tx, exception filter, DTO
+    validation decorators, `Clock`/`SystemClock`, `RealtimeBroadcaster`, the outbox
+    publisher/dispatcher/consumer, pg-boss, email, bootstrap config).
+    **`domain/` may never import it.**
+- **Infrastructure ports live beside their adapters in `platform/`**, not in `kernel/`.
+  Only _repository_ ports split by layer, and that split is within a context
+  (`<ctx>/domain/ports/` → `<ctx>/infrastructure/`).
+- There is **no `packages/shared`**. It was a package in name only — no `index.ts`,
+  compiled into `apps/api`'s own program, one consumer. Shared code lives in `kernel/`
+  or `platform/`.
 - Dependency rule: `presentation -> application -> domain`. `infrastructure` implements
   domain ports. **Only `<context>.module.ts` may import `infrastructure/`.**
 - `domain/` is framework-free: no `@nestjs/*`, no drizzle, no class-validator, no zod.

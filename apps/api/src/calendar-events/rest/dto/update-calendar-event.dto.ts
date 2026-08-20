@@ -11,7 +11,7 @@ import {
 import {
   IsIanaTimezone,
   IsIsoDateWithOffset,
-} from "@/api/common/decorators/validators";
+} from "@/api/platform/decorators/fieldValidators.decorators";
 
 export class UpdateCalendarEventRequestDto {
   @IsOptional()

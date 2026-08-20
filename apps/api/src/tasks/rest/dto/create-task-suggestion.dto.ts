@@ -12,7 +12,7 @@ import {
 import {
   IsIsoDateWithOffset,
   IsUuidV7,
-} from "@/api/common/decorators/validators";
+} from "@/api/platform/decorators/fieldValidators.decorators";
 import {
   TASK_SUGGESTION_KINDS,
   TaskSuggestionKind,
