@@ -9,6 +9,7 @@ export type ErrorKey = string;
 export type ErrorDefinition = {
   category: DomainErrorCategory;
   message: string;
+  exposable: boolean;
 };
 
 export type ErrorCatalog = {
@@ -25,10 +26,10 @@ export function defineCatalog<D extends Record<ErrorKey, ErrorDefinition>>(
     params: Record<string, unknown> = {},
     options?: ErrorOptions,
   ) => {
-    const { category, message: messageTemplate } = definitions[errorKey];
+    const { message: messageTemplate } = definitions[errorKey];
     const message = _.template(messageTemplate)(params);
     const code = `${namespace}.${errorKey}`;
-    return new DomainError(category, code, params, message, options);
+    return new DomainError(code, message, options);
   };
 
   return { catalog: { namespace, definitions }, createError };

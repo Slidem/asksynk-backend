@@ -5,6 +5,7 @@ import {
   HttpException,
 } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
+import { ERROR_REGISTRY } from "src/errors/error-registry.root";
 import {
   DomainError,
   DomainErrorCategory,
@@ -78,38 +79,40 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private handleDomainError(exception: DomainError, response: any) {
-    const statusCode = STATUS_BY_CATEGORY[exception.category] || 500;
+    const errorDefinition = ERROR_REGISTRY.get(exception.code);
+    const category = errorDefinition?.category || DomainErrorCategory.INTERNAL;
+    const exposable = errorDefinition?.exposable ?? false;
+    const statusCode = STATUS_BY_CATEGORY[category];
+    const clientMessage =
+      exposable && exception.message
+        ? exception.message
+        : "A domain error occurred";
+
     if (statusCode >= 500) {
       this.logger.error("DomainError occurred", {
-        category: exception.category,
-        code: exception.code,
-        params: exception.params,
+        category,
         statusCode,
+        code: exception.code,
         message: exception.message,
         stack: exception.stack,
       });
     } else {
       this.logger.debug("DomainError occurred", {
-        category: exception.category,
-        code: exception.code,
-        params: exception.params,
+        category,
         statusCode,
+        code: exception.code,
         message: exception.message,
       });
     }
     response.status(statusCode).json({
-      error: exception.code,
       statusCode,
-      message: exception.message || "A domain error occurred",
+      error: exception.code,
+      message: clientMessage,
     });
   }
 
   /**
-   *
    * NestJS built-in exceptions (validation 400s, 404s, etc.).
-   *
-   * @param exception
-   * @param response
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private handleNestJsHttpError(exception: HttpException, response: any) {

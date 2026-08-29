@@ -8,9 +8,7 @@ export enum DomainErrorCategory {
 
 export class DomainError extends Error {
   constructor(
-    readonly category: DomainErrorCategory,
     readonly code: string,
-    readonly params: Record<string, unknown> = {},
     message?: string,
     options?: ErrorOptions,
   ) {
