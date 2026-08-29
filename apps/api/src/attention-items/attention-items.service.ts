@@ -14,7 +14,6 @@ import {
   UpsertAttentionFromSourceInput,
 } from "@/api/attention-items/models/attention-item.model";
 import { toAttentionItemResponse } from "@/api/attention-items/rest/attention-item.mapper";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   AttentionItemRemoved,
@@ -22,6 +21,8 @@ import {
   AttentionMessageStatusChanged,
 } from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
+
+import { attentionItemError } from "./attention-items.errors";
 
 @Injectable()
 export class AttentionItemsService {
@@ -48,7 +49,7 @@ export class AttentionItemsService {
   async getAttentionItem(userId: string, id: string): Promise<AttentionItem> {
     const item = await this.attentionItemsRepository.getById(id);
     if (!item || item.isDeleted || !item.belongsTo(userId)) {
-      throw AsksynkError.notFound("Attention item not found");
+      throw attentionItemError("item_not_found", { id });
     }
     return item;
   }
@@ -67,7 +68,7 @@ export class AttentionItemsService {
   ): Promise<AttentionItem> {
     const item = await this.attentionItemsRepository.getById(input.id);
     if (!item || item.isDeleted || !item.belongsTo(input.userId)) {
-      throw AsksynkError.notFound("Attention item not found");
+      throw attentionItemError("item_not_found", { id: input.id });
     }
 
     if (input.status !== undefined) item.status = input.status;
@@ -235,7 +236,7 @@ export class AttentionItemsService {
   async deleteAttentionItem(userId: string, id: string): Promise<void> {
     const item = await this.attentionItemsRepository.getById(id);
     if (!item || item.isDeleted || !item.belongsTo(userId)) {
-      throw AsksynkError.notFound("Attention item not found");
+      throw attentionItemError("item_not_found", { id });
     }
     await this.softDeleteAndNotify(id, userId);
   }

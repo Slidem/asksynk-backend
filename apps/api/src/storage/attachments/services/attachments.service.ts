@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
-import { uuidv7 } from "uuidv7";
 
 import { AttachmentAccessService } from "@/api/storage/attachment-access.service";
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
@@ -21,6 +20,7 @@ import {
 } from "@/api/storage/attachments/models/attachment.model";
 import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
 import { ObjectStorage, UploadGrant } from "@/api/storage/object-storage";
+import { generateId } from "@/shared/id";
 
 export interface CreateAttachmentInput {
   placement: AttachmentPlacement;
@@ -54,7 +54,7 @@ export class AttachmentsService {
     this.assertContentType(input.contentType);
     this.assertSize(input.sizeBytes);
 
-    const id = uuidv7();
+    const id = generateId();
     const storageKey = this.buildKey(actor.userId, input.placement, id);
     const bucket = bucketForPlacement(input.placement);
 
@@ -103,15 +103,19 @@ export class AttachmentsService {
 
     const bucket = bucketForPlacement(attachment.placement);
     const head = await this.storage.head(bucket, attachment.storageKey);
+
     if (!head) {
       throw new BadRequestException("Upload not found in storage");
     }
+
     if (head.contentLength <= 0 || head.contentLength > MAX_ATTACHMENT_BYTES) {
       await this.discard(attachment.id, bucket, attachment.storageKey);
       throw new BadRequestException("Uploaded object exceeds size limit");
     }
+
     // Strip any `; charset=…` parameter the store may echo before comparing.
     const baseType = head.contentType.split(";")[0].trim();
+
     if (!ALLOWED_CONTENT_TYPES.includes(baseType)) {
       await this.discard(attachment.id, bucket, attachment.storageKey);
       throw new BadRequestException("Uploaded object has disallowed type");

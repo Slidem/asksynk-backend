@@ -18,7 +18,6 @@ import {
   replaceRruleUntil,
   validateAndNormalizeRrule,
 } from "@/api/calendar-events/utils/recurrence.utils";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
@@ -27,6 +26,8 @@ import {
   CalendarEventUpdated,
 } from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
+
+import { calendarEventError } from "../calendar-events.errors";
 
 function mergeNullable<T>(
   input: T | null | undefined,
@@ -53,7 +54,7 @@ export class CalendarEventsService {
   async getCalendar(userId: string): Promise<Calendar> {
     const calendar = await this.calendarRepository.getAsksynkByUserId(userId);
     if (!calendar) {
-      throw AsksynkError.notFound("Calendar not found");
+      throw calendarEventError("calendar_not_found_for_user", { userId });
     }
     return calendar;
   }
@@ -110,12 +111,12 @@ export class CalendarEventsService {
   ): Promise<CalendarEvent> {
     const event = await this.calendarEventsRepository.getById(eventId);
     if (!event) {
-      throw AsksynkError.notFound("Calendar event not found");
+      throw calendarEventError("calendar_event_not_found", { id: eventId });
     }
 
     const calendar = await this.calendarRepository.getById(event.calendarId);
     if (!calendar || !calendar.belongsTo(userId)) {
-      throw AsksynkError.notFound("Calendar event not found");
+      throw calendarEventError("calendar_event_not_found", { id: eventId });
     }
 
     return event;
@@ -141,7 +142,9 @@ export class CalendarEventsService {
     let calendarIds = calendars.map((c) => c.id);
     if (input.calendarId) {
       if (!calendarIds.includes(input.calendarId)) {
-        throw AsksynkError.notFound("Calendar not found");
+        throw calendarEventError("calendar_not_found", {
+          id: input.calendarId,
+        });
       }
       calendarIds = [input.calendarId];
     }
@@ -182,9 +185,9 @@ export class CalendarEventsService {
       (Object.keys(updates).length > 0 || input.rrule !== undefined) &&
       !calendar?.isNative
     ) {
-      throw AsksynkError.badRequest(
-        "Imported calendar events are read-only; only tags can be changed",
-      );
+      throw calendarEventError("imported_calendar_event_readonly", {
+        id: event.id,
+      });
     }
 
     Object.assign(event, updates);
@@ -210,9 +213,9 @@ export class CalendarEventsService {
     const event = await this.getCalendarEvent(userId, eventId);
     const calendar = await this.calendarRepository.getById(event.calendarId);
     if (!calendar?.isNative) {
-      throw AsksynkError.badRequest(
-        "Imported calendar events are read-only and cannot be deleted",
-      );
+      throw calendarEventError("imported_calendar_event_readonly", {
+        id: eventId,
+      });
     }
     await this.calendarEventsRepository.delete(eventId);
     await this.eventsPublisher.publish(CalendarEventDeleted, {
@@ -236,7 +239,9 @@ export class CalendarEventsService {
   ): Promise<void> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
-      throw AsksynkError.badRequest("Calendar event is not recurring");
+      throw calendarEventError("calendar_event_is_not_recurring", {
+        id: eventId,
+      });
     }
     const occStart = parseIsoWallClockInTimezone(
       occurrenceStart,
@@ -258,7 +263,9 @@ export class CalendarEventsService {
   ): Promise<CalendarEventInstance> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
-      throw AsksynkError.badRequest("Calendar event is not recurring");
+      throw calendarEventError("calendar_event_is_not_recurring", {
+        id: eventId,
+      });
     }
 
     const occStart = parseIsoWallClockInTimezone(instanceStart, event.timezone);
@@ -306,7 +313,9 @@ export class CalendarEventsService {
   ): Promise<CalendarEventInstance> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
-      throw AsksynkError.badRequest("Calendar event is not recurring");
+      throw calendarEventError("calendar_event_is_not_recurring", {
+        id: eventId,
+      });
     }
 
     const splitDate = parseIsoWallClockInTimezone(splitStart, event.timezone);
@@ -412,7 +421,9 @@ export class CalendarEventsService {
     const foundTags = await this.tagRepository.getByIds(tagIds);
     const allBelongToUser = foundTags.every((t) => t.belongsTo(userId));
     if (foundTags.length !== tagIds.length || !allBelongToUser) {
-      throw AsksynkError.badRequest("One or more tags not found");
+      throw calendarEventError("one_or_more_tags_not_found", {
+        tagIds: tagIds.join(","),
+      });
     }
   }
 }
