@@ -11,11 +11,12 @@ import {
   DomainErrorCategory,
 } from "src/kernel/errors/domain-errors";
 
-import { AsksynkError, ErrorType } from "@/api/common/errors/errors.model";
+import { AsksynkError } from "@/api/common/errors/errors.model";
 
 const STATUS_BY_CATEGORY: Record<DomainErrorCategory, number> = {
-  NOT_FOUND: 404,
+  INVALID_VALUE: 400,
   FORBIDDEN: 403,
+  NOT_FOUND: 404,
   CONFLICT: 409,
   RULE_VIOLATION: 422,
   INTERNAL: 500,
@@ -51,7 +52,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     });
 
     response.status(500).json({
-      error: ErrorType.INTERNAL_SERVER_ERROR,
+      error: "internal",
       statusCode: 500,
       message: "An unexpected error occurred",
     });
@@ -104,6 +105,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: exception.message,
       });
     }
+
     response.status(statusCode).json({
       statusCode,
       error: exception.code,

@@ -1,3 +1,5 @@
+import { invalidValueError } from "src/kernel/errors/kernel.errors";
+
 import { AsksynkError } from "@/api/common/errors/errors.model";
 
 /**
@@ -12,7 +14,7 @@ export function parseIsoWallClockInTimezone(
 ): Date {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
   if (!match) {
-    throw AsksynkError.badRequest(`Invalid ISO 8601 date: ${iso}`);
+    throw invalidValueError(`Invalid ISO 8601 date: ${iso}`);
   }
   const [, year, month, day, hour, minute, second] = match.map(Number);
   return wallClockPartsToUtc({
