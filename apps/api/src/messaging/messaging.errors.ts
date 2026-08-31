@@ -1,5 +1,5 @@
-import { DomainErrorCategory } from "src/kernel/errors/domain-errors";
-import { defineCatalog } from "src/kernel/errors/error-catalog";
+import { DomainErrorCategory } from "@/api/kernel/errors/domain-errors";
+import { defineCatalog } from "@/api/kernel/errors/error-catalog";
 
 const { catalog, createError } = defineCatalog("messaging", {
   invalid_attachment: {

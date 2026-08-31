@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskBatch } from "@/api/tasks/entities/task-batch.entity";
@@ -12,6 +11,7 @@ import {
 import { TaskBatchesRepository } from "@/api/tasks/repositories/task-batches.repository";
 import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { aggregateBatchStatus } from "@/api/tasks/task-status.util";
+import { tasksError } from "@/api/tasks/tasks.errors";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   TaskBatchDeleted,
@@ -31,7 +31,7 @@ export class TaskBatchesService {
   @Transactional()
   async create(input: CreateTaskBatchInput): Promise<TaskBatch> {
     if (input.tasks.length === 0) {
-      throw AsksynkError.badRequest("A batch needs at least one task");
+      throw tasksError("batch_requires_tasks");
     }
     // Tags + due date are batch-level and must belong to the assignee.
     await this.tags.assertOwnedBy(input.assigneeUserId, input.tagIds);
@@ -68,7 +68,7 @@ export class TaskBatchesService {
   async getBatch(userId: string, id: string): Promise<TaskBatch> {
     const batch = await this.batchesRepository.getById(id);
     if (!batch || batch.isDeleted || !batch.isVisibleTo(userId)) {
-      throw AsksynkError.notFound("Task batch not found");
+      throw tasksError("task_batch_not_found", { batchId: id });
     }
     return batch;
   }
@@ -108,10 +108,10 @@ export class TaskBatchesService {
   async requireAssignee(userId: string, id: string): Promise<TaskBatch> {
     const batch = await this.batchesRepository.getById(id);
     if (!batch || batch.isDeleted || !batch.isVisibleTo(userId)) {
-      throw AsksynkError.notFound("Task batch not found");
+      throw tasksError("task_batch_not_found", { batchId: id });
     }
     if (!batch.isAssignee(userId)) {
-      throw AsksynkError.forbidden("Only the assignee can modify this batch");
+      throw tasksError("not_batch_assignee");
     }
     return batch;
   }

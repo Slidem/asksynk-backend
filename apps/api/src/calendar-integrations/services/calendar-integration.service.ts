@@ -6,8 +6,10 @@ import { ContextLogger } from "nestjs-context-logger";
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
 import { CalendarRepository } from "@/api/calendar-events/repositories/calendar.repository";
 import { CalendarEventsRepository } from "@/api/calendar-events/repositories/calendar-events.repository";
+import { calendarIntegrationError } from "@/api/calendar-integrations/calendar-integration.errors";
 import { CalendarIntegration } from "@/api/calendar-integrations/entities/calendar-integration.entity";
 import { IntegrationWithCalendars } from "@/api/calendar-integrations/models/integration-with-calendars.model";
+import { RefreshCredentialsResult } from "@/api/calendar-integrations/models/refresh-credentials-result";
 import { UpdateIntegrationInput } from "@/api/calendar-integrations/models/update-integration.model";
 import { CalendarProviderRegistry } from "@/api/calendar-integrations/providers/calendar-provider.registry";
 import { CalendarEventLinkRepository } from "@/api/calendar-integrations/repositories/calendar-event-link.repository";
@@ -17,9 +19,6 @@ import {
   verifyOAuthState,
 } from "@/api/calendar-integrations/utils/oauth-state.util";
 import { generateId } from "@/shared/id";
-
-import { calendarIntegrationError } from "../calendar-integration.errors";
-import { RefreshCredentialsResult } from "../models/refresh-credentials-result";
 
 @Injectable()
 export class CalendarIntegrationService {

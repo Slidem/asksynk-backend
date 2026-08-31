@@ -1,5 +1,5 @@
-import { CalendarIntegration } from "../entities/calendar-integration.entity";
-import { ProviderCredentials } from "../providers/types";
+import { CalendarIntegration } from "@/api/calendar-integrations/entities/calendar-integration.entity";
+import { ProviderCredentials } from "@/api/calendar-integrations/providers/types";
 
 export type RefreshCredentialsResult =
   | {

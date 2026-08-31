@@ -4,12 +4,12 @@ import { defaultsDeep, pick, pickBy } from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { UUID } from "uuidv7";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { Tag } from "@/api/tags/entities/tag.entity";
 import { CreateTagInput } from "@/api/tags/models/create-tag.model";
 import { ListTagsInput } from "@/api/tags/models/list-tags.model";
 import { UpdateTagInput } from "@/api/tags/models/update-tag.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
+import { tagsError } from "@/api/tags/tags.errors";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   TagDeleted,
@@ -59,7 +59,7 @@ export class TagsService {
     const existing = await this.tagsRepository.getById(updateTag.tagId);
 
     if (!existing || !existing.belongsTo(updateTag.userId)) {
-      throw AsksynkError.notFound("Tag not found");
+      throw tagsError("tag_not_found", { tagId: updateTag.tagId });
     }
 
     const updates = pickBy(
@@ -89,7 +89,7 @@ export class TagsService {
   async deleteTag(userId: string, tagId: string): Promise<Tag> {
     const existing = await this.tagsRepository.getById(tagId);
     if (!existing || !existing.belongsTo(userId)) {
-      throw AsksynkError.notFound("Tag not found");
+      throw tagsError("tag_not_found", { tagId });
     }
     const tag = await this.tagsRepository.delete(tagId);
 
@@ -108,7 +108,7 @@ export class TagsService {
       found.length !== tagIds.length ||
       !found.every((t) => t.belongsTo(userId))
     ) {
-      throw AsksynkError.badRequest("One or more tags not found");
+      throw tagsError("tags_not_found");
     }
   }
 }

@@ -1,6 +1,9 @@
-import _ from "node_modules/@types/lodash";
+import _ from "lodash";
 
 import { DomainError, DomainErrorCategory } from "./domain-errors";
+
+/** Catalog messages interpolate `{ param }`, not lodash's default delimiters. */
+const TEMPLATE_SETTINGS = { interpolate: /{\s*([\s\S]+?)\s*}/g };
 
 export type NameSpaceKey = string;
 
@@ -27,7 +30,7 @@ export function defineCatalog<D extends Record<ErrorKey, ErrorDefinition>>(
     options?: ErrorOptions,
   ) => {
     const { message: messageTemplate } = definitions[errorKey];
-    const message = _.template(messageTemplate)(params);
+    const message = _.template(messageTemplate, TEMPLATE_SETTINGS)(params);
     const code = `${namespace}.${errorKey}`;
     return new DomainError(code, message, options);
   };

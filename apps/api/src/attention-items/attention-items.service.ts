@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
+import { attentionItemError } from "@/api/attention-items/attention-items.errors";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import {
@@ -21,8 +22,6 @@ import {
   AttentionMessageStatusChanged,
 } from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
-
-import { attentionItemError } from "./attention-items.errors";
 
 @Injectable()
 export class AttentionItemsService {

@@ -4,9 +4,9 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { RequestActor } from "@/api/auth/auth.types";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { Invite } from "@/api/networks/entities/invite.entity";
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
+import { networksError } from "@/api/networks/networks.errors";
 import { InvitesRepository } from "@/api/networks/repositories/invites.repository";
 import { NetworkRepository } from "@/api/networks/repositories/network.repository";
 import { UsersLookupRepository } from "@/api/networks/repositories/users-lookup.repository";
@@ -35,11 +35,11 @@ export class NetworksService {
     const inviter = await this.usersLookupRepository.getById(inviterUserId);
 
     if (!inviter) {
-      throw AsksynkError.notFound("Inviter not found");
+      throw networksError("inviter_not_found", { inviterUserId });
     }
 
     if (inviter.email.toLowerCase() === normalized) {
-      throw AsksynkError.badRequest("Cannot invite yourself");
+      throw networksError("cannot_invite_self");
     }
 
     const invitee = await this.usersLookupRepository.getByEmail(normalized);
@@ -50,7 +50,7 @@ export class NetworksService {
         invitee.id,
       );
       if (alreadyConnected) {
-        throw AsksynkError.badRequest("Already connected");
+        throw networksError("already_connected", { inviteeUserId: invitee.id });
       }
     }
 
@@ -60,7 +60,7 @@ export class NetworksService {
     );
 
     if (existing) {
-      throw AsksynkError.badRequest("Pending invite already exists");
+      throw networksError("invite_already_pending", { email: normalized });
     }
 
     const invite = await this.invitesRepository.add({
@@ -95,15 +95,15 @@ export class NetworksService {
     const invite = await this.invitesRepository.getById(inviteId);
 
     if (!invite) {
-      throw AsksynkError.notFound("Invite not found");
+      throw networksError("invite_not_found", { inviteId });
     }
 
     if (!invite.isForEmail(acceptingUser.email)) {
-      throw AsksynkError.forbidden("Invite is for a different email");
+      throw networksError("invite_email_mismatch", { inviteId });
     }
 
     if (!invite.isPending()) {
-      throw AsksynkError.badRequest("Invite is not pending");
+      throw networksError("invite_not_pending", { inviteId });
     }
 
     const updated = await this.invitesRepository.updateStatus(
@@ -112,7 +112,7 @@ export class NetworksService {
     );
 
     if (!updated) {
-      throw AsksynkError.notFound("Invite not found");
+      throw networksError("invite_not_found", { inviteId });
     }
 
     await this.networkRepository.upsertPair(
@@ -129,15 +129,15 @@ export class NetworksService {
   ): Promise<Invite> {
     const invite = await this.invitesRepository.getById(inviteId);
     if (!invite) {
-      throw AsksynkError.notFound("Invite not found");
+      throw networksError("invite_not_found", { inviteId });
     }
 
     if (!invite.isForEmail(acceptingUser.email)) {
-      throw AsksynkError.forbidden("Invite is for a different email");
+      throw networksError("invite_email_mismatch", { inviteId });
     }
 
     if (!invite.isPending()) {
-      throw AsksynkError.badRequest("Invite is not pending");
+      throw networksError("invite_not_pending", { inviteId });
     }
 
     const updated = await this.invitesRepository.updateStatus(
@@ -146,7 +146,7 @@ export class NetworksService {
     );
 
     if (!updated) {
-      throw AsksynkError.notFound("Invite not found");
+      throw networksError("invite_not_found", { inviteId });
     }
 
     return updated;
@@ -175,7 +175,7 @@ export class NetworksService {
     );
 
     if (!isActive) {
-      throw AsksynkError.notFound("Network connection not found");
+      throw networksError("network_connection_not_found", { userId: userIdB });
     }
   }
 

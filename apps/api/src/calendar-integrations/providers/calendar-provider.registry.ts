@@ -1,9 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import { calendarIntegrationError } from "@/api/calendar-integrations/calendar-integration.errors";
 import { CalendarProvider } from "@/api/calendar-integrations/providers/calendar-provider";
 import { GoogleCalendarProvider } from "@/api/calendar-integrations/providers/google-calendar.provider";
-
-import { calendarIntegrationError } from "../calendar-integration.errors";
 
 /**
  * Resolves a {@link CalendarProvider} by its `provider` discriminator. Adding a

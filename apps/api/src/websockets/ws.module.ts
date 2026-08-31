@@ -2,9 +2,8 @@ import { Module } from "@nestjs/common";
 
 import { AuthModule } from "@/api/auth/auth.module";
 import { MessagingModule } from "@/api/messaging/messaging.module";
-
-import { WsAuthService } from "./services/ws-auth.service";
-import { WsGateway } from "./ws.gateway";
+import { WsAuthService } from "@/api/websockets/services/ws-auth.service";
+import { WsGateway } from "@/api/websockets/ws.gateway";
 
 @Module({
   imports: [AuthModule, MessagingModule],

@@ -1,4 +1,4 @@
-import { invalidValueError } from "src/kernel/errors/kernel.errors";
+import { invalidValueError } from "@/api/kernel/errors/kernel.errors";
 
 /**
  * Extracts wall-clock digits from an ISO 8601 string (ignores offset),

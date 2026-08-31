@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { Task } from "@/api/tasks/entities/task.entity";
@@ -18,6 +17,7 @@ import { toTaskSuggestionResponse } from "@/api/tasks/rest/mappers/task.mapper";
 import { MaterializedTask } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { TasksService } from "@/api/tasks/services/tasks.service";
+import { tasksError } from "@/api/tasks/tasks.errors";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
@@ -46,7 +46,7 @@ export class TaskSuggestionsService {
   @Transactional()
   async suggest(input: CreateTaskSuggestionInput): Promise<TaskSuggestion> {
     if (input.suggesterUserId === input.suggesteeUserId) {
-      throw AsksynkError.badRequest("Cannot suggest a task to yourself");
+      throw tasksError("cannot_suggest_to_self");
     }
     await this.networks.validateIsActiveConnection(
       input.suggesterUserId,
@@ -79,7 +79,7 @@ export class TaskSuggestionsService {
       !suggestion ||
       (!suggestion.isSuggester(userId) && !suggestion.isSuggestee(userId))
     ) {
-      throw AsksynkError.notFound("Task suggestion not found");
+      throw tasksError("task_suggestion_not_found", { suggestionId: id });
     }
     return suggestion;
   }
@@ -165,7 +165,7 @@ export class TaskSuggestionsService {
     const current = suggestion.payload;
 
     if (input.tasks !== undefined && current.kind !== "batch") {
-      throw AsksynkError.badRequest("Only batch suggestions can have tasks");
+      throw tasksError("tasks_only_on_batch_suggestion");
     }
     if (input.tagIds !== undefined) {
       await this.tags.assertOwnedBy(suggestion.suggesteeUserId, input.tagIds);
@@ -184,9 +184,7 @@ export class TaskSuggestionsService {
     };
 
     if (merged.kind === "batch" && merged.tasks.length === 0) {
-      throw AsksynkError.badRequest(
-        "A batch suggestion needs at least one task",
-      );
+      throw tasksError("batch_requires_tasks");
     }
 
     const updated = await this.suggestionsRepository.updatePayload(
@@ -262,7 +260,7 @@ export class TaskSuggestionsService {
   ): Promise<TaskSuggestion> {
     const suggestion = await this.suggestionsRepository.getById(id);
     if (!suggestion) {
-      throw AsksynkError.notFound("Task suggestion not found");
+      throw tasksError("task_suggestion_not_found", { suggestionId: id });
     }
     const allowed =
       as === "suggestee"
@@ -271,10 +269,10 @@ export class TaskSuggestionsService {
           ? suggestion.isSuggester(userId)
           : suggestion.isSuggestee(userId) || suggestion.isSuggester(userId);
     if (!allowed) {
-      throw AsksynkError.forbidden("Not allowed to act on this suggestion");
+      throw tasksError("cannot_act_on_suggestion", { suggestionId: id });
     }
     if (!suggestion.isPending()) {
-      throw AsksynkError.badRequest("Suggestion is not pending");
+      throw tasksError("suggestion_not_pending", { suggestionId: id });
     }
     return suggestion;
   }
@@ -318,9 +316,7 @@ export class TaskSuggestionsService {
 
   private validatePayload(payload: TaskSuggestionPayload): void {
     if (payload.kind === "batch" && payload.tasks.length === 0) {
-      throw AsksynkError.badRequest(
-        "A batch suggestion needs at least one task",
-      );
+      throw tasksError("batch_requires_tasks");
     }
   }
 

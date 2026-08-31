@@ -3,7 +3,6 @@ import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import {
   PUBLIC_VIEW_DEFAULT_TTL_MS,
@@ -11,6 +10,7 @@ import {
   SLUG_INSERT_MAX_RETRIES,
   SLUG_LENGTH,
 } from "@/api/public-views/public-views.constants";
+import { publicViewsError } from "@/api/public-views/public-views.errors";
 import {
   GuestWithStats,
   PublicViewGuestsRepository,
@@ -44,10 +44,14 @@ export class PublicViewsService {
 
     if (input.expiresAt) {
       if (input.expiresAt <= now) {
-        throw AsksynkError.badRequest("expiresAt must be in the future");
+        throw publicViewsError("invalid_expiry", {
+          reason: "expiresAt must be in the future",
+        });
       }
       if (input.expiresAt.getTime() - now.getTime() > PUBLIC_VIEW_MAX_TTL_MS) {
-        throw AsksynkError.badRequest("expiresAt must be within 30 days");
+        throw publicViewsError("invalid_expiry", {
+          reason: "expiresAt must be within 30 days",
+        });
       }
       expiresAt = input.expiresAt;
     }
@@ -71,9 +75,9 @@ export class PublicViewsService {
       }
     }
 
-    throw AsksynkError.internalServerError(
-      "Failed to allocate public view slug",
-    );
+    throw publicViewsError("slug_allocation_failed", {
+      attempts: SLUG_INSERT_MAX_RETRIES,
+    });
   }
 
   async listForOwner(
@@ -90,7 +94,7 @@ export class PublicViewsService {
   ): Promise<GuestWithStats[]> {
     const view = await this.publicViewsRepository.getById(viewId);
     if (!view || !view.belongsTo(ownerUserId)) {
-      throw AsksynkError.notFound("Public view not found");
+      throw publicViewsError("public_view_not_found", { viewId });
     }
     return this.guestsRepository.listForViewWithStats(viewId);
   }
@@ -101,7 +105,7 @@ export class PublicViewsService {
       viewId,
       ownerUserId,
     );
-    if (!revoked) throw AsksynkError.notFound("Public view not found");
+    if (!revoked) throw publicViewsError("public_view_not_found", { viewId });
     return revoked;
   }
 

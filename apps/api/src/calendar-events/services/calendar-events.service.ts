@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import { pick, pickBy } from "lodash";
 
+import { calendarEventError } from "@/api/calendar-events/calendar-events.errors";
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
 import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
 import { toCalendarEventInstance } from "@/api/calendar-events/mappers/calendar-event-instance.mapper";
@@ -26,8 +27,6 @@ import {
   CalendarEventUpdated,
 } from "@/shared/event-registry/events.registry";
 import { generateId } from "@/shared/id";
-
-import { calendarEventError } from "../calendar-events.errors";
 
 function mergeNullable<T>(
   input: T | null | undefined,

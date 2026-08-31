@@ -1,19 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { ContextLogger } from "nestjs-context-logger";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { UserProfile } from "@/api/user-profile/entities/user-profile.entity";
 import { UpdateUserProfileInput } from "@/api/user-profile/models/update-user-profile.model";
 import { UserProfileRepository } from "@/api/user-profile/repositories/user-profile.repository";
+import { userProfileError } from "@/api/user-profile/user-profile.errors";
 
 @Injectable()
 export class UserProfileService {
-  private readonly logger = new ContextLogger(UserProfileService.name);
-
   constructor(
     private readonly userProfileRepository: UserProfileRepository,
     private readonly attachmentsService: AttachmentsService,
@@ -24,7 +21,7 @@ export class UserProfileService {
   async getProfile(userId: string): Promise<UserProfile> {
     const profile = await this.userProfileRepository.getById(userId);
     if (!profile) {
-      throw AsksynkError.notFound("User profile not found");
+      throw userProfileError("user_profile_not_found", { userId });
     }
     return profile;
   }
@@ -33,7 +30,9 @@ export class UserProfileService {
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const profile = await this.userProfileRepository.getById(input.userId);
     if (!profile) {
-      throw AsksynkError.notFound("User profile not found");
+      throw userProfileError("user_profile_not_found", {
+        userId: input.userId,
+      });
     }
 
     if (input.phone !== undefined) {
@@ -70,7 +69,7 @@ export class UserProfileService {
       attachment.placement !== "public" ||
       !attachment.isActive()
     ) {
-      throw AsksynkError.badRequest("Invalid avatar attachment");
+      throw userProfileError("invalid_avatar_attachment", { attachmentId });
     }
     return attachment;
   }

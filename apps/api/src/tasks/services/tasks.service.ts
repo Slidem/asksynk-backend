@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { Task } from "@/api/tasks/entities/task.entity";
 import {
@@ -12,6 +11,7 @@ import {
 import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
+import { tasksError } from "@/api/tasks/tasks.errors";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   TaskDeleted,
@@ -37,9 +37,7 @@ export class TasksService {
         input.batchId,
       );
       if (input.tagIds.length > 0 || input.dueDate != null) {
-        throw AsksynkError.badRequest(
-          "Tags and due date are managed at batch level",
-        );
+        throw tasksError("batch_fields_managed_at_batch_level");
       }
       const task = await this.tasksRepository.add(generateId(), {
         ...input,
@@ -63,7 +61,7 @@ export class TasksService {
   async getTask(userId: string, id: string): Promise<Task> {
     const task = await this.tasksRepository.getById(id);
     if (!task || task.isDeleted || !task.isVisibleTo(userId)) {
-      throw AsksynkError.notFound("Task not found");
+      throw tasksError("task_not_found", { taskId: id });
     }
     return task;
   }
@@ -77,20 +75,18 @@ export class TasksService {
   async updateTask(input: UpdateTaskInput): Promise<Task> {
     const task = await this.tasksRepository.getById(input.id);
     if (!task || task.isDeleted || !task.isVisibleTo(input.userId)) {
-      throw AsksynkError.notFound("Task not found");
+      throw tasksError("task_not_found", { taskId: input.id });
     }
     // The assignee owns the task — only they may edit (incl. status).
     if (!task.isAssignee(input.userId)) {
-      throw AsksynkError.forbidden("Only the assignee can edit this task");
+      throw tasksError("not_task_assignee", { action: "edit" });
     }
     // Batched tasks: tags + due date are managed at batch level.
     if (
       task.batchId &&
       (input.tagIds !== undefined || input.dueDate !== undefined)
     ) {
-      throw AsksynkError.badRequest(
-        "Tags and due date are managed at batch level",
-      );
+      throw tasksError("batch_fields_managed_at_batch_level");
     }
 
     const prevStatus = task.status;
@@ -122,10 +118,10 @@ export class TasksService {
   async deleteTask(userId: string, id: string): Promise<void> {
     const task = await this.tasksRepository.getById(id);
     if (!task || task.isDeleted || !task.isVisibleTo(userId)) {
-      throw AsksynkError.notFound("Task not found");
+      throw tasksError("task_not_found", { taskId: id });
     }
     if (!task.isAssignee(userId)) {
-      throw AsksynkError.forbidden("Only the assignee can delete this task");
+      throw tasksError("not_task_assignee", { action: "delete" });
     }
     await this.tasksRepository.softDelete(id);
     if (task.batchId) {

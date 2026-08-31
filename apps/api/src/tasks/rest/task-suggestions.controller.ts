@@ -13,7 +13,6 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { CreateTaskSuggestionRequestDto } from "@/api/tasks/rest/dto/create-task-suggestion.dto";
@@ -22,6 +21,7 @@ import { PatchTaskSuggestionRequestDto } from "@/api/tasks/rest/dto/patch-task-s
 import { toTaskSuggestionResponse } from "@/api/tasks/rest/mappers/task.mapper";
 import { TaskSuggestionResponse } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
+import { tasksError } from "@/api/tasks/tasks.errors";
 
 @ApiTags("Task Suggestions")
 @ApiBearerAuth("bearer")
@@ -84,9 +84,9 @@ export class TaskSuggestionsController {
       body.tasks !== undefined;
 
     if (body.status !== undefined && hasPayloadEdit) {
-      throw AsksynkError.badRequest(
-        "Cannot change status and edit payload in the same request",
-      );
+      throw tasksError("invalid_suggestion_update", {
+        reason: "cannot change status and edit payload in the same request",
+      });
     }
 
     if (body.status !== undefined) {
@@ -98,7 +98,9 @@ export class TaskSuggestionsController {
     }
 
     if (!hasPayloadEdit) {
-      throw AsksynkError.badRequest("Nothing to update");
+      throw tasksError("invalid_suggestion_update", {
+        reason: "nothing to update",
+      });
     }
 
     const suggestion = await this.suggestionsService.editPayload({

@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { Clock } from "src/platform/clock/clock";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
+import { Clock } from "@/api/platform/clock/clock";
 import { UserTimer } from "@/api/timers/entities/user-timer.entity";
 import { UserTimerSettings } from "@/api/timers/entities/user-timer-settings.entity";
 import {
@@ -15,6 +14,7 @@ import {
 } from "@/api/timers/models/timer.model";
 import { TIMER_COMPLETION_QUEUE } from "@/api/timers/scheduling/timer-jobs.constants";
 import { TimerSettingsRepository } from "@/api/timers/timer-settings.repository";
+import { timersError } from "@/api/timers/timers.errors";
 import { TimersRepository } from "@/api/timers/timers.repository";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import { TimerLifecycle } from "@/shared/event-registry/events.registry";
@@ -73,7 +73,7 @@ export class TimersService {
       case "stopped":
         return this.stopSession(userId);
       default:
-        throw AsksynkError.badRequest("Unsupported timer status");
+        throw timersError("unsupported_status", { status: input.status });
     }
   }
 
@@ -200,10 +200,10 @@ export class TimersService {
     const now = this.clock.now();
     const current = await this.timersRepo.ensure(userId);
     if (current.status !== "paused") {
-      throw AsksynkError.badRequest("Timer not paused");
+      throw timersError("timer_not_paused");
     }
     const updated = await this.timersRepo.resume(userId, now);
-    if (!updated) throw AsksynkError.badRequest("Timer not paused");
+    if (!updated) throw timersError("timer_not_paused");
     await this.publishLifecycle({
       userId,
       eventType: "resumed",
@@ -219,7 +219,7 @@ export class TimersService {
     const now = this.clock.now();
     const current = await this.timersRepo.ensure(userId);
     if (current.status !== "running") {
-      throw AsksynkError.badRequest("Timer not running");
+      throw timersError("timer_not_running");
     }
     const jobIdToCancel = current.pendingCompletionJobRef;
     const remaining = current.remainingSeconds(now) ?? 0;
@@ -231,7 +231,7 @@ export class TimersService {
     }
 
     const updated = await this.timersRepo.pause(userId, remaining, now);
-    if (!updated) throw AsksynkError.badRequest("Timer not running");
+    if (!updated) throw timersError("timer_not_running");
     await this.publishLifecycle({
       userId,
       eventType: "paused",
@@ -248,7 +248,7 @@ export class TimersService {
     const current = await this.timersRepo.ensure(userId);
 
     if (current.status !== "running" && current.status !== "paused") {
-      throw AsksynkError.badRequest("No active timer");
+      throw timersError("no_active_timer");
     }
 
     const jobIdToCancel = current.pendingCompletionJobRef;
@@ -256,7 +256,7 @@ export class TimersService {
     const updated = await this.timersRepo.stop(userId, remaining, now);
 
     if (!updated) {
-      throw AsksynkError.badRequest("No active timer");
+      throw timersError("no_active_timer");
     }
 
     await this.publishLifecycle({
@@ -355,14 +355,14 @@ export class TimersService {
     const hasSessionType = input.sessionType != null;
     const hasDuration = input.durationSeconds != null;
     if (hasSessionType !== hasDuration) {
-      throw AsksynkError.badRequest(
-        "sessionType and durationSeconds must be provided together",
-      );
+      throw timersError("invalid_session_input", {
+        reason: "sessionType and durationSeconds must be provided together",
+      });
     }
     if (hasSessionType && input.status !== "running") {
-      throw AsksynkError.badRequest(
-        "Session fields are only valid when starting (status=running)",
-      );
+      throw timersError("invalid_session_input", {
+        reason: "session fields are only valid when starting (status=running)",
+      });
     }
   }
 }

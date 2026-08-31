@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { PublicViewGuest } from "@/api/public-views/entities/public-view-guest.entity";
 import { GUEST_SESSION_TTL_MS } from "@/api/public-views/public-views.constants";
+import { publicViewsError } from "@/api/public-views/public-views.errors";
 import { PublicViewGuestsRepository } from "@/api/public-views/repositories/public-view-guests.repository";
 import {
   PublicViewMetadata,
@@ -23,7 +23,7 @@ export class GuestSessionsService {
   async getViewMetadataBySlug(slug: string): Promise<PublicViewMetadata> {
     const metadata = await this.publicViewsRepository.getMetadataBySlug(slug);
     if (!metadata || !metadata.view.isLive()) {
-      throw AsksynkError.notFound("Public view not found or expired");
+      throw publicViewsError("public_view_not_found_or_expired", { slug });
     }
     return metadata;
   }
@@ -36,7 +36,9 @@ export class GuestSessionsService {
     const view = await this.publicViewsRepository.getBySlug(input.slug);
 
     if (!view || !view.isLive()) {
-      throw AsksynkError.notFound("Public view not found or expired");
+      throw publicViewsError("public_view_not_found_or_expired", {
+        slug: input.slug,
+      });
     }
 
     const now = new Date();

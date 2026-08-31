@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { WsIdentity } from "src/websockets/services/ws-auth.service";
 
 import { AuthGuest } from "@/api/auth/auth.types";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
@@ -11,6 +10,7 @@ import {
   MessageSender,
 } from "@/api/messaging/entities/message.entity";
 import { Thread } from "@/api/messaging/entities/thread.entity";
+import { messagingError } from "@/api/messaging/messaging.errors";
 import {
   MessagingRepository,
   ThreadListItem,
@@ -23,6 +23,7 @@ import { PublicViewsRepository } from "@/api/public-views/repositories/public-vi
 import { TagsService } from "@/api/tags/services/tags.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
+import { WsIdentity } from "@/api/websockets/services/ws-auth.service";
 import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
 import {
   MessageCreated,
@@ -31,8 +32,6 @@ import {
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
 import { generateId } from "@/shared/id";
-
-import { messagingError } from "../messaging.errors";
 
 const MAX_MESSAGE_LIMIT = 100;
 

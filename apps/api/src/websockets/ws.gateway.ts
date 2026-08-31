@@ -10,9 +10,10 @@ import {
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
-import { MAX_ATTACHMENTS_PER_MESSAGE } from "src/messaging/attachments/message-attachment.constants";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
+import { resolveDomainError } from "@/api/errors/resolve-domain-error";
+import { DomainError } from "@/api/kernel/errors/domain-errors";
+import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/api/messaging/attachments/message-attachment.constants";
 import {
   MANAGED_MESSAGE_STATUSES,
   ManagedMessageStatus,
@@ -22,6 +23,12 @@ import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
+import {
+  WsAuthService,
+  WsIdentity,
+} from "@/api/websockets/services/ws-auth.service";
+import { guestRoom, threadRoom, userRoom } from "@/api/websockets/ws.rooms";
+import { Ack, SendAck } from "@/api/websockets/ws.types";
 import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
 import {
   AttentionItemRemoved,
@@ -33,10 +40,6 @@ import {
   TimerLifecycle,
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
-
-import { WsAuthService, WsIdentity } from "./services/ws-auth.service";
-import { guestRoom, threadRoom, userRoom } from "./ws.rooms";
-import { Ack, SendAck } from "./ws.types";
 
 @WebSocketGateway({ cors: true })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -243,8 +246,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       return { ok: true, messageId: message.id };
     } catch (error) {
-      if (error instanceof AsksynkError) {
-        return { ok: false, error: error.message };
+      if (error instanceof DomainError) {
+        return { ok: false, error: resolveDomainError(error).message };
       }
       this.logger.error("message.send failed", { error });
       return { ok: false, error: "internal_error" };
@@ -291,8 +294,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       return { ok: true };
     } catch (error) {
-      if (error instanceof AsksynkError) {
-        return { ok: false, error: error.message };
+      if (error instanceof DomainError) {
+        return { ok: false, error: resolveDomainError(error).message };
       }
       this.logger.error("message.tag failed", { error });
       return { ok: false, error: "internal_error" };
@@ -338,8 +341,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       return { ok: true };
     } catch (error) {
-      if (error instanceof AsksynkError) {
-        return { ok: false, error: error.message };
+      if (error instanceof DomainError) {
+        return { ok: false, error: resolveDomainError(error).message };
       }
       this.logger.error("message.updateStatus failed", { error });
       return { ok: false, error: "internal_error" };

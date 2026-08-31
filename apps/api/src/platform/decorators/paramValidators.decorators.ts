@@ -1,6 +1,9 @@
-import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import {
+  BadRequestException,
+  createParamDecorator,
+  ExecutionContext,
+} from "@nestjs/common";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { isIsoDateWithOffset } from "@/api/kernel/time/iso";
 import { isValidId } from "@/shared/id";
 
@@ -12,7 +15,7 @@ export const UuidV7Param = createParamDecorator(
     const request = ctx.switchToHttp().getRequest();
     const value = request.params[param];
     if (!isValidId(value)) {
-      throw AsksynkError.badRequest("Invalid ID");
+      throw new BadRequestException("Invalid ID");
     }
     return value;
   },
@@ -26,7 +29,7 @@ export const IsoDateWithOffsetParam = createParamDecorator(
     const request = ctx.switchToHttp().getRequest();
     const value = request.params[param];
     if (!isIsoDateWithOffset(value)) {
-      throw AsksynkError.badRequest(
+      throw new BadRequestException(
         "Invalid ISO 8601 date with offset (e.g. 2026-03-15T10:00:00+02:00)",
       );
     }
