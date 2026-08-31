@@ -1,7 +1,5 @@
 import { invalidValueError } from "src/kernel/errors/kernel.errors";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
-
 /**
  * Extracts wall-clock digits from an ISO 8601 string (ignores offset),
  * interprets them in the given IANA timezone, returns the true UTC instant.
@@ -152,7 +150,7 @@ export function validateAndNormalizeRrule(
   maxMonths = 12,
 ): string {
   if (/COUNT=/i.test(rrule)) {
-    throw AsksynkError.badRequest("rrule must use UNTIL, not COUNT");
+    throw invalidValueError("rrule must use UNTIL, not COUNT");
   }
 
   const untilMatch = rrule.match(/UNTIL=([^;]+)/i);
@@ -165,7 +163,9 @@ export function validateAndNormalizeRrule(
   } else {
     const parsed = parseRruleUntil(untilMatch[1]);
     if (!parsed) {
-      throw AsksynkError.badRequest("rrule UNTIL is not a valid date");
+      throw invalidValueError(
+        `rrule UNTIL is not a valid date: ${untilMatch[1]}`,
+      );
     }
     until = parsed;
   }
@@ -173,7 +173,7 @@ export function validateAndNormalizeRrule(
   const maxUntil = new Date(start);
   maxUntil.setUTCMonth(maxUntil.getUTCMonth() + maxMonths);
   if (until > maxUntil) {
-    throw AsksynkError.badRequest(
+    throw invalidValueError(
       `rrule UNTIL must be within ${maxMonths} months of start`,
     );
   }

@@ -2,7 +2,8 @@ import { Injectable } from "@nestjs/common";
 
 import { CalendarProvider } from "@/api/calendar-integrations/providers/calendar-provider";
 import { GoogleCalendarProvider } from "@/api/calendar-integrations/providers/google-calendar.provider";
-import { AsksynkError } from "@/api/common/errors/errors.model";
+
+import { calendarIntegrationError } from "../calendar-integration.errors";
 
 /**
  * Resolves a {@link CalendarProvider} by its `provider` discriminator. Adding a
@@ -19,9 +20,7 @@ export class CalendarProviderRegistry {
   get(provider: string): CalendarProvider {
     const found = this.byName.get(provider);
     if (!found) {
-      throw AsksynkError.badRequest(
-        `Unsupported calendar provider: ${provider}`,
-      );
+      throw calendarIntegrationError("unsupported_provider", { provider });
     }
     return found;
   }

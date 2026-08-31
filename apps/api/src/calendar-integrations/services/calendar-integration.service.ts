@@ -16,9 +16,9 @@ import {
   signOAuthState,
   verifyOAuthState,
 } from "@/api/calendar-integrations/utils/oauth-state.util";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { generateId } from "@/shared/id";
 
+import { calendarIntegrationError } from "../calendar-integration.errors";
 import { RefreshCredentialsResult } from "../models/refresh-credentials-result";
 
 @Injectable()
@@ -57,7 +57,7 @@ export class CalendarIntegrationService {
     );
 
     if (!parsed) {
-      throw AsksynkError.badRequest("Invalid OAuth state");
+      throw calendarIntegrationError("invalid_oauth_state");
     }
 
     const provider = this.registry.get(parsed.provider);
@@ -106,6 +106,7 @@ export class CalendarIntegrationService {
     const redirectUrl = new URL(
       this.config.getOrThrow<string>("CALENDAR_OAUTH_REDIRECT_URL"),
     );
+
     redirectUrl.searchParams.set("connected", parsed.provider);
     return redirectUrl.toString();
   }
@@ -160,8 +161,11 @@ export class CalendarIntegrationService {
       for (const selection of input.calendars) {
         const calendar = ownedById.get(selection.calendarId);
         if (!calendar) {
-          throw AsksynkError.badRequest(
-            "Calendar does not belong to this integration",
+          throw calendarIntegrationError(
+            "calendar_does_not_belong_to_this_integration",
+            {
+              calendarId: selection.calendarId,
+            },
           );
         }
         // disabling a previously-synced calendar: drop its imported events
@@ -213,7 +217,9 @@ export class CalendarIntegrationService {
       await this.integrationRepository.getByIdForUpdate(integrationId);
 
     if (!integration) {
-      throw AsksynkError.notFound("Calendar integration not found");
+      throw calendarIntegrationError("calendar_integration_not_found", {
+        integrationId,
+      });
     }
 
     if (!integration.accessTokenExpired(new Date())) {
@@ -259,7 +265,9 @@ export class CalendarIntegrationService {
       userId,
     );
     if (!integration) {
-      throw AsksynkError.notFound("Calendar integration not found");
+      throw calendarIntegrationError("calendar_integration_not_found", {
+        integrationId,
+      });
     }
     return integration;
   }

@@ -1,12 +1,13 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { MessageAttachmentRepository } from "@/api/messaging/attachments/message-attachment.repository";
 import { AttachmentAccessService } from "@/api/storage/attachment-access.service";
 import { AttachmentPermissionResolver } from "@/api/storage/attachment-permission-resolver";
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import { AttachmentActor } from "@/api/storage/attachments/models/attachment.model";
 import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
+
+import { messagingError } from "../messaging.errors";
 
 /**
  * The "message" placement micro-module: owns read-authz (thread participation) and the
@@ -56,7 +57,7 @@ export class MessageAttachmentResolver
         !attachment.isActive() ||
         attachment.placement !== "message"
       ) {
-        throw AsksynkError.badRequest("Invalid attachment");
+        throw messagingError("invalid_attachment", { attachmentId: id });
       }
     }
   }

@@ -3,7 +3,6 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { WsIdentity } from "src/websockets/services/ws-auth.service";
 
 import { AuthGuest } from "@/api/auth/auth.types";
-import { AsksynkError } from "@/api/common/errors/errors.model";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import {
   ManagedMessageStatus,
@@ -32,6 +31,8 @@ import {
 } from "@/shared/event-registry/events.registry";
 import { EventOf } from "@/shared/event-registry/events.types";
 import { generateId } from "@/shared/id";
+
+import { messagingError } from "../messaging.errors";
 
 const MAX_MESSAGE_LIMIT = 100;
 
@@ -86,7 +87,12 @@ export class MessagingService {
     options: { before?: Date; limit?: number },
   ): Promise<Message[]> {
     const threadId = await this.resolveGuestThreadId(guest.id);
-    if (!threadId) throw AsksynkError.notFound("Message not found");
+    if (!threadId) {
+      throw messagingError("message_not_found_for_thread", {
+        messageId,
+        threadId,
+      });
+    }
     await this.assertReplyParent(threadId, messageId);
     return this.messagingRepository.listReplies(messageId, this.paged(options));
   }
@@ -133,7 +139,9 @@ export class MessagingService {
       threadId,
       userId,
     );
-    if (!isParticipant) throw AsksynkError.notFound("Thread not found");
+    if (!isParticipant) {
+      throw messagingError("thread_not_found", { threadId });
+    }
   }
 
   private async resolveGuestThreadId(guestId: string): Promise<string | null> {
@@ -147,7 +155,9 @@ export class MessagingService {
   ): Promise<void> {
     const parent = await this.messagingRepository.getMessageById(messageId);
     if (!parent || parent.threadId !== threadId) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("message_not_found", {
+        messageId,
+      });
     }
   }
 
@@ -174,7 +184,9 @@ export class MessagingService {
     recipientUserId: string,
   ): Promise<Thread> {
     if (userId === recipientUserId) {
-      throw AsksynkError.badRequest("Cannot start a thread with yourself");
+      throw messagingError("cannot_start_thread", {
+        reason: "Cannot start a thread with yourself",
+      });
     }
     const connected = await this.networksService.isActiveConnection(
       userId,
@@ -182,7 +194,9 @@ export class MessagingService {
     );
 
     if (!connected) {
-      throw AsksynkError.forbidden("Recipient is not in your network");
+      throw messagingError("cannot_start_thread", {
+        reason: "Recipient is not in your network",
+      });
     }
 
     const existing = await this.messagingRepository.findUserPairThread(
@@ -218,7 +232,7 @@ export class MessagingService {
     const thread = await this.messagingRepository.getThread(threadId);
 
     if (!thread) {
-      throw AsksynkError.notFound("Thread not found");
+      throw messagingError("thread_not_found", { threadId });
     }
 
     const isParticipant = await this.messagingRepository.isUserParticipant(
@@ -226,7 +240,7 @@ export class MessagingService {
       senderUserId,
     );
     if (!isParticipant) {
-      throw AsksynkError.notFound("Thread not found");
+      throw messagingError("thread_not_found", { threadId });
     }
 
     await this.assertNotFrozen(thread, senderUserId);
@@ -238,7 +252,9 @@ export class MessagingService {
     if (tagIds.length > 0) {
       const recipientUserId = this.resolveRecipientUserId(sender, participants);
       if (!recipientUserId) {
-        throw AsksynkError.badRequest("Tagging not supported on this message");
+        throw messagingError("cannot_start_thread", {
+          reason: "Tagging not supported on this thread",
+        });
       }
       await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
     }
@@ -260,9 +276,9 @@ export class MessagingService {
     if (taskSuggestion) {
       const recipientUserId = this.resolveRecipientUserId(sender, participants);
       if (!recipientUserId) {
-        throw AsksynkError.badRequest(
-          "Task suggestions are not supported on this thread",
-        );
+        throw messagingError("cannot_start_thread", {
+          reason: "Task suggestions are not supported on this thread",
+        });
       }
       const suggestion = await this.taskSuggestionsService.suggest({
         suggesterUserId: senderUserId,
@@ -344,7 +360,9 @@ export class MessagingService {
   ): Promise<Message> {
     const message = await this.messagingRepository.getMessageById(messageId);
     if (!message) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("message_not_found", {
+        messageId,
+      });
     }
 
     const isParticipant = await this.messagingRepository.isUserParticipant(
@@ -353,7 +371,9 @@ export class MessagingService {
     );
 
     if (!isParticipant) {
-      throw AsksynkError.notFound("Thread not found");
+      throw messagingError("thread_not_found", {
+        threadId: message.threadId,
+      });
     }
 
     const participants = await this.messagingRepository.getParticipants(
@@ -366,7 +386,9 @@ export class MessagingService {
     );
 
     if (!recipientUserId) {
-      throw AsksynkError.badRequest("Tagging not supported on this message");
+      throw messagingError("cannot_start_thread", {
+        reason: "Tagging not supported on this message",
+      });
     }
 
     await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
@@ -375,7 +397,9 @@ export class MessagingService {
 
     const updated = await this.messagingRepository.getMessageById(messageId);
     if (!updated) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("message_not_found", {
+        messageId,
+      });
     }
 
     await this.notifyMessageUpdated(updated, participants);
@@ -391,12 +415,16 @@ export class MessagingService {
   ): Promise<Message> {
     const message = await this.messagingRepository.getMessageById(messageId);
     if (!message) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("message_not_found", {
+        messageId,
+      });
     }
 
     const thread = await this.messagingRepository.findGuestThread(guest.id);
     if (!thread || thread.id !== message.threadId) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("thread_not_found", {
+        threadId: message.threadId,
+      });
     }
 
     // Guests re-tag only their own messages; the owner's own messages have no
@@ -405,7 +433,9 @@ export class MessagingService {
       message.sender.kind !== "guest" ||
       message.sender.guestId !== guest.id
     ) {
-      throw AsksynkError.forbidden("Cannot tag this message");
+      throw messagingError("cannot_tag_message", {
+        reason: "Guests can only tag their own messages in a guest thread",
+      });
     }
 
     await this.tagsService.assertOwnedBy(guest.ownerUserId, tagIds);
@@ -414,7 +444,9 @@ export class MessagingService {
 
     const updated = await this.messagingRepository.getMessageById(messageId);
     if (!updated) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("message_not_found", {
+        messageId,
+      });
     }
 
     const participants = await this.messagingRepository.getParticipants(
@@ -440,10 +472,14 @@ export class MessagingService {
   ): Promise<Message> {
     const message = await this.messagingRepository.getMessageById(messageId);
     if (!message) {
-      throw AsksynkError.notFound("Message not found");
+      throw messagingError("message_not_found", {
+        messageId,
+      });
     }
     if (!message.managedStatus) {
-      throw AsksynkError.badRequest("Message is not manageable");
+      throw messagingError("cannot_update_message", {
+        reason: "Message is not manageable",
+      });
     }
 
     const isParticipant = await this.messagingRepository.isUserParticipant(
@@ -451,12 +487,14 @@ export class MessagingService {
       userId,
     );
     if (!isParticipant) {
-      throw AsksynkError.notFound("Thread not found");
+      throw messagingError("thread_not_found", {
+        threadId: message.threadId,
+      });
     }
     if (message.sender.kind === "user" && message.sender.userId === userId) {
-      throw AsksynkError.forbidden(
-        "Only the recipient can update this message's status",
-      );
+      throw messagingError("cannot_update_message", {
+        reason: "Only the recipient can update this message's status",
+      });
     }
 
     if (message.managedStatus.status === status) {
@@ -562,11 +600,17 @@ export class MessagingService {
   ): Promise<void> {
     const parent =
       await this.messagingRepository.getMessageById(parentMessageId);
+
     if (!parent || parent.threadId !== threadId) {
-      throw AsksynkError.notFound("Parent message not found");
+      throw messagingError("message_not_found_for_thread", {
+        messageId: parentMessageId,
+        threadId,
+      });
     }
     if (parent.isReply()) {
-      throw AsksynkError.badRequest("Cannot reply to a reply");
+      throw messagingError("cannot_reply_to_message", {
+        reason: "Cannot reply to a message that is already a reply",
+      });
     }
   }
 
@@ -655,7 +699,9 @@ export class MessagingService {
         thread.publicViewId!,
       );
       if (!view || !view.isLive()) {
-        throw AsksynkError.badRequest("Thread is frozen");
+        throw messagingError("thread_is_frozen", {
+          threadId: thread.id,
+        });
       }
       return;
     }
@@ -668,7 +714,9 @@ export class MessagingService {
     );
 
     if (!otherUser?.userId) {
-      throw AsksynkError.badRequest("Thread is frozen");
+      throw messagingError("thread_is_frozen", {
+        threadId: thread.id,
+      });
     }
 
     const connected = await this.networksService.isActiveConnection(
@@ -677,7 +725,9 @@ export class MessagingService {
     );
 
     if (!connected) {
-      throw AsksynkError.badRequest("Thread is frozen");
+      throw messagingError("thread_is_frozen", {
+        threadId: thread.id,
+      });
     }
   }
 }
