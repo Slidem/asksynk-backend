@@ -1,5 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { generateId } from "src/kernel/id";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
+import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
+import {
+  TaskBatchUpserted,
+  TaskSuggested,
+  TaskSuggestionBroadcast,
+  TaskSuggestionResolved,
+  TaskSuggestionUpdated,
+  TaskUpserted,
+} from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
 
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { TagsService } from "@/api/tags/services/tags.service";
@@ -18,18 +30,6 @@ import { MaterializedTask } from "@/api/tasks/rest/responses/task-suggestion.res
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { TasksService } from "@/api/tasks/services/tasks.service";
 import { tasksError } from "@/api/tasks/tasks.errors";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
-import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
-import {
-  TaskBatchUpserted,
-  TaskSuggested,
-  TaskSuggestionBroadcast,
-  TaskSuggestionResolved,
-  TaskSuggestionUpdated,
-  TaskUpserted,
-} from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
-import { generateId } from "@/shared/id";
 
 @Injectable()
 export class TaskSuggestionsService {

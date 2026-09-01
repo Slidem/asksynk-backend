@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
-
-import { CalendarOutboundSyncService } from "@/api/calendar-integrations/services/calendar-outbound-sync.service";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
 import {
   CalendarEventCreated,
   CalendarEventDeleted,
   CalendarEventUpdated,
-} from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
+} from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
+
+import { CalendarOutboundSyncService } from "@/api/calendar-integrations/services/calendar-outbound-sync.service";
 
 /**
  * Durable consumer (group `calendar-sync`) that mirrors native asksynk events to

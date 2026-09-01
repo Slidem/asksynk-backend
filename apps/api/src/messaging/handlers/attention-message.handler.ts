@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
+import { AttentionMessageStatusChanged } from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
 
 import { MessagingService } from "@/api/messaging/services/messaging.service";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
-import { AttentionMessageStatusChanged } from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
 
 // Reverse sync: a tagged_message attention item resolved from the inbox →
 // reflect its status back onto the linked message.

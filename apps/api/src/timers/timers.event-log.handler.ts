@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
+import { TimerLifecycle } from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
 
 import { TimersRepository } from "@/api/timers/timers.repository";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
-import { TimerLifecycle } from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
 
 /** Persists timer lifecycle events to the append-only event log, asynchronously. */
 @Injectable()

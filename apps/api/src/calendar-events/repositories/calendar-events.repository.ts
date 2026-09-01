@@ -2,10 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq, sql } from "drizzle-orm";
 import { ContextLogger } from "nestjs-context-logger";
+import { TxAdapter } from "src/platform/db/tx.module";
 
 import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
 import { CalendarEventInstance } from "@/api/calendar-events/models/calendar-event-instance.model";
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";

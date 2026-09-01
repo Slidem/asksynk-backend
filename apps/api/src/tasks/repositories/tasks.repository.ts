@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
+import { TxAdapter } from "src/platform/db/tx.module";
 import { Task } from "@/api/tasks/entities/task.entity";
 import {
   CreateTaskInput,

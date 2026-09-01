@@ -7,7 +7,7 @@ import { Client } from "pg";
 
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
-import type { EventDef } from "../event-registry/events.types";
+import { EventDef } from "../registry/events.types";
 import { EventHandlerContext, EventHandlerFn } from "./event-consumer.types";
 
 const RECONNECT_BASE_DELAY_MS = 500;

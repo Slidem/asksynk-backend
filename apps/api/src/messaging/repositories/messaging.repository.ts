@@ -1,9 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  sql,
+} from "drizzle-orm";
 import _ from "lodash";
+import { TxAdapter } from "src/platform/db/tx.module";
 
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import {
   ManagedStatus,
   Message,
@@ -298,9 +307,7 @@ export class MessagingRepository {
     }));
   }
 
-  async listTaggedMessages(
-    threadId: string,
-  ): Promise<ThreadMessageListItem[]> {
+  async listTaggedMessages(threadId: string): Promise<ThreadMessageListItem[]> {
     const rows = await this.txHost.tx
       .select({
         id: messages.id,
@@ -319,10 +326,7 @@ export class MessagingRepository {
       })
       .from(messages)
       .where(
-        and(
-          eq(messages.threadId, threadId),
-          isNotNull(messages.managedStatus),
-        ),
+        and(eq(messages.threadId, threadId), isNotNull(messages.managedStatus)),
       )
       .orderBy(desc(messages.createdAt));
 

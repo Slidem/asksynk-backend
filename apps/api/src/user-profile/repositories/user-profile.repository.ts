@@ -3,7 +3,7 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq } from "drizzle-orm";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
+import { TxAdapter } from "src/platform/db/tx.module";
 import { UserProfile } from "@/api/user-profile/entities/user-profile.entity";
 import { users } from "@/migrations/schema/users";
 

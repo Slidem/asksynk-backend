@@ -12,8 +12,8 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
-import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
+import { toNonNegativeNumberOptional } from "src/platform/mappers/string.utils";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { CreateTaskRequestDto } from "@/api/tasks/rest/dto/create-task.dto";
 import { ListTasksQueryDto } from "@/api/tasks/rest/dto/list-tasks-query.dto";

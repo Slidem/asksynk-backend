@@ -23,7 +23,6 @@ export default [
         project: [
           "./apps/api/tsconfig.json",
           "./apps/migrations/tsconfig.json",
-          "./packages/shared/tsconfig.json",
           "./scripts/tsconfig.json",
         ],
         // eslint-disable-next-line no-undef

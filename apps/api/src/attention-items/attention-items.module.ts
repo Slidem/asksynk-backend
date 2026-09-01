@@ -8,7 +8,7 @@ import { TagCalendarAttentionHandler } from "@/api/attention-items/handlers/tag-
 import { TaskAttentionHandler } from "@/api/attention-items/handlers/task-attention.handler";
 import { AttentionItemsController } from "@/api/attention-items/rest/attention-items.controller";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
-import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher.module";
+import { EventsPublisherModule } from "src/platform/events/publisher/events-publisher.module";
 
 @Module({
   imports: [EventsPublisherModule],

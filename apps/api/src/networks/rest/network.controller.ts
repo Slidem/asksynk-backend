@@ -1,9 +1,9 @@
 import { Controller, Delete, Get, HttpCode, Param } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { toNetworkConnectionResponseDto } from "@/api/networks/rest/networks.mapper";
 import { NetworkConnectionResponseDto } from "@/api/networks/rest/responses/network-connection.response";
 import { NetworksService } from "@/api/networks/services/networks.service";

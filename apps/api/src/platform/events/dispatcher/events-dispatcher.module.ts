@@ -5,8 +5,8 @@ import {
   ModuleMetadata,
 } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { MessageBusModule } from "src/platform/jobs/message-bus/message-bus.module";
 
-import { MessageBusModule } from "../message-bus/message-bus.module";
 import {
   EVENTS_DISPATCHER_DB,
   EventsDispatcherDb,

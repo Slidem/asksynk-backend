@@ -10,6 +10,17 @@ import {
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
+import {
+  AttentionItemRemoved,
+  AttentionItemUpserted,
+  MessageCreated,
+  MessageManagedStatusChanged,
+  MessageUpdated,
+  TaskSuggestionBroadcast,
+  TimerLifecycle,
+} from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
 
 import { resolveDomainError } from "@/api/errors/resolve-domain-error";
 import { DomainError } from "@/api/kernel/errors/domain-errors";
@@ -29,17 +40,6 @@ import {
 } from "@/api/websockets/services/ws-auth.service";
 import { guestRoom, threadRoom, userRoom } from "@/api/websockets/ws.rooms";
 import { Ack, SendAck } from "@/api/websockets/ws.types";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
-import {
-  AttentionItemRemoved,
-  AttentionItemUpserted,
-  MessageCreated,
-  MessageManagedStatusChanged,
-  MessageUpdated,
-  TaskSuggestionBroadcast,
-  TimerLifecycle,
-} from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
 
 @WebSocketGateway({ cors: true })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {

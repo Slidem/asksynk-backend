@@ -5,7 +5,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
-import { EventDef, EventOf } from "../event-registry/events.types";
+import { EventDef, EventOf } from "../registry/events.types";
 
 type OutboxSchema = { eventsOutbox: typeof eventsOutbox };
 

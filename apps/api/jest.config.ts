@@ -3,7 +3,6 @@ import type { Config } from "jest";
 const moduleNameMapper = {
   "^@/api/(.*)$": "<rootDir>/src/$1",
   "^@/migrations/(.*)$": "<rootDir>/../migrations/src/$1",
-  "^@/shared/(.*)$": "<rootDir>/../../packages/shared/src/$1",
   "^@/test/(.*)$": "<rootDir>/test/$1",
 };
 

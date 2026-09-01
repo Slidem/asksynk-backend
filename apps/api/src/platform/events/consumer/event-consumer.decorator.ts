@@ -1,7 +1,6 @@
 import "reflect-metadata";
 
-import type { EventDef } from "../event-registry/events.types";
-import { DeliveryMode } from "../event-registry/events.types";
+import { DeliveryMode, EventDef } from "../registry/events.types";
 import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
 import {
   EventHandlerFn,

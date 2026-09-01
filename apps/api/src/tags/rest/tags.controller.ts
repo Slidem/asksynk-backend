@@ -10,6 +10,8 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { pick } from "lodash";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
+import { toNonNegativeNumberOptional } from "src/platform/mappers/string.utils";
 
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import {
@@ -18,8 +20,6 @@ import {
 } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { RequestActor } from "@/api/auth/requestActor.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
-import { toNonNegativeNumberOptional } from "@/api/common/utils/inputs";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { CreateTagRequestDto } from "@/api/tags/rest/dto/create-tag.dto";

@@ -1,8 +1,8 @@
 import { DynamicModule, Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import { EmailModule } from "@/shared/email/email.module";
-import { EmailService } from "@/shared/email/email.service";
+import { EmailModule } from "src/platform/email/email.module";
+import { EmailService } from "src/platform/email/email.service";
 
 import { Auth, createAuth } from "./betterAuth";
 

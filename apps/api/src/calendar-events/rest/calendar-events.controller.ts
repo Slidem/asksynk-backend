@@ -28,7 +28,7 @@ import { CalendarResponseDto } from "@/api/calendar-events/rest/responses/calend
 import { CalendarEventInstanceResponse } from "@/api/calendar-events/rest/responses/calendar-event-instance.response";
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
 import { parseIsoWallClockInTimezone } from "@/api/calendar-events/utils/recurrence.utils";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import {
   IsoDateWithOffsetParam,

@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Patch, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
 import { Clock } from "@/api/platform/clock/clock";
 import { PatchTimerDto } from "@/api/timers/rest/dto/patch-timer.dto";
 import { UpdateTimerSettingsDto } from "@/api/timers/rest/dto/update-timer-settings.dto";

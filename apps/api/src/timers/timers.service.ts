@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
+import { TimerLifecycle } from "src/platform/events/registry/events.registry";
+import { ScheduledJobService } from "src/platform/jobs/scheduled-job/scheduled-job.service";
 
 import { Clock } from "@/api/platform/clock/clock";
 import { UserTimer } from "@/api/timers/entities/user-timer.entity";
@@ -16,9 +19,6 @@ import { TIMER_COMPLETION_QUEUE } from "@/api/timers/scheduling/timer-jobs.const
 import { TimerSettingsRepository } from "@/api/timers/timer-settings.repository";
 import { timersError } from "@/api/timers/timers.errors";
 import { TimersRepository } from "@/api/timers/timers.repository";
-import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
-import { TimerLifecycle } from "@/shared/event-registry/events.registry";
-import { ScheduledJobService } from "@/shared/scheduled-job/scheduled-job.service";
 
 interface PersistResult {
   entity: UserTimer;

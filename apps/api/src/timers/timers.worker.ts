@@ -1,9 +1,9 @@
 import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
+import { ScheduledJobService } from "src/platform/jobs/scheduled-job/scheduled-job.service";
 
 import { TimerCompletionJob } from "@/api/timers/models/timer.model";
 import { TIMER_COMPLETION_QUEUE } from "@/api/timers/scheduling/timer-jobs.constants";
 import { TimersService } from "@/api/timers/timers.service";
-import { ScheduledJobService } from "@/shared/scheduled-job/scheduled-job.service";
 
 /** Subscribes the scheduled completion queue to the timers service at bootstrap. */
 @Injectable()

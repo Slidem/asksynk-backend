@@ -6,7 +6,7 @@ import { CalendarEventsController } from "@/api/calendar-events/rest/calendar-ev
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
-import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher.module";
+import { EventsPublisherModule } from "src/platform/events/publisher/events-publisher.module";
 
 @Module({
   imports: [EventsPublisherModule, NetworksModule],
@@ -17,6 +17,10 @@ import { EventsPublisherModule } from "@/shared/event-publisher/events-publisher
     TagRepository,
   ],
   controllers: [CalendarEventsController],
-  exports: [CalendarEventsService, CalendarRepository, CalendarEventsRepository],
+  exports: [
+    CalendarEventsService,
+    CalendarRepository,
+    CalendarEventsRepository,
+  ],
 })
 export class CalendarEventsModule {}

@@ -11,7 +11,7 @@ import { CalendarOutboundSyncService } from "@/api/calendar-integrations/service
 import { CalendarSyncService } from "@/api/calendar-integrations/services/calendar-sync.service";
 import { CalendarSyncEventHandler } from "@/api/calendar-integrations/sync/calendar-sync.event-handler";
 import { CalendarSyncScheduler } from "@/api/calendar-integrations/sync/calendar-sync.scheduler";
-import { MessageBusModule } from "@/shared/message-bus/message-bus.module";
+import { MessageBusModule } from "src/platform/jobs/message-bus/message-bus.module";
 
 @Module({
   imports: [CalendarEventsModule, MessageBusModule],

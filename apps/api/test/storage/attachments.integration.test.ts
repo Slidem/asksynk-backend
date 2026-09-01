@@ -7,15 +7,12 @@ import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { inArray } from "drizzle-orm";
 import * as path from "path";
+import { DB_CLIENT_PROVIDER, DbModule } from "src/platform/db/db.module";
+import { TxModule } from "src/platform/db/tx.module";
 import request from "supertest";
 import { uuidv7 } from "uuidv7";
 
 import { AuthUser } from "@/api/auth/auth.types";
-import {
-  DB_CLIENT_PROVIDER,
-  DbModule,
-} from "@/api/infrastructure/db/db.module";
-import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { MessageAttachmentRepository } from "@/api/messaging/attachments/message-attachment.repository";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import { MessagingRepository } from "@/api/messaging/repositories/messaging.repository";

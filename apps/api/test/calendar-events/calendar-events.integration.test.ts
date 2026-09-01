@@ -7,19 +7,16 @@ import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { eq } from "drizzle-orm";
 import * as path from "path";
+import { generateId } from "src/kernel/id";
+import { DB_CLIENT_PROVIDER, DbModule } from "src/platform/db/db.module";
+import { TxModule } from "src/platform/db/tx.module";
 import request from "supertest";
 
 import { AuthUser } from "@/api/auth/auth.types";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
-import {
-  DB_CLIENT_PROVIDER,
-  DbModule,
-} from "@/api/infrastructure/db/db.module";
-import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { users } from "@/migrations/schema/users";
-import { generateId } from "@/shared/id";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
 import {
   makeTestUser,

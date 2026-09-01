@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 import { UpdateUserSettingsDto } from "@/api/user-settings/rest/dto/update-user-settings.dto";
 import { UserSettingsResponse } from "@/api/user-settings/rest/responses/user-settings.response";
 import { toUserSettingsResponse } from "@/api/user-settings/rest/user-settings.mapper";

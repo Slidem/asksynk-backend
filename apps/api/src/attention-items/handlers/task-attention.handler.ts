@@ -1,10 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-
-import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
-import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
+import { generateId } from "src/kernel/id";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
 import {
   TaskBatchDeleted,
   TaskBatchUpserted,
@@ -13,9 +10,12 @@ import {
   TaskSuggestionResolved,
   TaskSuggestionUpdated,
   TaskUpserted,
-} from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
-import { generateId } from "@/shared/id";
+} from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
+
+import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
+import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 
 // Mirrors task / batch / suggestion domain events into attention items. Tasks and
 // batches both produce a single "task" item (one per assignee); suggestions an
@@ -31,7 +31,8 @@ export class TaskAttentionHandler {
   @Transactional()
   @EventHandler(TaskUpserted, { group: "attention-items" })
   async onTaskUpserted(payload: EventOf<typeof TaskUpserted>): Promise<void> {
-    const { dueDate, sourceCalendarEventId } = await this.deriveDueDate(payload);
+    const { dueDate, sourceCalendarEventId } =
+      await this.deriveDueDate(payload);
     await this.attentionItemsService.upsertFromSource({
       source: { taskId: payload.taskId },
       userId: payload.assigneeUserId,
@@ -55,7 +56,8 @@ export class TaskAttentionHandler {
   async onTaskBatchUpserted(
     payload: EventOf<typeof TaskBatchUpserted>,
   ): Promise<void> {
-    const { dueDate, sourceCalendarEventId } = await this.deriveDueDate(payload);
+    const { dueDate, sourceCalendarEventId } =
+      await this.deriveDueDate(payload);
     await this.attentionItemsService.upsertFromSource({
       source: { taskBatchId: payload.taskBatchId },
       userId: payload.assigneeUserId,

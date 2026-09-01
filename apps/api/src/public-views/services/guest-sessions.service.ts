@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { generateId } from "src/kernel/id";
 
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { PublicViewGuest } from "@/api/public-views/entities/public-view-guest.entity";
@@ -11,7 +12,6 @@ import {
   PublicViewsRepository,
 } from "@/api/public-views/repositories/public-views.repository";
 import { generateGuestToken } from "@/api/public-views/utils/slug.util";
-import { generateId } from "@/shared/id";
 
 @Injectable()
 export class GuestSessionsService {

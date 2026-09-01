@@ -5,10 +5,10 @@ import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { IoAdapter } from "@nestjs/platform-socket.io";
+import { getCorsOptions } from "src/platform/config/cors.config";
+import { setupSwagger } from "src/platform/config/swagger.config";
 
 import { AppModule } from "@/api/app.module";
-import { getCorsOptions } from "@/api/common/config/cors.config";
-import { setupSwagger } from "@/api/common/config/swagger.config";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

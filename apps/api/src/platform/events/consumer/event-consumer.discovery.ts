@@ -2,8 +2,7 @@ import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
 import { DiscoveryService, MetadataScanner } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
 
-import type { EventDef } from "../event-registry/events.types";
-import { DeliveryMode } from "../event-registry/events.types";
+import { DeliveryMode, EventDef } from "../registry/events.types";
 import { DurableConsumerRuntime } from "./durable-consumer-runtime.service";
 import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
 import { EventHandlerFn, EventHandlerMeta } from "./event-consumer.types";

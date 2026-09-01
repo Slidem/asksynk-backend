@@ -6,17 +6,15 @@ import { APP_GUARD } from "@nestjs/core";
 import { Test, TestingModule } from "@nestjs/testing";
 import { and, eq, inArray, or, SQL, sql } from "drizzle-orm";
 import * as path from "path";
+import { generateId } from "src/kernel/id";
+import { DB_CLIENT_PROVIDER, DbModule } from "src/platform/db/db.module";
+import { TxModule } from "src/platform/db/tx.module";
 import request from "supertest";
 
 import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
 import { AuthUser } from "@/api/auth/auth.types";
 import { EventsModule } from "@/api/events/events.module";
-import {
-  DB_CLIENT_PROVIDER,
-  DbModule,
-} from "@/api/infrastructure/db/db.module";
-import { TxModule } from "@/api/infrastructure/db/tx.module";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { TagsModule } from "@/api/tags/tags.module";
@@ -32,7 +30,6 @@ import { tasks } from "@/migrations/schema/tasks";
 import { taskSuggestions } from "@/migrations/schema/taskSuggestions";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
-import { generateId } from "@/shared/id";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
 import { pollUntil } from "@/test/helpers/pollUntil";
 import {

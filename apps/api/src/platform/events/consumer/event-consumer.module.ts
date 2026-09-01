@@ -6,8 +6,8 @@ import {
 } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { DiscoveryModule } from "@nestjs/core";
+import { MessageBusModule } from "src/platform/jobs/message-bus/message-bus.module";
 
-import { MessageBusModule } from "../message-bus/message-bus.module";
 import { DurableConsumerRuntime } from "./durable-consumer-runtime.service";
 import { EventConsumerDiscovery } from "./event-consumer.discovery";
 import {

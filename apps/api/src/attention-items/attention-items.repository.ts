@@ -11,7 +11,7 @@ import {
   CreateAttentionItemInput,
   ListAttentionItemsInput,
 } from "@/api/attention-items/models/attention-item.model";
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
+import { TxAdapter } from "src/platform/db/tx.module";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
 import { tags } from "@/migrations/schema/tags";

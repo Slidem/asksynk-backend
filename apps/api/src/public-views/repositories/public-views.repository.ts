@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, desc, eq, sql } from "drizzle-orm";
 
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
+import { TxAdapter } from "src/platform/db/tx.module";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { users } from "@/migrations/schema/users";
@@ -68,7 +68,9 @@ export class PublicViewsRepository {
       .leftJoin(users, eq(users.id, publicViews.ownerUserId))
       .where(eq(publicViews.slug, slug))
       .limit(1);
-    return row ? { view: this.map(row.view), ownerImage: row.ownerImage } : null;
+    return row
+      ? { view: this.map(row.view), ownerImage: row.ownerImage }
+      : null;
   }
 
   async listForOwnerWithStats(

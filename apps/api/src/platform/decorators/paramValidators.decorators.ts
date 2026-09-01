@@ -3,9 +3,9 @@ import {
   createParamDecorator,
   ExecutionContext,
 } from "@nestjs/common";
+import { isValidId } from "src/kernel/id";
 
 import { isIsoDateWithOffset } from "@/api/kernel/time/iso";
-import { isValidId } from "@/shared/id";
 
 /**
  * Param decorator to validate that a string is a valid UUIDv7.

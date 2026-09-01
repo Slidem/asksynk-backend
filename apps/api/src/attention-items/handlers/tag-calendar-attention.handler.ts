@@ -2,21 +2,21 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
-
-import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
-import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
-import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
-import { TagRepository } from "@/api/tags/repositories/tags.repository";
-import { EventHandler } from "@/shared/event-consumer/event-consumer.decorator";
+import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
 import {
   CalendarEventCreated,
   CalendarEventDeleted,
   CalendarEventUpdated,
   TagDeleted,
   TagUpdated,
-} from "@/shared/event-registry/events.registry";
-import { EventOf } from "@/shared/event-registry/events.types";
+} from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
+
+import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
+import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
+import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
+import { TagRepository } from "@/api/tags/repositories/tags.repository";
 
 // Cross-cutting: tag and calendar changes recompute due dates for ANY affected
 // attention item regardless of source type, and clean up items orphaned by a

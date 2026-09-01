@@ -6,7 +6,7 @@ import { UsersLookupRepository } from "@/api/networks/repositories/users-lookup.
 import { InvitesController } from "@/api/networks/rest/invites.controller";
 import { NetworkController } from "@/api/networks/rest/network.controller";
 import { NetworksService } from "@/api/networks/services/networks.service";
-import { EmailModule } from "@/shared/email/email.module";
+import { EmailModule } from "src/platform/email/email.module";
 
 @Module({
   imports: [EmailModule],

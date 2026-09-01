@@ -10,11 +10,11 @@ import { ListTagsInput } from "@/api/tags/models/list-tags.model";
 import { UpdateTagInput } from "@/api/tags/models/update-tag.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { tagsError } from "@/api/tags/tags.errors";
-import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
+import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
 import {
   TagDeleted,
   TagUpdated,
-} from "@/shared/event-registry/events.registry";
+} from "src/platform/events/registry/events.registry";
 
 @Injectable()
 export class TagsService {

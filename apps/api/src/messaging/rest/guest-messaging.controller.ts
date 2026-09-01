@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import { AuthGuest as AuthGuestType } from "@/api/auth/auth.types";
 import { AuthGuest } from "@/api/auth/authGuest.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import { resolveAttachmentsByMessage } from "@/api/messaging/rest/message-attachments.helper";
 import {

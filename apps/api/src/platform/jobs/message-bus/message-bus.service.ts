@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
 import { JobInsert, PgBoss } from "pg-boss";
 
-import { PgError, PgErrorCode } from "../pg-error-codes";
+import { PgError, PgErrorCode } from "../../db/pg-error-codes";
 import {
   CancelOptions,
   MessageHandler,

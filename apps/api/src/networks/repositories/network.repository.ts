@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
+import { TxAdapter } from "src/platform/db/tx.module";
 
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
@@ -57,9 +57,7 @@ export class NetworkRepository {
       })
       .from(userNetwork)
       .innerJoin(users, eq(userNetwork.connectionId, users.id))
-      .where(
-        and(eq(userNetwork.userId, userId), isNull(userNetwork.removedAt)),
-      )
+      .where(and(eq(userNetwork.userId, userId), isNull(userNetwork.removedAt)))
       .orderBy(asc(userNetwork.createdAt));
 
     return rows.map((r) =>
@@ -76,10 +74,7 @@ export class NetworkRepository {
     );
   }
 
-  async isActiveConnection(
-    userIdA: string,
-    userIdB: string,
-  ): Promise<boolean> {
+  async isActiveConnection(userIdA: string, userIdB: string): Promise<boolean> {
     const rows = await this.txHost.tx
       .select({ userId: userNetwork.userId })
       .from(userNetwork)

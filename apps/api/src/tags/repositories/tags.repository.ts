@@ -4,7 +4,7 @@ import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { ContextLogger } from "nestjs-context-logger";
 import { UUID } from "uuidv7";
 
-import { TxAdapter } from "@/api/infrastructure/db/tx.module";
+import { TxAdapter } from "src/platform/db/tx.module";
 import { Tag } from "@/api/tags/entities/tag.entity";
 import { AnswerModeType } from "@/api/tags/models/tag.model";
 import { tags } from "@/migrations/schema/tags";

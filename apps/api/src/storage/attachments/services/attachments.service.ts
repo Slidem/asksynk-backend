@@ -20,7 +20,7 @@ import {
 } from "@/api/storage/attachments/models/attachment.model";
 import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
 import { ObjectStorage, UploadGrant } from "@/api/storage/object-storage";
-import { generateId } from "@/shared/id";
+import { generateId } from "src/kernel/id";
 
 export interface CreateAttachmentInput {
   placement: AttachmentPlacement;

@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "@/api/common/errors/api-error-responses.decorator";
+import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 import { CreateThreadRequestDto } from "@/api/messaging/rest/dto/create-thread.dto";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import { resolveAttachmentsByMessage } from "@/api/messaging/rest/message-attachments.helper";

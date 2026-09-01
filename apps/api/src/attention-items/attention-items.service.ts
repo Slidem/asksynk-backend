@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { generateId } from "src/kernel/id";
 
 import { attentionItemError } from "@/api/attention-items/attention-items.errors";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
@@ -15,13 +16,12 @@ import {
   UpsertAttentionFromSourceInput,
 } from "@/api/attention-items/models/attention-item.model";
 import { toAttentionItemResponse } from "@/api/attention-items/rest/attention-item.mapper";
-import { EventsPublisher } from "@/shared/event-publisher/events-publisher";
+import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
 import {
   AttentionItemRemoved,
   AttentionItemUpserted,
   AttentionMessageStatusChanged,
-} from "@/shared/event-registry/events.registry";
-import { generateId } from "@/shared/id";
+} from "src/platform/events/registry/events.registry";
 
 @Injectable()
 export class AttentionItemsService {

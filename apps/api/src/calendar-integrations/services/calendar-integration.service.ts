@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
+import { generateId } from "src/kernel/id";
 
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
 import { CalendarRepository } from "@/api/calendar-events/repositories/calendar.repository";
@@ -18,7 +19,6 @@ import {
   signOAuthState,
   verifyOAuthState,
 } from "@/api/calendar-integrations/utils/oauth-state.util";
-import { generateId } from "@/shared/id";
 
 @Injectable()
 export class CalendarIntegrationService {

@@ -1,10 +1,10 @@
 import { registerDecorator, ValidationOptions } from "class-validator";
+import { isValidId } from "src/kernel/id";
 
 import {
   isIsoDateWithOffset,
   isValidIanaTimezone,
 } from "@/api/kernel/time/iso";
-import { isValidId } from "@/shared/id";
 
 /**
  * Class validator decorator to validate that a string is a valid UUIDv7.

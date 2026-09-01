@@ -2,6 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
+import { generateId } from "src/kernel/id";
+import { PgError, PgErrorCode } from "src/platform/db/pg-error-codes";
 
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import {
@@ -20,8 +22,6 @@ import {
   PublicViewWithStats,
 } from "@/api/public-views/repositories/public-views.repository";
 import { generateSlug } from "@/api/public-views/utils/slug.util";
-import { generateId } from "@/shared/id";
-import { PgError, PgErrorCode } from "@/shared/pg-error-codes";
 
 @Injectable()
 export class PublicViewsService {
