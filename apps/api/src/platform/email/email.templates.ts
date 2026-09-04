@@ -1,8 +1,8 @@
-import { EmailTemplate, RenderedEmail } from "./email.types";
-import { wrapHtml } from "./templates/layout";
-import { magicLinkTemplate } from "./templates/magic-link.template";
-import { networkInviteTemplate } from "./templates/network-invite.template";
-import { verifyEmailTemplate } from "./templates/verify-email.template";
+import { EmailTemplate, RenderedEmail } from "@/api/platform/email/email.types";
+import { wrapHtml } from "@/api/platform/email/templates/layout";
+import { magicLinkTemplate } from "@/api/platform/email/templates/magic-link.template";
+import { networkInviteTemplate } from "@/api/platform/email/templates/network-invite.template";
+import { verifyEmailTemplate } from "@/api/platform/email/templates/verify-email.template";
 
 export function renderTemplate(
   template: EmailTemplate,

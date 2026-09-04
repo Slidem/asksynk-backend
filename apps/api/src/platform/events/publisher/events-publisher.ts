@@ -3,9 +3,8 @@ import { Transactional, TransactionHost } from "@nestjs-cls/transactional";
 import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapter-drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
+import { EventDef, EventOf } from "@/api/platform/events/registry/events.types";
 import { eventsOutbox } from "@/migrations/schema/outbox";
-
-import { EventDef, EventOf } from "../registry/events.types";
 
 type OutboxSchema = { eventsOutbox: typeof eventsOutbox };
 

@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
-import { TimerLifecycle } from "src/platform/events/registry/events.registry";
-import { ScheduledJobService } from "src/platform/jobs/scheduled-job/scheduled-job.service";
 
 import { Clock } from "@/api/platform/clock/clock";
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import { TimerLifecycle } from "@/api/platform/events/registry/events.registry";
+import { ScheduledJobService } from "@/api/platform/jobs/scheduled-job/scheduled-job.service";
 import { UserTimer } from "@/api/timers/entities/user-timer.entity";
 import { UserTimerSettings } from "@/api/timers/entities/user-timer-settings.entity";
 import {

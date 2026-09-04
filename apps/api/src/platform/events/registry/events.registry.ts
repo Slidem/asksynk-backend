@@ -1,7 +1,7 @@
 import z from "zod";
 
-import { defineEvent } from "./events.registration";
-import { DeliveryMode } from "./events.types";
+import { defineEvent } from "@/api/platform/events/registry/events.registration";
+import { DeliveryMode } from "@/api/platform/events/registry/events.types";
 
 // A managed message's status mirrors the attention-item status 1:1.
 const managedStatusEnum = z.enum(["created", "in_progress", "resolved"]);

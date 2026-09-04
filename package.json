@@ -21,11 +21,13 @@
     "test:integration": "pnpm --filter @asksynk/api test:integration",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint --fix",
     "format": "prettier -w .",
     "format:check": "prettier --check .",
     "test": "pnpm -r test",
     "secret:better-auth": "pnpm --filter @asksynk/scripts generate-secret",
-    "prepare-storage": "pnpm --filter @asksynk/scripts prepare-storage"
+    "prepare-storage": "pnpm --filter @asksynk/scripts prepare-storage",
+    "fix-imports": "pnpm --filter @asksynk/scripts fix-imports --"
   },
   "devDependencies": {
     "@eslint/js": "^9.7.0",

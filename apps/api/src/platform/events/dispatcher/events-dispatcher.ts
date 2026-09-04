@@ -9,9 +9,9 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 import { Client } from "pg";
-import { MessageBusService } from "src/platform/jobs/message-bus/message-bus.service";
-import { QueuedJobInsert } from "src/platform/jobs/message-bus/message-bus.types";
 
+import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
+import { QueuedJobInsert } from "@/api/platform/jobs/message-bus/message-bus.types";
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
 export const EVENTS_DISPATCHER_DB = "EVENTS_DISPATCHER_DB";

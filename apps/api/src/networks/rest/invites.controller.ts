@@ -1,6 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
@@ -9,6 +8,7 @@ import { toInviteResponseDto } from "@/api/networks/rest/networks.mapper";
 import { InviteResponseDto } from "@/api/networks/rest/responses/invite.response";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
 
 @ApiTags("Invites")
 @ApiBearerAuth("bearer")

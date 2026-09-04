@@ -7,8 +7,6 @@ import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { inArray } from "drizzle-orm";
 import * as path from "path";
-import { DB_CLIENT_PROVIDER, DbModule } from "src/platform/db/db.module";
-import { TxModule } from "src/platform/db/tx.module";
 import request from "supertest";
 import { uuidv7 } from "uuidv7";
 
@@ -17,6 +15,8 @@ import { MessageAttachmentRepository } from "@/api/messaging/attachments/message
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import { MessagingRepository } from "@/api/messaging/repositories/messaging.repository";
 import { ClockModule } from "@/api/platform/clock/clock.module";
+import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
+import { TxModule } from "@/api/platform/db/tx.module";
 import { StorageModule } from "@/api/storage/storage.module";
 import {
   messageAttachments,

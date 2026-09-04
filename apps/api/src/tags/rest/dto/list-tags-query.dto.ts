@@ -7,10 +7,7 @@ import {
   TagOrderBy,
   TagOrderDirection,
 } from "@/api/tags/models/list-tags.model";
-import {
-  ANSWER_MODE_TYPES,
-  AnswerModeType,
-} from "@/api/tags/models/tag.model";
+import { ANSWER_MODE_TYPES, AnswerModeType } from "@/api/tags/models/tag.model";
 
 export class ListTagsQueryDto {
   @ApiPropertyOptional({

@@ -2,11 +2,17 @@ import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
 import { DiscoveryService, MetadataScanner } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { DeliveryMode, EventDef } from "../registry/events.types";
-import { DurableConsumerRuntime } from "./durable-consumer-runtime.service";
-import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
-import { EventHandlerFn, EventHandlerMeta } from "./event-consumer.types";
-import { RealtimeListenerService } from "./realtime-listener.service";
+import { DurableConsumerRuntime } from "@/api/platform/events/consumer/durable-consumer-runtime.service";
+import { EVENT_HANDLERS_METADATA } from "@/api/platform/events/consumer/event-consumer.constants";
+import {
+  EventHandlerFn,
+  EventHandlerMeta,
+} from "@/api/platform/events/consumer/event-consumer.types";
+import { RealtimeListenerService } from "@/api/platform/events/consumer/realtime-listener.service";
+import {
+  DeliveryMode,
+  EventDef,
+} from "@/api/platform/events/registry/events.types";
 
 interface DiscoveredHandler {
   className: string;

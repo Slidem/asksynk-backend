@@ -4,7 +4,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
-import { TxAdapter } from "src/platform/db/tx.module";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { calendarIntegrations } from "@/migrations/schema/calendarIntegrations";
 import { calendars } from "@/migrations/schema/calendars";
 

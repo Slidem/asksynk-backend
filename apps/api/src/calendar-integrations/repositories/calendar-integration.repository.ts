@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq } from "drizzle-orm";
-import { TxAdapter } from "src/platform/db/tx.module";
 
 import {
   CalendarIntegration,
   CalendarIntegrationStatus,
 } from "@/api/calendar-integrations/entities/calendar-integration.entity";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import {
   CalendarIntegrationCredentials,
   calendarIntegrations,

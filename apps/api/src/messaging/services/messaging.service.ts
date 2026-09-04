@@ -1,15 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { generateId } from "src/kernel/id";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
-import {
-  MessageCreated,
-  MessageManagedStatusChanged,
-  MessageUpdated,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
 
 import { AuthGuest } from "@/api/auth/auth.types";
+import { generateId } from "@/api/kernel/id";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import {
   ManagedMessageStatus,
@@ -27,6 +20,13 @@ import {
   ThreadStats,
 } from "@/api/messaging/repositories/messaging.repository";
 import { NetworksService } from "@/api/networks/services/networks.service";
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import {
+  MessageCreated,
+  MessageManagedStatusChanged,
+  MessageUpdated,
+} from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";

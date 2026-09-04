@@ -5,7 +5,7 @@ import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import { AuthGuest as AuthGuestType } from "@/api/auth/auth.types";
 import { AuthGuest } from "@/api/auth/authGuest.decorator";
 import { Public } from "@/api/auth/public.decorator";
-import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
 import { GuestSignInRequestDto } from "@/api/public-views/rest/dto/guest-sign-in.dto";
 import { toPublicViewMetadataResponseDto } from "@/api/public-views/rest/public-views.mapper";
 import {

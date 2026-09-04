@@ -1,7 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import { getDbInstance } from "./db";
+import { getDbInstance } from "@/api/platform/db/db";
 
 export const DB_CLIENT_PROVIDER = "DB";
 

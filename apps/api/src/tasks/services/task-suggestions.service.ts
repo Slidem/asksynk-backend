@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { generateId } from "src/kernel/id";
-import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
+
+import { generateId } from "@/api/kernel/id";
+import { NetworksService } from "@/api/networks/services/networks.service";
+import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import {
   TaskBatchUpserted,
   TaskSuggested,
@@ -10,10 +12,8 @@ import {
   TaskSuggestionResolved,
   TaskSuggestionUpdated,
   TaskUpserted,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
-
-import { NetworksService } from "@/api/networks/services/networks.service";
+} from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskSuggestion } from "@/api/tasks/entities/task-suggestion.entity";

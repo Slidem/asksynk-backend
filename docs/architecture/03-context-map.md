@@ -45,19 +45,19 @@ Subdomain classification follows Khononov: _core_ is complex **and** a competiti
 advantage; _supporting_ is necessary but not differentiating; _generic_ is a solved
 problem. **The classification decides how much modelling each context earns.**
 
-| Context           | Today                                           | Subdomain  | Owns                                                                                                                                |
-| ----------------- | ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **tagging**       | `tags`                                          | **Core**   | `tags`                                                                                                                              |
-| **attention**     | `attention-items`                               | **Core**   | `attention_items`, `attention_item_tags`                                                                                            |
-| **scheduling**    | `calendar-events` **+** `calendar-integrations` | **Core**   | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
-| **conversations** | `messaging`                                     | Supporting | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
-| **tasks**         | `tasks`                                         | Supporting | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
-| **network**       | `networks`                                      | Supporting | `user_invites`, `user_network`                                                                                                      |
-| **sharing**       | `public-views`                                  | Supporting | `public_views`, `public_view_guests`                                                                                                |
-| **focus**         | `timers`                                        | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
-| **files**         | `storage`                                       | Generic    | `attachments`                                                                                                                       |
-| **identity**      | `auth` + `user-profile` + `user-settings`       | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
-| _(platform)_      | `packages/shared` — **dissolves**, see [04 §1b](04-layering.md) | —          | `events_outbox`                                                                                                     |
+| Context           | Today                                                           | Subdomain  | Owns                                                                                                                                |
+| ----------------- | --------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **tagging**       | `tags`                                                          | **Core**   | `tags`                                                                                                                              |
+| **attention**     | `attention-items`                                               | **Core**   | `attention_items`, `attention_item_tags`                                                                                            |
+| **scheduling**    | `calendar-events` **+** `calendar-integrations`                 | **Core**   | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
+| **conversations** | `messaging`                                                     | Supporting | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
+| **tasks**         | `tasks`                                                         | Supporting | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
+| **network**       | `networks`                                                      | Supporting | `user_invites`, `user_network`                                                                                                      |
+| **sharing**       | `public-views`                                                  | Supporting | `public_views`, `public_view_guests`                                                                                                |
+| **focus**         | `timers`                                                        | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
+| **files**         | `storage`                                                       | Generic    | `attachments`                                                                                                                       |
+| **identity**      | `auth` + `user-profile` + `user-settings`                       | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
+| _(platform)_      | `packages/shared` — **dissolves**, see [04 §1b](04-layering.md) | —          | `events_outbox`                                                                                                                     |
 
 All 33 tables are assigned; none appears twice.
 
@@ -325,7 +325,7 @@ integration re-implements them.
     modules, the outbox publisher/dispatcher/consumer, pg-boss, email, the exception
     filter, DTO validation decorators, `Clock`/`SystemClock`, `RealtimeBroadcaster`,
     bootstrap config. **`domain/` may never import it.** Note that infrastructure
-    *ports* live here too, next to their adapters — the abstract/adapter split does not
+    _ports_ live here too, next to their adapters — the abstract/adapter split does not
     run along this seam ([04 §1a](04-layering.md)).
 
   Full rationale and the per-file mapping in

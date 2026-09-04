@@ -3,8 +3,8 @@ import {
   createParamDecorator,
   ExecutionContext,
 } from "@nestjs/common";
-import { isValidId } from "src/kernel/id";
 
+import { isValidId } from "@/api/kernel/id";
 import { isIsoDateWithOffset } from "@/api/kernel/time/iso";
 
 /**

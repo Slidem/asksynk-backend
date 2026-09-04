@@ -1,8 +1,9 @@
 import { Module } from "@nestjs/common";
-import { DB_CLIENT_PROVIDER } from "src/platform/db/db.module";
-import { EventConsumerModule } from "src/platform/events/consumer/event-consumer.module";
-import { EventsConsumerDb } from "src/platform/events/consumer/realtime-listener.service";
-import { EventsDispatcherModule } from "src/platform/events/dispatcher/events-dispatcher.module";
+
+import { DB_CLIENT_PROVIDER } from "@/api/platform/db/db.module";
+import { EventConsumerModule } from "@/api/platform/events/consumer/event-consumer.module";
+import { EventsConsumerDb } from "@/api/platform/events/consumer/realtime-listener.service";
+import { EventsDispatcherModule } from "@/api/platform/events/dispatcher/events-dispatcher.module";
 
 @Module({
   imports: [

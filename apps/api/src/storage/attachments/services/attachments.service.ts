@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 
+import { generateId } from "@/api/kernel/id";
 import { AttachmentAccessService } from "@/api/storage/attachment-access.service";
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import {
@@ -20,7 +21,6 @@ import {
 } from "@/api/storage/attachments/models/attachment.model";
 import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
 import { ObjectStorage, UploadGrant } from "@/api/storage/object-storage";
-import { generateId } from "src/kernel/id";
 
 export interface CreateAttachmentInput {
   placement: AttachmentPlacement;

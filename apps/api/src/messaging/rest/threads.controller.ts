@@ -3,7 +3,6 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 import { CreateThreadRequestDto } from "@/api/messaging/rest/dto/create-thread.dto";
 import { ListMessagesQueryDto } from "@/api/messaging/rest/dto/list-messages-query.dto";
 import { resolveAttachmentsByMessage } from "@/api/messaging/rest/message-attachments.helper";
@@ -23,6 +22,7 @@ import {
 } from "@/api/messaging/rest/responses/thread.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 
 @ApiTags("Threads")

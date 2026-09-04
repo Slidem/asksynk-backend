@@ -3,14 +3,14 @@ import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
 import { JobInsert, PgBoss } from "pg-boss";
 
-import { PgError, PgErrorCode } from "../../db/pg-error-codes";
+import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import {
   CancelOptions,
   MessageHandler,
   QueuedJobInsert,
   SendOptions,
   WorkOptions,
-} from "./message-bus.types";
+} from "@/api/platform/jobs/message-bus/message-bus.types";
 
 /** Max retries when createQueue hits a deadlock during concurrent partition creation. */
 const QUEUE_CREATE_MAX_RETRIES = 5;

@@ -1,6 +1,9 @@
 import { Module } from "@nestjs/common";
 
-import { EventsPublisher, EventsPublisherImpl } from "./events-publisher";
+import {
+  EventsPublisher,
+  EventsPublisherImpl,
+} from "@/api/platform/events/publisher/events-publisher";
 
 @Module({
   imports: [],

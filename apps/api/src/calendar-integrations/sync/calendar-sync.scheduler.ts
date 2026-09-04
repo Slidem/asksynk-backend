@@ -11,7 +11,7 @@ import {
   CALENDAR_SYNC_SINGLETON_SECONDS,
   CalendarSyncJob,
 } from "@/api/calendar-integrations/sync/calendar-sync.constants";
-import { MessageBusService } from "src/platform/jobs/message-bus/message-bus.service";
+import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
 
 /**
  * Drives inbound calendar polling across a multi-instance API:

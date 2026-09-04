@@ -5,7 +5,7 @@ import { Socket } from "socket.io";
 import { AuthService } from "@/api/auth/auth.service";
 import { AuthGuest, AuthUser } from "@/api/auth/auth.types";
 import { GuestAuthService } from "@/api/auth/guest-auth.service";
-import { extractBearerToken } from "src/platform/http/bearer-token";
+import { extractBearerToken } from "@/api/platform/http/bearer-token";
 
 export type WsIdentity =
   | { kind: "user"; user: AuthUser }

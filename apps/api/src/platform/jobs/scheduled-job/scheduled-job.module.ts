@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
 
-import { MessageBusModule } from "../message-bus/message-bus.module";
-import { PgBossScheduledJobService } from "./pgboss-scheduled-job.service";
-import { ScheduledJobService } from "./scheduled-job.service";
+import { MessageBusModule } from "@/api/platform/jobs/message-bus/message-bus.module";
+import { PgBossScheduledJobService } from "@/api/platform/jobs/scheduled-job/pgboss-scheduled-job.service";
+import { ScheduledJobService } from "@/api/platform/jobs/scheduled-job/scheduled-job.service";
 
 @Module({
   imports: [MessageBusModule],

@@ -8,10 +8,10 @@ import { GuestMessagingController } from "@/api/messaging/rest/guest-messaging.c
 import { ThreadsController } from "@/api/messaging/rest/threads.controller";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { NetworksModule } from "@/api/networks/networks.module";
+import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
 import { TagsModule } from "@/api/tags/tags.module";
 import { TasksModule } from "@/api/tasks/tasks.module";
-import { EventsPublisherModule } from "src/platform/events/publisher/events-publisher.module";
 
 @Module({
   imports: [

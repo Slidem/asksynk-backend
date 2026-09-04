@@ -1,6 +1,9 @@
 import _ from "lodash";
 
-import { DomainError, DomainErrorCategory } from "./domain-errors";
+import {
+  DomainError,
+  DomainErrorCategory,
+} from "@/api/kernel/errors/domain-errors";
 
 /** Catalog messages interpolate `{ param }`, not lodash's default delimiters. */
 const TEMPLATE_SETTINGS = { interpolate: /{\s*([\s\S]+?)\s*}/g };

@@ -2,8 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, desc, eq } from "drizzle-orm";
 
-import { TxAdapter } from "src/platform/db/tx.module";
 import { Invite, InviteStatus } from "@/api/networks/entities/invite.entity";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { userInvites } from "@/migrations/schema/userNetwork";
 
 type InviteRow = typeof userInvites.$inferSelect;

@@ -1,10 +1,9 @@
 import { DynamicModule, Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import { EmailModule } from "src/platform/email/email.module";
-import { EmailService } from "src/platform/email/email.service";
-
-import { Auth, createAuth } from "./betterAuth";
+import { Auth, createAuth } from "@/api/auth/betterAuth";
+import { EmailModule } from "@/api/platform/email/email.module";
+import { EmailService } from "@/api/platform/email/email.service";
 
 export const BETTER_AUTH = "BETTER_AUTH";
 

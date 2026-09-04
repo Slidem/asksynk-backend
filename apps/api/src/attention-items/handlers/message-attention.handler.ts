@@ -2,19 +2,19 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
-import { generateId } from "src/kernel/id";
-import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
-import {
-  MessageCreated,
-  MessageManagedStatusChanged,
-  MessageUpdated,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
 
 import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-item.model";
+import { generateId } from "@/api/kernel/id";
+import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import {
+  MessageCreated,
+  MessageManagedStatusChanged,
+  MessageUpdated,
+} from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 
 // Mirrors tagged in-app messages into one attention item per recipient.
 @Injectable()

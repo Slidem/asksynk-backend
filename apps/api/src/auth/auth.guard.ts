@@ -6,13 +6,13 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
-import { extractBearerToken } from "src/platform/http/bearer-token";
 
 import { ALLOW_GUEST_KEY } from "@/api/auth/allowGuest.decorator";
 import { AuthService } from "@/api/auth/auth.service";
 import { RequestHeaders, RequestWithAuth } from "@/api/auth/auth.types";
 import { GuestAuthService } from "@/api/auth/guest-auth.service";
 import { IS_PUBLIC_KEY } from "@/api/auth/public.decorator";
+import { extractBearerToken } from "@/api/platform/http/bearer-token";
 
 @Injectable()
 export class AuthGuard implements CanActivate {

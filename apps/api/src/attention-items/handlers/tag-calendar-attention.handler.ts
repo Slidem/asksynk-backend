@@ -2,20 +2,20 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
-import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
+
+import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
+import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
+import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
+import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
 import {
   CalendarEventCreated,
   CalendarEventDeleted,
   CalendarEventUpdated,
   TagDeleted,
   TagUpdated,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
-
-import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
-import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
-import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
+} from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 
 // Cross-cutting: tag and calendar changes recompute due dates for ANY affected

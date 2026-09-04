@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { generateId } from "src/kernel/id";
 
+import { generateId } from "@/api/kernel/id";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { PublicViewGuest } from "@/api/public-views/entities/public-view-guest.entity";
 import { GUEST_SESSION_TTL_MS } from "@/api/public-views/public-views.constants";

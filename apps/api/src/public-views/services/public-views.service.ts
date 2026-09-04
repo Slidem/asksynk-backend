@@ -2,9 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
-import { generateId } from "src/kernel/id";
-import { PgError, PgErrorCode } from "src/platform/db/pg-error-codes";
 
+import { generateId } from "@/api/kernel/id";
+import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import {
   PUBLIC_VIEW_DEFAULT_TTL_MS,

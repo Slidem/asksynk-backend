@@ -1,4 +1,4 @@
-import { EventDef, EventOf } from "../registry/events.types";
+import { EventDef, EventOf } from "@/api/platform/events/registry/events.types";
 
 export interface EventHandlerContext {
   eventId: string;

@@ -1,7 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { generateId } from "src/kernel/id";
 
+import { generateId } from "@/api/kernel/id";
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import {
+  TaskDeleted,
+  TaskUpserted,
+} from "@/api/platform/events/registry/events.registry";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { Task } from "@/api/tasks/entities/task.entity";
 import {
@@ -13,11 +18,6 @@ import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
 import { tasksError } from "@/api/tasks/tasks.errors";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
-import {
-  TaskDeleted,
-  TaskUpserted,
-} from "src/platform/events/registry/events.registry";
 
 @Injectable()
 export class TasksService {

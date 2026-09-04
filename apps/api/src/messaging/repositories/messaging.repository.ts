@@ -11,7 +11,6 @@ import {
   sql,
 } from "drizzle-orm";
 import _ from "lodash";
-import { TxAdapter } from "src/platform/db/tx.module";
 
 import {
   ManagedStatus,
@@ -19,6 +18,7 @@ import {
   MessageSender,
 } from "@/api/messaging/entities/message.entity";
 import { Thread } from "@/api/messaging/entities/thread.entity";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { messageTags } from "@/migrations/schema/messageTags";
 import {
   messageAttachments,

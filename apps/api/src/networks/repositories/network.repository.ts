@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
-import { TxAdapter } from "src/platform/db/tx.module";
 
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
 

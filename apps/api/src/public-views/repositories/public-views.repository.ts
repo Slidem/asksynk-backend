@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, desc, eq, sql } from "drizzle-orm";
 
-import { TxAdapter } from "src/platform/db/tx.module";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { users } from "@/migrations/schema/users";

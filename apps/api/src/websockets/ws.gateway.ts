@@ -10,17 +10,6 @@ import {
 import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
-import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
-import {
-  AttentionItemRemoved,
-  AttentionItemUpserted,
-  MessageCreated,
-  MessageManagedStatusChanged,
-  MessageUpdated,
-  TaskSuggestionBroadcast,
-  TimerLifecycle,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
 
 import { resolveDomainError } from "@/api/errors/resolve-domain-error";
 import { DomainError } from "@/api/kernel/errors/domain-errors";
@@ -31,6 +20,17 @@ import {
 } from "@/api/messaging/entities/message.entity";
 import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
+import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import {
+  AttentionItemRemoved,
+  AttentionItemUpserted,
+  MessageCreated,
+  MessageManagedStatusChanged,
+  MessageUpdated,
+  TaskSuggestionBroadcast,
+  TimerLifecycle,
+} from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";

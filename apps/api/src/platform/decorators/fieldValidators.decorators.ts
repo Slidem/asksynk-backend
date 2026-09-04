@@ -1,6 +1,6 @@
 import { registerDecorator, ValidationOptions } from "class-validator";
-import { isValidId } from "src/kernel/id";
 
+import { isValidId } from "@/api/kernel/id";
 import {
   isIsoDateWithOffset,
   isValidIanaTimezone,

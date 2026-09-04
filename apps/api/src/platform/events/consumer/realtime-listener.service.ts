@@ -5,10 +5,12 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 import { Client } from "pg";
 
+import {
+  EventHandlerContext,
+  EventHandlerFn,
+} from "@/api/platform/events/consumer/event-consumer.types";
+import { EventDef } from "@/api/platform/events/registry/events.types";
 import { eventsOutbox } from "@/migrations/schema/outbox";
-
-import { EventDef } from "../registry/events.types";
-import { EventHandlerContext, EventHandlerFn } from "./event-consumer.types";
 
 const RECONNECT_BASE_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 15_000;

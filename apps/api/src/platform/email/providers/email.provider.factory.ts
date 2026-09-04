@@ -1,9 +1,9 @@
 import { Provider } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import { AgentEmailProvider } from "./agentemail.provider";
-import { EmailProvider } from "./email.provider";
-import { LocalEmailProvider } from "./localemail.provider";
+import { AgentEmailProvider } from "@/api/platform/email/providers/agentemail.provider";
+import { EmailProvider } from "@/api/platform/email/providers/email.provider";
+import { LocalEmailProvider } from "@/api/platform/email/providers/localemail.provider";
 
 /**
  * Binds EmailProvider to a concrete transport chosen from EMAIL_PROVIDER

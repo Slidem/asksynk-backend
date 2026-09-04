@@ -16,9 +16,9 @@ import { PatchAttentionItemDto } from "@/api/attention-items/rest/dto/patch-atte
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
-import { toNonNegativeNumberOptional } from "src/platform/mappers/string.utils";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
+import { toNonNegativeNumberOptional } from "@/api/platform/mappers/string.utils";
 
 @ApiTags("Attention Items")
 @ApiBearerAuth("bearer")

@@ -3,7 +3,7 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq } from "drizzle-orm";
 
 import { CalendarEventLink } from "@/api/calendar-integrations/entities/calendar-event-link.entity";
-import { TxAdapter } from "src/platform/db/tx.module";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { calendarEventLinks } from "@/migrations/schema/calendarEventLinks";
 
 type LinkRow = typeof calendarEventLinks.$inferSelect;

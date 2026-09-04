@@ -4,17 +4,17 @@ import { defaultsDeep, pick, pickBy } from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { UUID } from "uuidv7";
 
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import {
+  TagDeleted,
+  TagUpdated,
+} from "@/api/platform/events/registry/events.registry";
 import { Tag } from "@/api/tags/entities/tag.entity";
 import { CreateTagInput } from "@/api/tags/models/create-tag.model";
 import { ListTagsInput } from "@/api/tags/models/list-tags.model";
 import { UpdateTagInput } from "@/api/tags/models/update-tag.model";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 import { tagsError } from "@/api/tags/tags.errors";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
-import {
-  TagDeleted,
-  TagUpdated,
-} from "src/platform/events/registry/events.registry";
 
 @Injectable()
 export class TagsService {

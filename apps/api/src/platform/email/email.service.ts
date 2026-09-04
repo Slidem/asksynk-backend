@@ -1,9 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
-import { renderTemplate } from "./email.templates";
-import { EmailMessage, RawEmailMessage } from "./email.types";
-import { EmailProvider } from "./providers/email.provider";
+import { renderTemplate } from "@/api/platform/email/email.templates";
+import {
+  EmailMessage,
+  RawEmailMessage,
+} from "@/api/platform/email/email.types";
+import { EmailProvider } from "@/api/platform/email/providers/email.provider";
 
 @Injectable()
 export class EmailService {

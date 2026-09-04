@@ -1,5 +1,5 @@
-import { RenderedEmail } from "../email.types";
-import { styles } from "./layout";
+import { RenderedEmail } from "@/api/platform/email/email.types";
+import { styles } from "@/api/platform/email/templates/layout";
 
 export function networkInviteTemplate(vars: {
   inviterName: string;

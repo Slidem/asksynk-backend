@@ -7,9 +7,6 @@ import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as path from "path";
-import { generateId } from "src/kernel/id";
-import { DB_CLIENT_PROVIDER, DbModule } from "src/platform/db/db.module";
-import { TxModule } from "src/platform/db/tx.module";
 import request from "supertest";
 
 import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
@@ -17,10 +14,13 @@ import { AttentionItemResponse } from "@/api/attention-items/rest/responses/atte
 import { AuthGuest, AuthUser } from "@/api/auth/auth.types";
 import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import { EventsModule } from "@/api/events/events.module";
+import { generateId } from "@/api/kernel/id";
 import { MessagingModule } from "@/api/messaging/messaging.module";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { NetworksModule } from "@/api/networks/networks.module";
 import { ClockModule } from "@/api/platform/clock/clock.module";
+import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
+import { TxModule } from "@/api/platform/db/tx.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
 import { StorageModule } from "@/api/storage/storage.module";
 import { TagsModule } from "@/api/tags/tags.module";

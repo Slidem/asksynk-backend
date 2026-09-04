@@ -1,12 +1,15 @@
 import "reflect-metadata";
 
-import { DeliveryMode, EventDef } from "../registry/events.types";
-import { EVENT_HANDLERS_METADATA } from "./event-consumer.constants";
+import { EVENT_HANDLERS_METADATA } from "@/api/platform/events/consumer/event-consumer.constants";
 import {
   EventHandlerFn,
   EventHandlerMeta,
   EventHandlerOptions,
-} from "./event-consumer.types";
+} from "@/api/platform/events/consumer/event-consumer.types";
+import {
+  DeliveryMode,
+  EventDef,
+} from "@/api/platform/events/registry/events.types";
 
 export function EventHandler<T extends EventDef>(
   event: T,

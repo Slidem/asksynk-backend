@@ -4,9 +4,12 @@ import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapte
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { MessageBusService } from "../message-bus/message-bus.service";
-import { fromDrizzleTx } from "./pgboss-drizzle-db";
-import { ScheduledJobService, ScheduleJobInput } from "./scheduled-job.service";
+import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
+import { fromDrizzleTx } from "@/api/platform/jobs/scheduled-job/pgboss-drizzle-db";
+import {
+  ScheduledJobService,
+  ScheduleJobInput,
+} from "@/api/platform/jobs/scheduled-job/scheduled-job.service";
 
 @Injectable()
 export class PgBossScheduledJobService extends ScheduledJobService {

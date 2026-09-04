@@ -1,7 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { generateId } from "src/kernel/id";
-import { EventHandler } from "src/platform/events/consumer/event-consumer.decorator";
+
+import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
+import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
+import { generateId } from "@/api/kernel/id";
+import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
 import {
   TaskBatchDeleted,
   TaskBatchUpserted,
@@ -10,12 +14,8 @@ import {
   TaskSuggestionResolved,
   TaskSuggestionUpdated,
   TaskUpserted,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
-
-import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
-import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
+} from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 
 // Mirrors task / batch / suggestion domain events into attention items. Tasks and
 // batches both produce a single "task" item (one per assignee); suggestions an

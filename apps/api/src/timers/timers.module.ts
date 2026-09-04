@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { EventsPublisherModule } from "src/platform/events/publisher/events-publisher.module";
-import { ScheduledJobModule } from "src/platform/jobs/scheduled-job/scheduled-job.module";
 
+import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
+import { ScheduledJobModule } from "@/api/platform/jobs/scheduled-job/scheduled-job.module";
 import { TimersController } from "@/api/timers/rest/timers.controller";
 import { TimerSettingsRepository } from "@/api/timers/timer-settings.repository";
 import { TimersEventLogHandler } from "@/api/timers/timers.event-log.handler";

@@ -2,16 +2,16 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
-import { generateId } from "src/kernel/id";
-import { EmailService } from "src/platform/email/email.service";
 
 import { RequestActor } from "@/api/auth/auth.types";
+import { generateId } from "@/api/kernel/id";
 import { Invite } from "@/api/networks/entities/invite.entity";
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
 import { networksError } from "@/api/networks/networks.errors";
 import { InvitesRepository } from "@/api/networks/repositories/invites.repository";
 import { NetworkRepository } from "@/api/networks/repositories/network.repository";
 import { UsersLookupRepository } from "@/api/networks/repositories/users-lookup.repository";
+import { EmailService } from "@/api/platform/email/email.service";
 
 @Injectable()
 export class NetworksService {

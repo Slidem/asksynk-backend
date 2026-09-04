@@ -30,7 +30,9 @@ export abstract class CalendarProvider {
   ): Promise<ProviderCredentials>;
 
   /** List the calendars available on the connected account. */
-  abstract listCalendars(creds: ProviderCredentials): Promise<ExternalCalendar[]>;
+  abstract listCalendars(
+    creds: ProviderCredentials,
+  ): Promise<ExternalCalendar[]>;
 
   /**
    * Incremental (or, without `syncToken`, full) event list for one calendar.

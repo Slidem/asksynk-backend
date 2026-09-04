@@ -2,15 +2,15 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 
-import { TxAdapter } from "src/platform/db/tx.module";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { Task } from "@/api/tasks/entities/task.entity";
 import {
   CreateTaskInput,
   ListTasksInput,
   TaskStatus,
 } from "@/api/tasks/models/task.model";
-import { taskTags } from "@/migrations/schema/taskTags";
 import { tasks } from "@/migrations/schema/tasks";
+import { taskTags } from "@/migrations/schema/taskTags";
 
 type TaskRow = typeof tasks.$inferSelect;
 

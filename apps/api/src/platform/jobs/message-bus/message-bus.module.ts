@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
-import { MessageBusService } from "./message-bus.service";
+import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
 
 @Module({
   imports: [ConfigModule],

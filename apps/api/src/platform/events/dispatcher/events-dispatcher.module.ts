@@ -5,13 +5,13 @@ import {
   ModuleMetadata,
 } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { MessageBusModule } from "src/platform/jobs/message-bus/message-bus.module";
 
 import {
   EVENTS_DISPATCHER_DB,
   EventsDispatcherDb,
   EventsOutboxDispatcher,
-} from "./events-dispatcher";
+} from "@/api/platform/events/dispatcher/events-dispatcher";
+import { MessageBusModule } from "@/api/platform/jobs/message-bus/message-bus.module";
 
 export interface EventsDispatcherAsyncOptions
   extends

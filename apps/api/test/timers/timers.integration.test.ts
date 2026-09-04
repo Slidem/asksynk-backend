@@ -7,14 +7,14 @@ import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { and, eq, inArray } from "drizzle-orm";
 import * as path from "path";
-import { DB_CLIENT_PROVIDER, DbModule } from "src/platform/db/db.module";
-import { TxModule } from "src/platform/db/tx.module";
 import request from "supertest";
 
 import { AuthUser } from "@/api/auth/auth.types";
 import { EventsModule } from "@/api/events/events.module";
 import { Clock } from "@/api/platform/clock/clock";
 import { ClockModule } from "@/api/platform/clock/clock.module";
+import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
+import { TxModule } from "@/api/platform/db/tx.module";
 import { TimersModule } from "@/api/timers/timers.module";
 import { users } from "@/migrations/schema/users";
 import { userTimerEvents } from "@/migrations/schema/userTimerEvents";

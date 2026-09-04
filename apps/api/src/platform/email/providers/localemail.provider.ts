@@ -1,8 +1,8 @@
 import { ConfigService } from "@nestjs/config";
 import { createTransport } from "nodemailer";
 
-import { RawEmailMessage } from "../email.types";
-import { EmailProvider } from "./email.provider";
+import { RawEmailMessage } from "@/api/platform/email/email.types";
+import { EmailProvider } from "@/api/platform/email/providers/email.provider";
 
 export class LocalEmailProvider extends EmailProvider {
   private readonly host: string;

@@ -1,6 +1,6 @@
-import { CalendarEvent } from "../entities/calendar-event.entity";
-import { CalendarEventInstance } from "../models/calendar-event-instance.model";
-import { getInstanceId } from "../utils/instanceId.utils";
+import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
+import { CalendarEventInstance } from "@/api/calendar-events/models/calendar-event-instance.model";
+import { getInstanceId } from "@/api/calendar-events/utils/instanceId.utils";
 
 export const toCalendarEventInstance = (
   event: CalendarEvent,

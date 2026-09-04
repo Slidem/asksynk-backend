@@ -13,7 +13,7 @@ import { ExternalEventInput } from "@/api/calendar-integrations/providers/types"
 import { CalendarEventLinkRepository } from "@/api/calendar-integrations/repositories/calendar-event-link.repository";
 import { CalendarIntegrationRepository } from "@/api/calendar-integrations/repositories/calendar-integration.repository";
 import { CalendarIntegrationService } from "@/api/calendar-integrations/services/calendar-integration.service";
-import { generateId } from "src/kernel/id";
+import { generateId } from "@/api/kernel/id";
 
 /**
  * Mirrors native asksynk events out to bidirectional integrations. Handlers are

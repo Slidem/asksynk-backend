@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq, inArray } from "drizzle-orm";
 
-import { TxAdapter } from "src/platform/db/tx.module";
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import { attachments } from "@/migrations/schema/attachments";
 

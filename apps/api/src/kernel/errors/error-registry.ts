@@ -1,4 +1,8 @@
-import { ErrorCatalog, ErrorDefinition, NameSpaceKey } from "./error-catalog";
+import {
+  ErrorCatalog,
+  ErrorDefinition,
+  NameSpaceKey,
+} from "@/api/kernel/errors/error-catalog";
 
 // full error key is in the format of "namespace.key"
 type ErrorCode = string;

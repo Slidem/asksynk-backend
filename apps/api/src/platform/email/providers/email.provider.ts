@@ -1,4 +1,4 @@
-import { RawEmailMessage } from "../email.types";
+import { RawEmailMessage } from "@/api/platform/email/email.types";
 
 /**
  * Email transport. Abstract class = interface + DI token (mirrors the `Clock`

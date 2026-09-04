@@ -7,7 +7,10 @@ import {
 } from "class-validator";
 
 import { AnswerMode } from "@/api/tags/models/tag.model";
-import { AnswerModeDto, NotificationsSettingsDto } from "@/api/tags/rest/dto/create-tag.dto";
+import {
+  AnswerModeDto,
+  NotificationsSettingsDto,
+} from "@/api/tags/rest/dto/create-tag.dto";
 
 export class UpdateTagRequestDto {
   @IsOptional()

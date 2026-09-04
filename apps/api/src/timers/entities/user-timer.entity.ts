@@ -1,7 +1,4 @@
-import {
-  TimerSessionType,
-  TimerStatus,
-} from "@/api/timers/models/timer.model";
+import { TimerSessionType, TimerStatus } from "@/api/timers/models/timer.model";
 
 export interface UserTimerProps {
   id: string;

@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq, sql } from "drizzle-orm";
-import { TxAdapter } from "src/platform/db/tx.module";
 
+import { TxAdapter } from "@/api/platform/db/tx.module";
 import { users } from "@/migrations/schema/users";
 
 export type UserLookupRow = {

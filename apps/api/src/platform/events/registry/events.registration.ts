@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { DeliveryMode, EventDef } from "./events.types";
+import {
+  DeliveryMode,
+  EventDef,
+} from "@/api/platform/events/registry/events.types";
 
 export function defineEvent<
   const TName extends string,

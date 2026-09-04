@@ -3,8 +3,8 @@ import { ClsPluginTransactional } from "@nestjs-cls/transactional";
 import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapter-drizzle-orm";
 import { ClsModule } from "nestjs-cls";
 
-import { DB } from "./db";
-import { DB_CLIENT_PROVIDER, DbModule } from "./db.module";
+import { DB } from "@/api/platform/db/db";
+import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 
 export type TxAdapter = TransactionalAdapterDrizzleOrm<DB>;
 

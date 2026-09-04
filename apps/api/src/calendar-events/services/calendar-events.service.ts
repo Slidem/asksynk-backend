@@ -1,13 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import { pick, pickBy } from "lodash";
-import { generateId } from "src/kernel/id";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
-import {
-  CalendarEventCreated,
-  CalendarEventDeleted,
-  CalendarEventUpdated,
-} from "src/platform/events/registry/events.registry";
 
 import { calendarEventError } from "@/api/calendar-events/calendar-events.errors";
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
@@ -26,6 +19,13 @@ import {
   replaceRruleUntil,
   validateAndNormalizeRrule,
 } from "@/api/calendar-events/utils/recurrence.utils";
+import { generateId } from "@/api/kernel/id";
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import {
+  CalendarEventCreated,
+  CalendarEventDeleted,
+  CalendarEventUpdated,
+} from "@/api/platform/events/registry/events.registry";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 
 function mergeNullable<T>(

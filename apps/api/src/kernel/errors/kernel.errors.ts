@@ -1,5 +1,5 @@
-import { DomainErrorCategory } from "./domain-errors";
-import { defineCatalog } from "./error-catalog";
+import { DomainErrorCategory } from "@/api/kernel/errors/domain-errors";
+import { defineCatalog } from "@/api/kernel/errors/error-catalog";
 
 const { catalog, createError } = defineCatalog("core", {
   invalid_value: {

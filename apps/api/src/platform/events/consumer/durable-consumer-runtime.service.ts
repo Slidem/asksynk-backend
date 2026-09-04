@@ -1,9 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
-import { MessageBusService } from "src/platform/jobs/message-bus/message-bus.service";
 
-import { EventDef, EventOf } from "../registry/events.types";
-import { EventHandlerContext, EventHandlerFn } from "./event-consumer.types";
+import {
+  EventHandlerContext,
+  EventHandlerFn,
+} from "@/api/platform/events/consumer/event-consumer.types";
+import { EventDef, EventOf } from "@/api/platform/events/registry/events.types";
+import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
 
 interface DurableJobData {
   eventId: string;

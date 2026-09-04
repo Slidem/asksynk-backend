@@ -3,8 +3,8 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
-import { ApiStandardErrors } from "src/platform/errors/swagger.decorator";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
 import { CreatePublicViewRequestDto } from "@/api/public-views/rest/dto/create-public-view.dto";
 import {
   toGuestResponseDto,
