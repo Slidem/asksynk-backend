@@ -1,6 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import { generateId } from "src/kernel/id";
+import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
+import {
+  MessageCreated,
+  MessageManagedStatusChanged,
+  MessageUpdated,
+} from "src/platform/events/registry/events.registry";
+import { EventOf } from "src/platform/events/registry/events.types";
 
 import { AuthGuest } from "@/api/auth/auth.types";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
@@ -25,13 +32,6 @@ import { TagsService } from "@/api/tags/services/tags.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
 import { WsIdentity } from "@/api/websockets/services/ws-auth.service";
-import { EventsPublisher } from "src/platform/events/publisher/events-publisher";
-import {
-  MessageCreated,
-  MessageManagedStatusChanged,
-  MessageUpdated,
-} from "src/platform/events/registry/events.registry";
-import { EventOf } from "src/platform/events/registry/events.types";
 
 const MAX_MESSAGE_LIMIT = 100;
 

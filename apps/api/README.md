@@ -5,7 +5,6 @@ NestJS API server for core backend operations.
 ## Endpoints
 
 - `GET /health`: health check
-- `GET /dummy`: dummy endpoint, uses shared package
 
 ## Local run
 

@@ -5,7 +5,6 @@ SaaS backend for asynchronous communication: calendars, tags, questions, and cha
 ## Structure
 
 - `apps/api`: NestJS API server
-- `packages/shared`: shared utilities
 - `scripts`: utility scripts
 - `localdev`: local Docker
 
