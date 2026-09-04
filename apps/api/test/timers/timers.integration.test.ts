@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { and, eq, inArray } from "drizzle-orm";
@@ -15,6 +15,7 @@ import { Clock } from "@/api/platform/clock/clock";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
+import { AllExceptionsFilter } from "@/api/platform/errors/errors.filter";
 import { TimersModule } from "@/api/timers/timers.module";
 import { users } from "@/migrations/schema/users";
 import { userTimerEvents } from "@/migrations/schema/userTimerEvents";
@@ -73,7 +74,10 @@ describe("Timers (integration)", () => {
         EventsModule,
         TimersModule,
       ],
-      providers: [{ provide: APP_GUARD, useClass: MockAuthGuard }],
+      providers: [
+        { provide: APP_GUARD, useClass: MockAuthGuard },
+        { provide: APP_FILTER, useClass: AllExceptionsFilter },
+      ],
     })
       .overrideProvider(Clock)
       .useValue(clock)
@@ -284,7 +288,7 @@ describe("Timers (integration)", () => {
   it("rejects invalid transitions and bad payload combos", async () => {
     const { patchTimer } = await createUserCtx();
     // pause while idle
-    await patchTimer({ status: "paused" }, 400);
+    await patchTimer({ status: "paused" }, 409);
     // session fields without duration
     await patchTimer({ status: "running", sessionType: "focus" }, 400);
     // session fields with a non-running status

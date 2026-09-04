@@ -23,7 +23,6 @@ import ts from "typescript";
  *
  * Usage: tsx src/fix-import-aliases.ts [workspaceDir] [--dry]
  */
-
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -48,15 +47,18 @@ function log(msg: string): void {
  */
 function loadAliases(tsconfigPath: string): Alias[] {
   const { config, error } = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+
   if (error) {
     throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
   }
+
   const configDir = dirname(tsconfigPath);
   const parsed = ts.parseJsonConfigFileContent(config, ts.sys, configDir);
   const { paths = {}, baseUrl } = parsed.options;
   const base = baseUrl ?? configDir;
 
   const aliases: Alias[] = [];
+
   for (const [pattern, targets] of Object.entries(paths)) {
     const prefix = pattern.endsWith("/*") ? pattern.slice(0, -1) : undefined;
     const target = targets[0];
@@ -115,9 +117,11 @@ function rewriteFile(
     const isRelative = spec.startsWith("./") || spec.startsWith("../");
     // A bare specifier is resolved against the tsconfig dir, which is exactly what
     // the `"*": ["./*"]` catch-all does — that's how `src/...` imports work today.
+
     const abs = isRelative
       ? resolve(dirname(file), spec)
       : resolve(configDir, spec);
+
     if (!moduleExists(abs)) return match;
 
     const alias = toAlias(abs, aliases);
@@ -147,6 +151,7 @@ function main(): void {
   }
 
   const aliases = loadAliases(tsconfigPath);
+
   if (aliases.length === 0) {
     throw new Error(`no usable path aliases in ${tsconfigPath}`);
   }
