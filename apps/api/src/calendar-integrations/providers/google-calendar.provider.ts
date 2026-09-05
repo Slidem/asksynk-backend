@@ -1,6 +1,6 @@
+import { auth, calendar, calendar_v3 } from "@googleapis/calendar";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { calendar_v3, google } from "googleapis";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { CalendarProvider } from "@/api/calendar-integrations/providers/calendar-provider";
@@ -20,6 +20,8 @@ const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
   "openid",
 ];
+
+const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 
 @Injectable()
 export class GoogleCalendarProvider extends CalendarProvider {
@@ -51,9 +53,9 @@ export class GoogleCalendarProvider extends CalendarProvider {
     const { tokens } = await client.getToken(code);
     client.setCredentials(tokens);
 
-    const { data } = await google
-      .oauth2({ version: "v2", auth: client })
-      .userinfo.get();
+    const { data } = await client.request<{ id?: string; email?: string }>({
+      url: GOOGLE_USERINFO_URL,
+    });
 
     return {
       credentials: this.toCredentials(tokens),
@@ -201,8 +203,8 @@ export class GoogleCalendarProvider extends CalendarProvider {
 
   private oauthClient(
     creds?: ProviderCredentials,
-  ): InstanceType<typeof google.auth.OAuth2> {
-    const client = new google.auth.OAuth2(
+  ): InstanceType<typeof auth.OAuth2> {
+    const client = new auth.OAuth2(
       this.clientId,
       this.clientSecret,
       this.redirectUri,
@@ -220,7 +222,7 @@ export class GoogleCalendarProvider extends CalendarProvider {
   }
 
   private calendarApi(creds: ProviderCredentials): calendar_v3.Calendar {
-    return google.calendar({ version: "v3", auth: this.oauthClient(creds) });
+    return calendar({ version: "v3", auth: this.oauthClient(creds) });
   }
 
   private toCredentials(tokens: {

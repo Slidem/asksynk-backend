@@ -35,8 +35,8 @@ export const getDbInstance = (config: ConfigService) => {
 
   const pool = new Pool({
     connectionString: dbUrl,
-    min: config.get<number>("DB_POOL_MIN") ?? 2,
-    max: config.get<number>("DB_POOL_MAX") ?? 10,
+    min: config.get<number>("DB_POOL_MIN") ?? 1,
+    max: config.get<number>("DB_POOL_MAX") ?? 5,
   });
 
   return drizzle(pool, {

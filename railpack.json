@@ -6,6 +6,6 @@
     }
   },
   "deploy": {
-    "startCommand": "node apps/api/dist/main.js"
+    "startCommand": "node --max-old-space-size=256 apps/api/dist/main.js"
   }
 }

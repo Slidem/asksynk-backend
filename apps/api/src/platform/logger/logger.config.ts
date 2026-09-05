@@ -8,7 +8,8 @@ import { ContextLogger, ContextLoggerModule } from "nestjs-context-logger";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const isProd = configService.get<string>("ENVIRONMENT") === "prod";
+        const isProd =
+          configService.get<string>("ENVIRONMENT") === "production";
 
         const serializers = { req: () => undefined };
 

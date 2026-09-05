@@ -40,7 +40,7 @@ export const createAuth = (config: AuthConfig) => {
   const pool = new Pool({
     connectionString: config.databaseUrl,
     min: 1,
-    max: 5,
+    max: 2,
   });
 
   const db = drizzle(pool, { schema: { ...authSchema, users } });
