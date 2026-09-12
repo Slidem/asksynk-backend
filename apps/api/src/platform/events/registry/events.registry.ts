@@ -10,17 +10,6 @@ const managedStatusSchema = z.object({
   status: managedStatusEnum,
 });
 
-export const TagCreated = defineEvent({
-  name: "tag.created",
-  schema: z.object({
-    id: z.string(),
-    name: z.string(),
-    userId: z.string(),
-  }),
-  delivery: DeliveryMode.Durable,
-  groups: ["email"],
-});
-
 export const TagUpdated = defineEvent({
   name: "tag.updated",
   schema: z.object({

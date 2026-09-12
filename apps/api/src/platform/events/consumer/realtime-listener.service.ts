@@ -94,10 +94,12 @@ export class RealtimeListenerService implements OnModuleDestroy {
     client.on("notification", (msg) => {
       void this.dispatch(msg.channel, msg.payload);
     });
+
     client.on("error", (error) => {
       this.logger.error("realtime listener error", { error });
       this.scheduleReconnect();
     });
+
     client.on("end", () => {
       if (!this.stopped) this.scheduleReconnect();
     });

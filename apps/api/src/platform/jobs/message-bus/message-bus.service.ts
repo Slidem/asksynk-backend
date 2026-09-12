@@ -99,6 +99,7 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
       byQueue.set(name, list);
     }
     await Promise.all([...byQueue.keys()].map((q) => this.ensureQueue(q)));
+
     await Promise.all(
       [...byQueue].map(([queue, queueJobs]) => boss.insert(queue, queueJobs)),
     );

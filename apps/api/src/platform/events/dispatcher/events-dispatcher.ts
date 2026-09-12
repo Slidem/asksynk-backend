@@ -125,7 +125,6 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
     );
 
     this.reconnectAttempts += 1;
-
     this.reconnectHandle = setTimeout(() => void this.connectListen(), delay);
   }
 
@@ -167,6 +166,7 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
 
   private async drainBatch(): Promise<boolean> {
     return this.db.transaction(async (tx) => {
+
       const rows = await tx
         .select({
           id: eventsOutbox.id,
