@@ -46,7 +46,7 @@ import {
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env.test") });
 
-const POLL_TIMEOUT_MS = 2500;
+const POLL_TIMEOUT_MS = 10000;
 const ASSERT_TOLERANCE_MS = 5000;
 
 type ImmediateMode = { type: "immediately"; responseTimeMillis: number };

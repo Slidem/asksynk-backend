@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
-import { JobInsert, PgBoss } from "pg-boss";
+import { Db, JobInsert, PgBoss } from "pg-boss";
 
 import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import {
@@ -88,20 +88,23 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
    * Batch-insert pre-built jobs. Ensures referenced queues exist (createQueue
    * is idempotent) before inserting, since pg-boss `insert` does not.
    */
-  async insertJobs(jobs: QueuedJobInsert[]): Promise<void> {
+  async insertJobs(jobs: QueuedJobInsert[], db?: Db): Promise<void> {
     if (jobs.length === 0) return;
     const boss = this.requireBoss();
+
     // pg-boss v12 insert() targets a single queue; group jobs by queue name.
     const byQueue = new Map<string, JobInsert[]>();
+
     for (const { name, ...job } of jobs) {
       const list = byQueue.get(name) ?? [];
       list.push(job);
       byQueue.set(name, list);
     }
-    await Promise.all([...byQueue.keys()].map((q) => this.ensureQueue(q)));
 
     await Promise.all(
-      [...byQueue].map(([queue, queueJobs]) => boss.insert(queue, queueJobs)),
+      [...byQueue].map(([queue, queueJobs]) =>
+        boss.insert(queue, queueJobs, { db }),
+      ),
     );
   }
 
@@ -144,31 +147,6 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Subscribes to the specified event and processes incoming messages using the provided handler. The handler will be retried according to the options specified in `opts` in case of failure.
-   */
-  async subscribe<T extends object>(
-    event: string,
-    queue: string,
-    handler: MessageHandler<T>,
-    opts: WorkOptions = {},
-  ): Promise<void> {
-    const boss = this.requireBoss();
-
-    // idempotent operation; ensures the queue exists before we start working on it
-    // we should keep track of created queues in memory to avoid unnecessary calls to pg-boss, but can be done later;
-    // TODO: keep track of created queues in memory to avoid unnecessary calls to pg-boss
-    await this.ensureQueue(queue);
-    await boss.subscribe(event, queue);
-    await boss.work<T>(
-      queue,
-      { ...opts, includeMetadata: true },
-      async ([job]) => {
-        await handler(job.data, job);
-      },
-    );
-  }
-
-  /**
    * Registers a recurring (cron) schedule for a queue. pg-boss runs a single
    * clock-monitoring instance, so the job is enqueued on exactly one API
    * instance per tick — no leader election needed. Idempotent: re-registering
@@ -199,17 +177,18 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Creates a queue, retrying on Postgres deadlocks. Concurrent first-time
-   * createQueue calls (across requests/instances) race on the ATTACH PARTITION
-   * of the shared pgboss.job table and can deadlock; createQueue is idempotent,
-   * so we back off and retry. Once the queue exists the call short-circuits
-   * server-side, so this is effectively a no-op when warm.
+   * Ensures a queue exists in the message bus, creating it if necessary.
    */
-  private async ensureQueue(queue: string): Promise<void> {
+  public async ensureQueue(
+    queue: string,
+    isFifoQueue: boolean = false,
+  ): Promise<void> {
     const boss = this.requireBoss();
+    const opt = isFifoQueue ? { policy: "key_strict_fifo" } : {};
+
     for (let attempt = 0; ; attempt++) {
       try {
-        await boss.createQueue(queue);
+        await boss.createQueue(queue, opt);
         return;
       } catch (error) {
         const isDeadlock =

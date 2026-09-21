@@ -20,7 +20,7 @@ import {
 } from "@/api/messaging/entities/message.entity";
 import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
-import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import {
   AttentionItemRemoved,
   AttentionItemUpserted,
@@ -354,11 +354,12 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     payload: EventOf<typeof MessageCreated>,
   ): Promise<void> {
     const rooms = new Set<string>([threadRoom(payload.threadId)]);
-    for (const userId of payload.participantUserIds) {
-      rooms.add(userRoom(userId));
+    if (payload.sentToUserId) {
+      rooms.add(userRoom(payload.sentToUserId));
     }
-    for (const guestId of payload.participantGuestIds) {
-      rooms.add(guestRoom(guestId));
+
+    if (payload.sentToGuestId) {
+      rooms.add(guestRoom(payload.sentToGuestId));
     }
 
     // Resolve attachments at emit time (fresh signed urls), not at publish time — the

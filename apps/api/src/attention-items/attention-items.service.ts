@@ -85,6 +85,7 @@ export class AttentionItemsService {
     if (updated.type === "tagged_message" && input.status !== undefined) {
       const metadata = updated.metadata as TaggedMessageMetadata;
       await this.eventsPublisher.publish(AttentionMessageStatusChanged, {
+        userId: input.userId,
         messageId: metadata.messageId,
         status: updated.status,
       });

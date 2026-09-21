@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
+import { EventHandlersModule } from "@/api/platform/events/decorators/event-handlers.module";
 import {
   EVENTS_DISPATCHER_DB,
   EventsDispatcherDb,
@@ -23,7 +24,12 @@ export class EventsDispatcherModule {
   static forRootAsync(opts: EventsDispatcherAsyncOptions): DynamicModule {
     return {
       module: EventsDispatcherModule,
-      imports: [ConfigModule, MessageBusModule, ...(opts.imports ?? [])],
+      imports: [
+        ConfigModule,
+        MessageBusModule,
+        EventHandlersModule,
+        ...(opts.imports ?? []),
+      ],
       providers: [
         {
           provide: EVENTS_DISPATCHER_DB,

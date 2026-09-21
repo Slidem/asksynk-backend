@@ -8,7 +8,8 @@ import { AttentionItemsRepository } from "@/api/attention-items/attention-items.
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-item.model";
 import { generateId } from "@/api/kernel/id";
-import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
+import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import {
   MessageCreated,
   MessageManagedStatusChanged,
@@ -28,7 +29,7 @@ export class MessageAttentionHandler {
   ) {}
 
   @Transactional()
-  @EventHandler(MessageCreated, { group: "attention-items" })
+  @EventHandler(MessageCreated, AttentionItemsConsumerGroup)
   async onMessageCreated(
     payload: EventOf<typeof MessageCreated>,
   ): Promise<void> {
@@ -42,17 +43,15 @@ export class MessageAttentionHandler {
       )}]`,
     );
 
-    const { message, participantUserIds } = payload;
-
-    await this.createAttentionItemsForMessage(message, participantUserIds);
+    await this.createAttentionItemsForMessage(payload);
   }
 
   @Transactional()
-  @EventHandler(MessageUpdated, { group: "attention-items" })
+  @EventHandler(MessageUpdated, AttentionItemsConsumerGroup)
   async onMessageUpdated(
     payload: EventOf<typeof MessageUpdated>,
   ): Promise<void> {
-    const { message, participantUserIds } = payload;
+    const { message } = payload;
 
     if (message.tagIds === undefined) {
       return;
@@ -72,7 +71,7 @@ export class MessageAttentionHandler {
       if (message.tagIds.length === 0) {
         return;
       }
-      await this.createAttentionItemsForMessage(message, participantUserIds);
+      await this.createAttentionItemsForMessage(payload);
       return;
     }
 
@@ -98,7 +97,7 @@ export class MessageAttentionHandler {
   // mirror it onto the linked attention item(s). syncSourceStatus is idempotent,
   // so a re-published event (from the reverse path) no-ops here.
   @Transactional()
-  @EventHandler(MessageManagedStatusChanged, { group: "attention-items" })
+  @EventHandler(MessageManagedStatusChanged, AttentionItemsConsumerGroup)
   async onMessageManagedStatusChanged(
     payload: EventOf<typeof MessageManagedStatusChanged>,
   ): Promise<void> {
@@ -109,26 +108,15 @@ export class MessageAttentionHandler {
   }
 
   private async createAttentionItemsForMessage(
-    message: {
-      id: string;
-      threadId: string;
-      senderKind: "user" | "guest";
-      senderId: string;
-      body: string;
-      tagIds?: string[];
-      createdAt: string;
-    },
-    participantUserIds: string[],
+    payload: EventOf<typeof MessageCreated | typeof MessageUpdated>,
   ): Promise<void> {
+    const { message, sentToUserId } = payload;
+
     if (_.isEmpty(message.tagIds)) {
       return;
     }
 
-    const recipientUserIds = participantUserIds.filter(
-      (id) => !(message.senderKind === "user" && id === message.senderId),
-    );
-
-    if (recipientUserIds.length === 0) {
+    if (!sentToUserId || sentToUserId === message.senderId) {
       return;
     }
 
@@ -148,20 +136,18 @@ export class MessageAttentionHandler {
     const { dueDate, sourceCalendarEventId } =
       await this.dueDateService.deriveFromTags(tagIds, sentAt);
 
-    for (const userId of recipientUserIds) {
-      this.logger.info(
-        `Creating attention item for user ${userId} based on message ${message.id}`,
-      );
+    this.logger.info(
+      `Creating attention item for user ${sentToUserId} based on message ${message.id}`,
+    );
 
-      await this.attentionItemsService.create({
-        id: generateId(),
-        userId,
-        type: "tagged_message",
-        dueDate,
-        metadata,
-        tagIds,
-        sourceCalendarEventId,
-      });
-    }
+    await this.attentionItemsService.create({
+      id: generateId(),
+      userId: sentToUserId,
+      type: "tagged_message",
+      dueDate,
+      metadata,
+      tagIds,
+      sourceCalendarEventId,
+    });
   }
 }

@@ -127,7 +127,10 @@ export class TasksService {
     if (task.batchId) {
       await this.taskBatches.emitBatchUpserted(task.batchId);
     } else {
-      await this.eventsPublisher.publish(TaskDeleted, { taskId: id });
+      await this.eventsPublisher.publish(TaskDeleted, {
+        taskId: id,
+        assigneeUserId: task.assigneeUserId,
+      });
     }
   }
 

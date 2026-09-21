@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
+import { PgDatabase } from "drizzle-orm/pg-core";
 import { Db } from "pg-boss";
 
 /**
@@ -13,7 +14,10 @@ import { Db } from "pg-boss";
  * caller's transaction. Wrapping each value in `sql.param()` binds an array as
  * one value (node-postgres serialises it to `{...}`); scalars are unaffected.
  */
-export function fromDrizzleTx(tx: NodePgDatabase): Db {
+export function fromDrizzleTx(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: PgDatabase<NodePgQueryResultHKT, any>,
+): Db {
   return {
     async executeSql(text: string, values: unknown[] = []) {
       const { parts, reordered } = splitPlaceholders(text, values);

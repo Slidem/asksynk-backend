@@ -153,3 +153,8 @@ event has no user at all and the group's key function stops being total.
    `@EventHandler` must be registered, and every registered `(group, event)`
    must have a handler. The second check is what keeps another orphan `email`
    group from ever existing.
+6. **`@EventHandler` still declares its group.** Only `defineEvent` loses its
+   `groups` field. A `Dual` event has handlers on both legs — realtime in
+   `ws.gateway.ts`, durable in its group's handler — and the presence of
+   `{ group }` is the only thing that tells them apart. It also names the
+   implementing class, which the registry cannot.

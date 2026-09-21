@@ -5,7 +5,6 @@ import {
   ModuleMetadata,
 } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { DiscoveryModule } from "@nestjs/core";
 
 import { DurableConsumerRuntime } from "@/api/platform/events/consumer/durable-consumer-runtime.service";
 import { EventConsumerDiscovery } from "@/api/platform/events/consumer/event-consumer.discovery";
@@ -14,6 +13,7 @@ import {
   EventsConsumerDb,
   RealtimeListenerService,
 } from "@/api/platform/events/consumer/realtime-listener.service";
+import { EventHandlersModule } from "@/api/platform/events/decorators/event-handlers.module";
 import { MessageBusModule } from "@/api/platform/jobs/message-bus/message-bus.module";
 
 export interface EventConsumerAsyncOptions
@@ -27,7 +27,7 @@ export class EventConsumerModule {
     return {
       module: EventConsumerModule,
       imports: [
-        DiscoveryModule,
+        EventHandlersModule,
         ConfigModule,
         MessageBusModule,
         ...(opts.imports ?? []),

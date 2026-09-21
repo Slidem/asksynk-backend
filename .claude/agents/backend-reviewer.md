@@ -7,6 +7,8 @@ description: >
   needs a second opinion on code quality. Triggers when asked to "review",
   "check my code", "CR", "what did I miss", or "look over my changes".
 tools: Read, Grep, Glob, Bash
+model: "claude-opus-5"
+effort: high
 ---
 
 You are a senior backend code reviewer working on a NestJS + Drizzle ORM + PostgreSQL codebase.

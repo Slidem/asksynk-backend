@@ -1,51 +1,36 @@
 import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
-import { DiscoveryService, MetadataScanner } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { DurableConsumerRuntime } from "@/api/platform/events/consumer/durable-consumer-runtime.service";
-import { EVENT_HANDLERS_METADATA } from "@/api/platform/events/consumer/event-consumer.constants";
-import {
-  EventHandlerFn,
-  EventHandlerMeta,
-} from "@/api/platform/events/consumer/event-consumer.types";
 import { RealtimeListenerService } from "@/api/platform/events/consumer/realtime-listener.service";
-import {
-  DeliveryMode,
-  EventDef,
-} from "@/api/platform/events/registry/events.types";
-
-interface DiscoveredHandler {
-  className: string;
-  meta: EventHandlerMeta;
-  handler: EventHandlerFn<EventDef>;
-}
+import { EventHandlersRegistry } from "@/api/platform/events/decorators/event-handlers.registry";
+import { DeliveryMode } from "@/api/platform/events/registry/events.types";
 
 @Injectable()
 export class EventConsumerDiscovery implements OnApplicationBootstrap {
   private readonly logger = new ContextLogger(EventConsumerDiscovery.name);
 
   constructor(
-    private readonly discovery: DiscoveryService,
-    private readonly metadataScanner: MetadataScanner,
+    private readonly handlerRegistry: EventHandlersRegistry,
     private readonly realtime: RealtimeListenerService,
     private readonly durable: DurableConsumerRuntime,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    const handlers = this.discoverHandlers();
+    const handlers = this.handlerRegistry.getHandlers();
 
     let realtimeCount = 0;
     let durableCount = 0;
 
     for (const h of handlers) {
-      const { event, options } = h.meta;
+      const { event, group } = h.meta;
       const delivery = event.delivery;
       const id = `${h.className}.${h.meta.propertyKey}`;
 
       if (
         (delivery === DeliveryMode.Realtime ||
           delivery === DeliveryMode.Dual) &&
-        options?.group === undefined
+        group === undefined
       ) {
         this.realtime.subscribe(event, h.handler);
         realtimeCount += 1;
@@ -58,14 +43,9 @@ export class EventConsumerDiscovery implements OnApplicationBootstrap {
 
       if (
         (delivery === DeliveryMode.Durable || delivery === DeliveryMode.Dual) &&
-        options?.group !== undefined
+        group !== undefined
       ) {
-        await this.durable.bind(
-          event,
-          options.group,
-          h.handler,
-          options.concurrency,
-        );
+        await this.durable.subscribe(h);
         durableCount += 1;
         continue;
       }
@@ -75,51 +55,11 @@ export class EventConsumerDiscovery implements OnApplicationBootstrap {
       );
     }
 
-    await this.realtime.start();
+    await Promise.all([this.realtime.start(), this.durable.start()]);
 
     this.logger.info("event handlers bound", {
       realtime: realtimeCount,
       durable: durableCount,
     });
-  }
-
-  private discoverHandlers(): DiscoveredHandler[] {
-    const result: DiscoveredHandler[] = [];
-
-    for (const wrapper of this.discovery.getProviders()) {
-      const { instance, metatype } = wrapper;
-      if (!instance || !metatype) continue;
-
-      const list = Reflect.getOwnMetadata(EVENT_HANDLERS_METADATA, metatype) as
-        | EventHandlerMeta[]
-        | undefined;
-      if (!list || list.length === 0) continue;
-
-      const className = metatype.name;
-      const prototype = Object.getPrototypeOf(instance) as object;
-      const methodNames = new Set(
-        this.metadataScanner.getAllMethodNames(prototype),
-      );
-
-      for (const meta of list) {
-        if (!methodNames.has(meta.propertyKey)) {
-          throw new Error(
-            `@EventHandler method "${meta.propertyKey}" not found on ${className}.`,
-          );
-        }
-        const fn = (instance as Record<string, unknown>)[meta.propertyKey];
-        if (typeof fn !== "function") {
-          throw new Error(
-            `@EventHandler target ${className}.${meta.propertyKey} is not a function.`,
-          );
-        }
-        const bound = (fn as (...args: unknown[]) => Promise<void>).bind(
-          instance,
-        ) as EventHandlerFn<EventDef>;
-        result.push({ className, meta, handler: bound });
-      }
-    }
-
-    return result;
   }
 }

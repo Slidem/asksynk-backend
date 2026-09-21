@@ -8,7 +8,7 @@
     "start": "node dist/main.js",
     "lint": "pnpm -w eslint .",
     "test:unit": "jest --config jest.config.ts --selectProjects unit --passWithNoTests",
-    "test:integration": "jest --config jest.config.ts --selectProjects integration",
+    "test:integration": "jest --config jest.config.ts --selectProjects integration --runInBand",
     "test:all": "jest --config jest.config.ts"
   },
   "dependencies": {

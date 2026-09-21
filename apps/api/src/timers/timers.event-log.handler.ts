@@ -1,7 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
+import { TimerEventLogConsumerGroup } from "@/api/timers/timer-event-log.consumer-group";
 import { TimerLifecycle } from "@/api/platform/events/registry/events.registry";
 import { EventOf } from "@/api/platform/events/registry/events.types";
 import { TimersRepository } from "@/api/timers/timers.repository";
@@ -11,7 +12,7 @@ import { TimersRepository } from "@/api/timers/timers.repository";
 export class TimersEventLogHandler {
   constructor(private readonly timersRepo: TimersRepository) {}
 
-  @EventHandler(TimerLifecycle, { group: "timer-event-log" })
+  @EventHandler(TimerLifecycle, TimerEventLogConsumerGroup)
   @Transactional()
   async onTimerLifecycle(
     payload: EventOf<typeof TimerLifecycle>,

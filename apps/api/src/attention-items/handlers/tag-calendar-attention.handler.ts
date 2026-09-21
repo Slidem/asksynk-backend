@@ -7,7 +7,8 @@ import { AttentionDueDateService } from "@/api/attention-items/attention-due-dat
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
-import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
+import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import {
   CalendarEventCreated,
   CalendarEventDeleted,
@@ -32,7 +33,7 @@ export class TagCalendarAttentionHandler {
     private readonly dueDateService: AttentionDueDateService,
   ) {}
 
-  @EventHandler(CalendarEventCreated, { group: "attention-items" })
+  @EventHandler(CalendarEventCreated, AttentionItemsConsumerGroup)
   @Transactional()
   async onCalendarEventCreated(
     payload: EventOf<typeof CalendarEventCreated>,
@@ -46,7 +47,7 @@ export class TagCalendarAttentionHandler {
     await this.dueDateService.recomputeForItems(this.activeItems(items));
   }
 
-  @EventHandler(CalendarEventUpdated, { group: "attention-items" })
+  @EventHandler(CalendarEventUpdated, AttentionItemsConsumerGroup)
   @Transactional()
   async onCalendarEventUpdated(
     payload: EventOf<typeof CalendarEventUpdated>,
@@ -59,7 +60,7 @@ export class TagCalendarAttentionHandler {
     await this.dueDateService.recomputeForItems(items);
   }
 
-  @EventHandler(CalendarEventDeleted, { group: "attention-items" })
+  @EventHandler(CalendarEventDeleted, AttentionItemsConsumerGroup)
   @Transactional()
   async onCalendarEventDeleted(
     payload: EventOf<typeof CalendarEventDeleted>,
@@ -72,7 +73,7 @@ export class TagCalendarAttentionHandler {
     await this.dueDateService.recomputeForItems(this.activeItems(items));
   }
 
-  @EventHandler(TagUpdated, { group: "attention-items" })
+  @EventHandler(TagUpdated, AttentionItemsConsumerGroup)
   @Transactional()
   async onTagUpdated(payload: EventOf<typeof TagUpdated>): Promise<void> {
     const affectedItems = await this.attentionItemsRepository.findByTagIds([
@@ -86,7 +87,7 @@ export class TagCalendarAttentionHandler {
     await this.dueDateService.recomputeForItems(affectedItems);
   }
 
-  @EventHandler(TagDeleted, { group: "attention-items" })
+  @EventHandler(TagDeleted, AttentionItemsConsumerGroup)
   @Transactional()
   async onTagDeleted(payload: EventOf<typeof TagDeleted>): Promise<void> {
     this.logger.info(

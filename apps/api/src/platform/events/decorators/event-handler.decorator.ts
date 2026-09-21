@@ -1,22 +1,22 @@
 import "reflect-metadata";
 
-import { EVENT_HANDLERS_METADATA } from "@/api/platform/events/consumer/event-consumer.constants";
+import { EVENT_HANDLERS_METADATA } from "@/api/platform/events/decorators/event-handler.constants";
 import {
   EventHandlerFn,
   EventHandlerMeta,
-  EventHandlerOptions,
-} from "@/api/platform/events/consumer/event-consumer.types";
+} from "@/api/platform/events/decorators/event-handler.types";
 import {
+  ConsumerGroup,
   DeliveryMode,
   EventDef,
 } from "@/api/platform/events/registry/events.types";
 
 export function EventHandler<T extends EventDef>(
   event: T,
-  options?: EventHandlerOptions,
+  group?: ConsumerGroup<T>,
 ): MethodDecorator {
   return (target, propertyKey, descriptor) => {
-    validate(event, options?.group);
+    validate(event, group);
 
     const ctor = target.constructor;
     const list: EventHandlerMeta[] =
@@ -25,7 +25,7 @@ export function EventHandler<T extends EventDef>(
     list.push({
       propertyKey: propertyKey as string,
       event,
-      options,
+      group,
     });
 
     Reflect.defineMetadata(EVENT_HANDLERS_METADATA, list, ctor);
@@ -38,7 +38,7 @@ export type { EventHandlerFn };
 
 function validate<T extends EventDef>(
   event: T,
-  group: string | undefined,
+  group: ConsumerGroup<T> | undefined,
 ): void {
   const isRealtime = event.delivery === DeliveryMode.Realtime;
 
@@ -49,12 +49,5 @@ function validate<T extends EventDef>(
       );
     }
     return;
-  }
-
-  if (group && !event.groups.includes(group)) {
-    throw new Error(
-      `Group "${group}" is not declared on event "${event.name}". ` +
-        `Declared groups: ${event.groups.join(", ") || "(none)"}.`,
-    );
   }
 }

@@ -26,7 +26,6 @@ import {
   MessageManagedStatusChanged,
   MessageUpdated,
 } from "@/api/platform/events/registry/events.registry";
-import { EventOf } from "@/api/platform/events/registry/events.types";
 import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
 import { TagsService } from "@/api/tags/services/tags.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
@@ -299,7 +298,7 @@ export class MessagingService {
       managedStatus: this.initialManagedStatus(tagIds),
     });
 
-    await this.notifyMessageCreated(message, participants);
+    await this.notifyMessage(message, participants, MessageCreated);
 
     return message;
   }
@@ -346,7 +345,7 @@ export class MessagingService {
       thread.id,
     );
 
-    await this.notifyMessageCreated(message, participants);
+    await this.notifyMessage(message, participants, MessageCreated);
 
     return message;
   }
@@ -401,7 +400,7 @@ export class MessagingService {
       });
     }
 
-    await this.notifyMessageUpdated(updated, participants);
+    await this.notifyMessage(updated, participants, MessageUpdated);
 
     return updated;
   }
@@ -452,7 +451,7 @@ export class MessagingService {
       message.threadId,
     );
 
-    await this.notifyMessageUpdated(updated, participants);
+    await this.notifyMessage(updated, participants, MessageUpdated);
 
     return updated;
   }
@@ -506,6 +505,7 @@ export class MessagingService {
       managedStatus,
     );
     await this.publishManagedStatusChanged(
+      userId,
       message.threadId,
       messageId,
       managedStatus,
@@ -521,6 +521,7 @@ export class MessagingService {
    */
   @Transactional()
   async applyManagedStatusFromAttention(
+    userId: string,
     messageId: string,
     status: ManagedMessageStatus,
   ): Promise<void> {
@@ -538,6 +539,7 @@ export class MessagingService {
       managedStatus,
     );
     await this.publishManagedStatusChanged(
+      userId,
       message.threadId,
       messageId,
       managedStatus,
@@ -568,11 +570,13 @@ export class MessagingService {
   }
 
   private async publishManagedStatusChanged(
+    userId: string,
     threadId: string,
     messageId: string,
     managedStatus: ManagedStatus,
   ): Promise<void> {
     await this.eventsPublisher.publish(MessageManagedStatusChanged, {
+      userId,
       threadId,
       messageId,
       managedStatus,
@@ -613,9 +617,10 @@ export class MessagingService {
     }
   }
 
-  private async notifyMessageCreated(
+  private async notifyMessage(
     message: Message,
     participants: ThreadParticipantRow[],
+    eventType: typeof MessageCreated | typeof MessageUpdated,
   ): Promise<void> {
     const senderId =
       message.sender.kind === "user"
@@ -624,69 +629,49 @@ export class MessagingService {
 
     const participantUserIds = participants
       .map((p) => p.userId)
-      .filter((id): id is string => !!id);
+      .filter((id): id is string => !!id && id !== senderId);
 
     const participantGuestIds = participants
       .map((p) => p.guestId)
-      .filter((id): id is string => !!id);
+      .filter((id): id is string => !!id && id !== senderId);
 
-    const payload: EventOf<typeof MessageCreated> = {
+    const notificationPromises: Promise<void>[] = [];
+
+    const messageForDispatch = {
+      id: message.id,
       threadId: message.threadId,
-      message: {
-        id: message.id,
-        threadId: message.threadId,
-        parentMessageId: message.parentMessageId,
-        senderKind: message.sender.kind,
-        senderId: senderId,
-        body: message.body,
-        tagIds: message.tagIds,
-        attachmentIds: message.attachmentIds,
-        suggestionId: message.suggestionId,
-        managedStatus: message.managedStatus ?? undefined,
-        createdAt: message.createdAt.toISOString(),
-      },
-      participantUserIds,
-      participantGuestIds,
+      parentMessageId: message.parentMessageId,
+      senderKind: message.sender.kind,
+      senderId: senderId,
+      body: message.body,
+      tagIds: message.tagIds,
+      attachmentIds: message.attachmentIds,
+      suggestionId: message.suggestionId,
+      managedStatus: message.managedStatus ?? undefined,
+      createdAt: message.createdAt.toISOString(),
     };
 
-    await this.eventsPublisher.publish(MessageCreated, payload);
-  }
+    for (const userId of participantUserIds) {
+      notificationPromises.push(
+        this.eventsPublisher.publish(eventType, {
+          threadId: message.threadId,
+          message: messageForDispatch,
+          sentToUserId: userId,
+        }),
+      );
+    }
 
-  private async notifyMessageUpdated(
-    message: Message,
-    participants: ThreadParticipantRow[],
-  ): Promise<void> {
-    const senderId =
-      message.sender.kind === "user"
-        ? message.sender.userId
-        : message.sender.guestId;
+    for (const guestId of participantGuestIds) {
+      notificationPromises.push(
+        this.eventsPublisher.publish(eventType, {
+          threadId: message.threadId,
+          message: messageForDispatch,
+          sentToGuestId: guestId,
+        }),
+      );
+    }
 
-    const participantUserIds = participants
-      .map((p) => p.userId)
-      .filter((id): id is string => !!id);
-
-    const participantGuestIds = participants
-      .map((p) => p.guestId)
-      .filter((id): id is string => !!id);
-
-    const payload: EventOf<typeof MessageUpdated> = {
-      threadId: message.threadId,
-      message: {
-        id: message.id,
-        threadId: message.threadId,
-        senderKind: message.sender.kind,
-        senderId: senderId,
-        body: message.body,
-        tagIds: message.tagIds,
-        suggestionId: message.suggestionId,
-        managedStatus: message.managedStatus ?? undefined,
-        createdAt: message.createdAt.toISOString(),
-      },
-      participantUserIds,
-      participantGuestIds,
-    };
-
-    await this.eventsPublisher.publish(MessageUpdated, payload);
+    await Promise.all(notificationPromises);
   }
 
   private async assertNotFrozen(

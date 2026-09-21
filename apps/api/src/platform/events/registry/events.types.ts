@@ -27,7 +27,11 @@ export type EventDef<
   name: TName;
   schema: TSchema;
   delivery: DeliveryMode;
-  groups: string[];
 };
 
 export type EventOf<T extends EventDef> = z.infer<T["schema"]>;
+
+export type ConsumerGroup<D extends EventDef> = {
+  name: string;
+  orderingKeyFn(event: EventOf<D>): string;
+};

@@ -3,8 +3,9 @@ import { Transactional } from "@nestjs-cls/transactional";
 
 import { generateId } from "@/api/kernel/id";
 import { NetworksService } from "@/api/networks/services/networks.service";
-import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import { SuggestionSyncConsumerGroup } from "@/api/tasks/suggestion-sync.consumer-group";
 import {
   TaskBatchUpserted,
   TaskSuggested,
@@ -120,6 +121,7 @@ export class TaskSuggestionsService {
     );
     await this.eventsPublisher.publish(TaskSuggestionResolved, {
       suggestionId: id,
+      suggesteeUserId: suggestion.suggesteeUserId,
     });
     await this.publishUpdated(id);
     return updated ?? suggestion;
@@ -134,6 +136,7 @@ export class TaskSuggestionsService {
     );
     await this.eventsPublisher.publish(TaskSuggestionResolved, {
       suggestionId: id,
+      suggesteeUserId: suggestion.suggesteeUserId,
     });
     await this.publishUpdated(id);
     return updated ?? suggestion;
@@ -142,10 +145,11 @@ export class TaskSuggestionsService {
   // Suggester rescinds a still-pending suggestion.
   @Transactional()
   async rescind(userId: string, id: string): Promise<void> {
-    await this.requirePending(userId, id, "suggester");
+    const suggestion = await this.requirePending(userId, id, "suggester");
     await this.suggestionsRepository.updateStatus(id, "rejected");
     await this.eventsPublisher.publish(TaskSuggestionResolved, {
       suggestionId: id,
+      suggesteeUserId: suggestion.suggesteeUserId,
     });
     await this.publishUpdated(id);
   }
@@ -195,6 +199,7 @@ export class TaskSuggestionsService {
       suggestionId: input.id,
       title: merged.title,
       dueDate: merged.dueDate,
+      suggesteeUserId: suggestion.suggesteeUserId,
     });
     await this.publishUpdated(input.id);
     return updated ?? suggestion;
@@ -203,7 +208,7 @@ export class TaskSuggestionsService {
   // A materialized task changed status: rebroadcast its parent suggestion (if
   // any) to both participants. Own consumer group so it never starves the
   // attention-items consumer of the same events.
-  @EventHandler(TaskUpserted, { group: "suggestion-sync" })
+  @EventHandler(TaskUpserted, SuggestionSyncConsumerGroup)
   async onMaterializedTaskChanged(
     payload: EventOf<typeof TaskUpserted>,
   ): Promise<void> {
@@ -212,7 +217,7 @@ export class TaskSuggestionsService {
     if (suggestion) await this.publishUpdated(suggestion.id);
   }
 
-  @EventHandler(TaskBatchUpserted, { group: "suggestion-sync" })
+  @EventHandler(TaskBatchUpserted, SuggestionSyncConsumerGroup)
   async onMaterializedBatchChanged(
     payload: EventOf<typeof TaskBatchUpserted>,
   ): Promise<void> {

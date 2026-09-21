@@ -197,10 +197,10 @@ With a half-populated registry that resolves zero groups for real rows and marks
 them dispatched. Silent loss on every boot race, and it would not reproduce
 reliably. So:
 
-| Runs in                   | What                                                              |
-| ------------------------- | ----------------------------------------------------------------- |
-| `onModuleInit`            | each context's `register()` call — writes only                    |
-| `onApplicationBootstrap`  | dispatcher start, queue bootstrap, handler discovery — reads only |
+| Runs in                  | What                                                              |
+| ------------------------ | ----------------------------------------------------------------- |
+| `onModuleInit`           | each context's `register()` call — writes only                    |
+| `onApplicationBootstrap` | dispatcher start, queue bootstrap, handler discovery — reads only |
 
 Nest runs `onApplicationBootstrap` only after every module's `onModuleInit` has
 resolved.
@@ -220,6 +220,47 @@ Log the resolved registry at boot — group, event count, key strategy. A static
 array could be grepped in one file; a bean cannot, and one log line buys that
 back.
 
+#### `@EventHandler`'s `group` option stays — it is the lane discriminator
+
+Two different things are called "groups", and only one of them is dropped.
+
+|                                  | Dropped? | What it does                                  |
+| -------------------------------- | -------- | --------------------------------------------- |
+| `groups: [...]` on `defineEvent` | **yes**  | the producer naming its consumers             |
+| `{ group }` on `@EventHandler`   | **no**   | which lane, and which group's handler this is |
+
+A `Dual` event legitimately has handlers on both legs — `ws.gateway.ts` takes
+`message.created` for the realtime push while `message-attention.handler.ts`
+takes it for `attention-items`. The only thing telling them apart is whether the
+decorator declares a group:
+
+```ts
+if ((delivery === Realtime || delivery === Dual) && options?.group === undefined) → realtime
+if ((delivery === Durable  || delivery === Dual) && options?.group !== undefined) → durable
+```
+
+Remove the option and every `Dual` handler falls into the first branch, leaving
+the durable branch unreachable — the durable leg of `message.created`,
+`message.updated`, `message.status.changed`, `timer.lifecycle` and `tag.updated`
+disappears with no error.
+
+The option is not redundant with the registry. The registry answers _which
+groups consume event E_; the decorator answers _which class implements group G's
+handler for E_, which the registry cannot express. Nor can it be inferred:
+`task.upserted` is consumed by both `attention-items` and `suggestion-sync`, so
+a bare `@EventHandler(TaskUpserted)` would be ambiguous. It is also what makes
+the reverse boot check below possible at all.
+
+The decorator keeps one check, since it needs only `event.delivery`: a realtime
+event must not declare a group. The "is this group declared on this event" check
+is the one that moves to discovery.
+
+> Considered and deferred: making the lane explicit with a class-level
+> `@DurableConsumer("<group>")` plus a bare `@EventHandler(E)` on methods. Every
+> handler class today is already single-lane and single-group, so it would map
+> cleanly — but it touches every handler site for a readability win, and
+> "absent means realtime" is survivable once written down.
+
 #### Validation replaces the event's `groups` field
 
 The event definitions **lose** `groups` rather than keeping it as a cross-check.
@@ -227,7 +268,10 @@ Keeping it would state the same fact in three places:
 
 1. event def — `groups: ["attention-items"]`
 2. registry — `events: [MessageCreated, …]`
-3. handler — `@EventHandler(MessageCreated, { group: "attention-items" })`
+3. handler — `@EventHandler(MessageCreated, AttentionItemsConsumerGroup)`
+
+Only (1) goes. (3) stays — see above; it is the lane discriminator, and it names
+the implementing class rather than restating the subscription.
 
 (1) and (2) are the same information in opposite directions, and (1) re-couples
 producer to consumer, which is the coupling this change exists to remove. It is

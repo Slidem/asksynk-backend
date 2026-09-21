@@ -1,8 +1,8 @@
 import {
   Inject,
   Injectable,
+  OnApplicationBootstrap,
   OnModuleDestroy,
-  OnModuleInit,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -10,8 +10,10 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 import { Client } from "pg";
 
+import { EventHandlersRegistry } from "@/api/platform/events/decorators/event-handlers.registry";
 import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
 import { QueuedJobInsert } from "@/api/platform/jobs/message-bus/message-bus.types";
+import { fromDrizzleTx } from "@/api/platform/jobs/scheduled-job/pgboss-drizzle-db";
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
 export const EVENTS_DISPATCHER_DB = "EVENTS_DISPATCHER_DB";
@@ -21,13 +23,16 @@ export type EventsDispatcherDb = NodePgDatabase<{
 }>;
 
 const LISTEN_CHANNEL = "outbox_new";
+const DISPATCH_LOCK_NAME = "events_outbox_dispatcher";
 const BATCH_SIZE = 100;
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 500;
 const RECONNECT_BASE_DELAY_MS = 500;
 const RECONNECT_MAX_DELAY_MS = 10000;
 
 @Injectable()
-export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
+export class EventsOutboxDispatcher
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
   private readonly logger = new ContextLogger(EventsOutboxDispatcher.name);
 
   private listenClient: Client | null = null;
@@ -42,9 +47,10 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
     @Inject(EVENTS_DISPATCHER_DB) private readonly db: EventsDispatcherDb,
     private readonly bus: MessageBusService,
     private readonly config: ConfigService,
+    private readonly eventHandlersRegistry: EventHandlersRegistry,
   ) {}
 
-  async onModuleInit(): Promise<void> {
+  async onApplicationBootstrap(): Promise<void> {
     await this.connectListen();
     this.startPollLoop();
     await this.tick();
@@ -166,12 +172,31 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
 
   private async drainBatch(): Promise<boolean> {
     return this.db.transaction(async (tx) => {
+      // Only one node may dispatch at a time, otherwise nodes drain disjoint
+      // batches concurrently and per-key order is lost. Released at tx end.
+      const {
+        rows: [lock],
+      } = await tx.execute<{ locked: boolean }>(
+        sql`select pg_try_advisory_xact_lock(hashtext(${DISPATCH_LOCK_NAME})) as locked`,
+      );
+
+      if (!lock?.locked) {
+        return false;
+      }
+
+      // Only drain what this node can hand to a consumer group; anything else
+      // is left for a node that has the handlers instead of being dropped.
+      const handledEventTypes = this.eventHandlersRegistry
+        .getAllConsumerGroupHandledEvents()
+        .map((e) => e.name);
+      if (handledEventTypes.length === 0) {
+        return false;
+      }
 
       const rows = await tx
         .select({
           id: eventsOutbox.id,
           eventType: eventsOutbox.eventType,
-          groups: eventsOutbox.groups,
           payload: eventsOutbox.payload,
         })
         .from(eventsOutbox)
@@ -180,9 +205,10 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
             isNull(eventsOutbox.dispatchedAt),
             isNull(eventsOutbox.failedAt),
             inArray(eventsOutbox.deliveryMode, ["durable", "dual"]),
+            inArray(eventsOutbox.eventType, handledEventTypes),
           ),
         )
-        .orderBy(asc(eventsOutbox.createdAt))
+        .orderBy(asc(eventsOutbox.id))
         .limit(BATCH_SIZE)
         .for("update", { skipLocked: true });
 
@@ -196,16 +222,24 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
 
       for (const row of rows) {
         try {
-          const groups = row.groups
-            .split(",")
-            .map((g) => g.trim())
-            .filter(Boolean);
+          const consumerGroups = this.eventHandlersRegistry.getConsumerGroups(
+            row.eventType,
+          );
 
-          for (const group of groups) {
+          for (const consumerGroup of consumerGroups) {
+            const messageId = row.id;
+            const queueName = consumerGroup.name;
+            const orderingKey = consumerGroup.orderingKeyFn(row.payload);
+
             jobs.push({
-              name: `${row.eventType}.${group}`,
-              data: { eventId: row.id, payload: row.payload },
-              singletonKey: `${row.id}.${group}`,
+              id: messageId,
+              name: queueName,
+              data: {
+                eventId: row.id,
+                eventType: row.eventType,
+                payload: row.payload,
+              },
+              singletonKey: orderingKey,
             });
           }
           succeededIds.push(row.id);
@@ -221,7 +255,7 @@ export class EventsOutboxDispatcher implements OnModuleInit, OnModuleDestroy {
       }
 
       if (jobs.length > 0) {
-        await this.bus.insertJobs(jobs);
+        await this.bus.insertJobs(jobs, fromDrizzleTx(tx));
       }
 
       if (succeededIds.length > 0) {

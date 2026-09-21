@@ -67,9 +67,12 @@ Changed:
   three `defineEvent` overloads collapse to two (realtime vs durable/dual)
 - `events.registry.ts` — remove `groups: [...]` from every definition, which
   also removes the orphan `email` group
-- `event-consumer.decorator.ts` — `validate()` can no longer check the event's
-  group list at decoration time; the check moves to discovery, against the
-  registry
+- `event-consumer.decorator.ts` — **keep `group` on `EventHandlerOptions`.** It
+  is the realtime/durable lane discriminator, not a restatement of the registry;
+  removing it makes every `Dual` handler bind realtime and leaves the durable
+  branch of discovery unreachable. Keep the realtime-must-not-declare-a-group
+  check too — it needs only `event.delivery`. Only the "is this group declared on
+  this event" check moves to discovery, against the registry.
 
 ## Phase 2 — producer payload changes
 
@@ -130,7 +133,8 @@ After this phase every group's key function is total.
   dead-letter branch (`job.retryCount >= job.retryLimit` → record and return)
 - `event-consumer.discovery.ts` — accumulate per-group handler maps, bind once
   per group after discovery completes
-- `event-consumer.types.ts` — drop `concurrency` from `EventHandlerOptions`
+- `event-consumer.types.ts` — drop `concurrency` from `EventHandlerOptions` and
+  nothing else; `group` stays (Phase 1)
 - New dead-letter repository + service (the runtime must not touch the DB
   directly)
 - `PATCH /event-dead-letters/:id` with `{ status: "replayed" }` — re-enqueues

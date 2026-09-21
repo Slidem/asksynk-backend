@@ -23,7 +23,6 @@ export const eventsOutbox = pgTable(
       .default(sql`uuidv7()`),
     eventType: text("event_type").notNull(),
     deliveryMode: outboxDeliveryMode("delivery_mode").notNull(),
-    groups: text("groups").notNull(), // comma-separated list of groups
     payload: jsonb("payload").$type<unknown>().notNull(),
     dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),

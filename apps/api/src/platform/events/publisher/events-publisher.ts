@@ -43,7 +43,6 @@ export class EventsPublisherImpl extends EventsPublisher {
     await this.txHost.tx.insert(eventsOutbox).values({
       eventType: def.name,
       deliveryMode: def.delivery,
-      groups: def.groups.join(","),
       payload: validated,
     });
   }

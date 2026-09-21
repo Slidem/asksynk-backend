@@ -5,7 +5,8 @@ import { AttentionDueDateService } from "@/api/attention-items/attention-due-dat
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { generateId } from "@/api/kernel/id";
-import { EventHandler } from "@/api/platform/events/consumer/event-consumer.decorator";
+import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
+import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import {
   TaskBatchDeleted,
   TaskBatchUpserted,
@@ -29,7 +30,7 @@ export class TaskAttentionHandler {
   ) {}
 
   @Transactional()
-  @EventHandler(TaskUpserted, { group: "attention-items" })
+  @EventHandler(TaskUpserted, AttentionItemsConsumerGroup)
   async onTaskUpserted(payload: EventOf<typeof TaskUpserted>): Promise<void> {
     const { dueDate, sourceCalendarEventId } =
       await this.deriveDueDate(payload);
@@ -46,13 +47,13 @@ export class TaskAttentionHandler {
   }
 
   @Transactional()
-  @EventHandler(TaskDeleted, { group: "attention-items" })
+  @EventHandler(TaskDeleted, AttentionItemsConsumerGroup)
   async onTaskDeleted(payload: EventOf<typeof TaskDeleted>): Promise<void> {
     await this.attentionItemsService.deleteBySource({ taskId: payload.taskId });
   }
 
   @Transactional()
-  @EventHandler(TaskBatchUpserted, { group: "attention-items" })
+  @EventHandler(TaskBatchUpserted, AttentionItemsConsumerGroup)
   async onTaskBatchUpserted(
     payload: EventOf<typeof TaskBatchUpserted>,
   ): Promise<void> {
@@ -71,7 +72,7 @@ export class TaskAttentionHandler {
   }
 
   @Transactional()
-  @EventHandler(TaskBatchDeleted, { group: "attention-items" })
+  @EventHandler(TaskBatchDeleted, AttentionItemsConsumerGroup)
   async onTaskBatchDeleted(
     payload: EventOf<typeof TaskBatchDeleted>,
   ): Promise<void> {
@@ -81,7 +82,7 @@ export class TaskAttentionHandler {
   }
 
   @Transactional()
-  @EventHandler(TaskSuggested, { group: "attention-items" })
+  @EventHandler(TaskSuggested, AttentionItemsConsumerGroup)
   async onTaskSuggested(payload: EventOf<typeof TaskSuggested>): Promise<void> {
     // Idempotent under redelivery: one inbox item per suggestion.
     const existing = await this.attentionItemsRepository.findBySuggestionId(
@@ -108,7 +109,7 @@ export class TaskAttentionHandler {
   }
 
   @Transactional()
-  @EventHandler(TaskSuggestionResolved, { group: "attention-items" })
+  @EventHandler(TaskSuggestionResolved, AttentionItemsConsumerGroup)
   async onTaskSuggestionResolved(
     payload: EventOf<typeof TaskSuggestionResolved>,
   ): Promise<void> {
@@ -119,7 +120,7 @@ export class TaskAttentionHandler {
   }
 
   @Transactional()
-  @EventHandler(TaskSuggestionUpdated, { group: "attention-items" })
+  @EventHandler(TaskSuggestionUpdated, AttentionItemsConsumerGroup)
   async onTaskSuggestionUpdated(
     payload: EventOf<typeof TaskSuggestionUpdated>,
   ): Promise<void> {

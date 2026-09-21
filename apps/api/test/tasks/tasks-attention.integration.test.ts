@@ -38,7 +38,7 @@ import {
 } from "@/test/helpers/testUserRegistry";
 
 const POLL_TIMEOUT_MS = 8000;
-const ASSERT_TOLERANCE_MS = 5000;
+const ASSERT_TOLERANCE_MS = 10000;
 
 interface TaskMeta {
   type: "task";

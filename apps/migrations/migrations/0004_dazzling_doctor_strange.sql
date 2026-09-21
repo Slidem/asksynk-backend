@@ -1,0 +1,1 @@
+ALTER TABLE "events_outbox" DROP COLUMN "groups";

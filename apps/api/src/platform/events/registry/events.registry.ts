@@ -19,7 +19,6 @@ export const TagUpdated = defineEvent({
     answerModeType: z.enum(["immediately", "timeblock"]),
   }),
   delivery: DeliveryMode.Dual,
-  groups: ["email", "attention-items"],
 });
 
 export const TagDeleted = defineEvent({
@@ -29,7 +28,6 @@ export const TagDeleted = defineEvent({
     userId: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
 });
 
 export const MessageCreated = defineEvent({
@@ -49,11 +47,10 @@ export const MessageCreated = defineEvent({
       managedStatus: managedStatusSchema.optional(),
       createdAt: z.string(),
     }),
-    participantUserIds: z.array(z.string()),
-    participantGuestIds: z.array(z.string()),
+    sentToUserId: z.string().optional(),
+    sentToGuestId: z.string().optional(),
   }),
   delivery: DeliveryMode.Dual,
-  groups: ["attention-items"],
 });
 
 export const MessageUpdated = defineEvent({
@@ -71,11 +68,10 @@ export const MessageUpdated = defineEvent({
       managedStatus: managedStatusSchema.optional(),
       createdAt: z.string(),
     }),
-    participantUserIds: z.array(z.string()),
-    participantGuestIds: z.array(z.string()),
+    sentToUserId: z.string().optional(),
+    sentToGuestId: z.string().optional(),
   }),
   delivery: DeliveryMode.Dual,
-  groups: ["attention-items"],
 });
 
 // Recipient changed a tagged message's managed_status (WS message.updateStatus)
@@ -84,12 +80,12 @@ export const MessageUpdated = defineEvent({
 export const MessageManagedStatusChanged = defineEvent({
   name: "message.status.changed",
   schema: z.object({
+    userId: z.string(),
     threadId: z.string(),
     messageId: z.string(),
     managedStatus: managedStatusSchema,
   }),
   delivery: DeliveryMode.Dual,
-  groups: ["attention-items"],
 });
 
 // Reverse sync: a tagged_message attention item's status was changed from the
@@ -99,11 +95,11 @@ export const MessageManagedStatusChanged = defineEvent({
 export const AttentionMessageStatusChanged = defineEvent({
   name: "attention.message.synced",
   schema: z.object({
+    userId: z.string(),
     messageId: z.string(),
     status: managedStatusEnum,
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["messaging"],
 });
 
 export const CalendarEventCreated = defineEvent({
@@ -116,7 +112,6 @@ export const CalendarEventCreated = defineEvent({
     endAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items", "calendar-sync"],
 });
 
 export const CalendarEventUpdated = defineEvent({
@@ -129,7 +124,6 @@ export const CalendarEventUpdated = defineEvent({
     endAt: z.optional(z.string()),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items", "calendar-sync"],
 });
 
 export const CalendarEventDeleted = defineEvent({
@@ -139,7 +133,6 @@ export const CalendarEventDeleted = defineEvent({
     userId: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items", "calendar-sync"],
 });
 
 export const TimerLifecycle = defineEvent({
@@ -153,7 +146,6 @@ export const TimerLifecycle = defineEvent({
     occurredAt: z.string(),
   }),
   delivery: DeliveryMode.Dual,
-  groups: ["timer-event-log"],
 });
 
 // Tasks emit durable domain events; the attention-items consumer group mirrors
@@ -174,17 +166,12 @@ export const TaskUpserted = defineEvent({
     createdAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  // suggestion-sync: independent queue that rebroadcasts the parent suggestion
-  // (if any) when a materialized task changes. Must NOT share attention-items'
-  // queue or events would be split between the two consumers.
-  groups: ["attention-items", "suggestion-sync"],
 });
 
 export const TaskDeleted = defineEvent({
   name: "task.deleted",
-  schema: z.object({ taskId: z.string() }),
+  schema: z.object({ taskId: z.string(), assigneeUserId: z.string() }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
 });
 
 export const TaskBatchUpserted = defineEvent({
@@ -200,14 +187,12 @@ export const TaskBatchUpserted = defineEvent({
     createdAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items", "suggestion-sync"],
 });
 
 export const TaskBatchDeleted = defineEvent({
   name: "task.batch.deleted",
   schema: z.object({ taskBatchId: z.string() }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
 });
 
 export const TaskSuggested = defineEvent({
@@ -220,25 +205,23 @@ export const TaskSuggested = defineEvent({
     dueDate: z.string().nullable(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
 });
 
 export const TaskSuggestionResolved = defineEvent({
   name: "task.suggestion.resolved",
-  schema: z.object({ suggestionId: z.string() }),
+  schema: z.object({ suggestionId: z.string(), suggesteeUserId: z.string() }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
 });
 
 export const TaskSuggestionUpdated = defineEvent({
   name: "task.suggestion.updated",
   schema: z.object({
     suggestionId: z.string(),
+    suggesteeUserId: z.string(),
     title: z.string(),
     dueDate: z.string().nullable(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention-items"],
 });
 
 const attentionItemTypeSchema = z.enum([

@@ -8,7 +8,7 @@ import { Client } from "pg";
 import {
   EventHandlerContext,
   EventHandlerFn,
-} from "@/api/platform/events/consumer/event-consumer.types";
+} from "@/api/platform/events/decorators/event-handler.types";
 import { EventDef } from "@/api/platform/events/registry/events.types";
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
