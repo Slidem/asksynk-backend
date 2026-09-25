@@ -5,7 +5,6 @@ import { generateId } from "@/api/kernel/id";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
-import { SuggestionSyncConsumerGroup } from "@/api/tasks/suggestion-sync.consumer-group";
 import {
   TaskBatchUpserted,
   TaskSuggested,
@@ -30,6 +29,7 @@ import { toTaskSuggestionResponse } from "@/api/tasks/rest/mappers/task.mapper";
 import { MaterializedTask } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { TasksService } from "@/api/tasks/services/tasks.service";
+import { SuggestionSyncConsumerGroup } from "@/api/tasks/suggestion-sync.consumer-group";
 import { tasksError } from "@/api/tasks/tasks.errors";
 
 @Injectable()

@@ -43,6 +43,13 @@
       "when": 1789961662467,
       "tag": "0005_narrow_outbox_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790307455994,
+      "tag": "0006_tiny_multiple_man",
+      "breakpoints": true
     }
   ]
 }

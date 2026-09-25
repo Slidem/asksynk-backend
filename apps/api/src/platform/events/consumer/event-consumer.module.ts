@@ -13,6 +13,7 @@ import {
   EventsConsumerDb,
   RealtimeListenerService,
 } from "@/api/platform/events/consumer/realtime-listener.service";
+import { EventsDeadLettersRepository } from "@/api/platform/events/dead-letters/events-dead-letters.repository";
 import { EventHandlersModule } from "@/api/platform/events/decorators/event-handlers.module";
 import { MessageBusModule } from "@/api/platform/jobs/message-bus/message-bus.module";
 
@@ -40,6 +41,7 @@ export class EventConsumerModule {
         },
         RealtimeListenerService,
         DurableConsumerRuntime,
+        EventsDeadLettersRepository,
         EventConsumerDiscovery,
       ],
       exports: [],

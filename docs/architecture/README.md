@@ -100,6 +100,7 @@ Five choices shape everything else. Each has an ADR.
 | Calendar boundary     | `calendar-events` + `calendar-integrations` merge into `scheduling` | [0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
 | Attention shape       | Aggregate whose _content_ is a projection; typed source columns     | [0004](adr/0004-attention-as-projection-with-typed-source.md)       |
 | Shared code           | Two tiers — `kernel/` (pure) and `platform/` (framework-aware)      | [0005](adr/0005-kernel-and-platform-tiers.md)                       |
+| Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table | [0006](adr/0006-group-ordered-event-delivery.md)                  |
 
 Code structure stays **in place** — `apps/api/src/<context>/` with layered
 subfolders — enforced by `eslint-plugin-boundaries` and `dependency-cruiser` rather

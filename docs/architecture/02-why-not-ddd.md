@@ -244,6 +244,13 @@ has **no publisher and no consumer**, and the `email` delivery group has **no ha
 anywhere** — yet the dispatcher faithfully creates the `tag.updated.email` queue and
 enqueues jobs into it that nothing will ever process.
 
+> **Update:** both symptoms are fixed. `tag.created` is gone, and the events
+> refactor ([docs/events](../events/README.md)) dropped `groups` from the event
+> definitions: consumer groups are now consts owned by the consuming context and
+> discovered from `@EventHandler`, so the producer no longer names its consumers.
+> The event catalogue itself is still central, now at
+> `apps/api/src/platform/events/registry/events.registry.ts`.
+
 ---
 
 ## Finding 8 — The hub of the system is the least typed thing in it

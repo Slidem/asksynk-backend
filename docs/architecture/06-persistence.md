@@ -25,7 +25,7 @@ All 33 tables, each assigned to exactly one context.
 | `sharing`       | `public_views`, `public_view_guests`                                                                                                |
 | `files`         | `attachments`                                                                                                                       |
 | `identity`      | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
-| `platform`      | `events_outbox`                                                                                                                     |
+| `platform`      | `events_outbox`, `events_dead_letters`                                                                                              |
 
 Already-separate schemas that stay separate: `pgboss` (pg-boss owns it), `drizzle`
 (migration journal), and whatever the `rrule` extension installs.
@@ -75,7 +75,7 @@ apps/migrations/src/schema/
   scheduling/   _schema.ts  calendars.ts  calendarEvents.ts  calendarEventsExceptions.ts
                             calendarEventTags.ts  calendarIntegrations.ts  calendarEventLinks.ts
   conversations/ …   tasks/ …   focus/ …   network/ …   sharing/ …   files/ …
-  platform/     _schema.ts  outbox.ts
+  platform/     _schema.ts  outbox.ts  eventsDeadLetters.ts
 ```
 
 `drizzle.config.ts` already points at `schema: "./src/schema"` and drizzle-kit globs
@@ -275,7 +275,7 @@ gets its own decision when it arrives.
 | `tags.name` `.unique()` → `uniqueIndex on (userId, lower(name))`                                   | **Live bug.** Two users cannot both have a tag called "urgent".                                                   | Medium — the migration **must dedupe existing rows first**, or it will fail on a non-empty database |
 | `attention_items`: typed `source_channel` / `source_id` + unique index; drop the `metadata` probes | Kills four unindexed jsonb scans and three speculative enum values; precondition for adding channels cheaply      | **High** — a real data migration. See [07](07-attention-core.md)                                    |
 | `attachments.placement` (`public \| message`) → `visibility` + `owner_context`                     | Removes consumer-context names from the storage table; the existing resolver registry already dispatches on a key | Low — `message → (restricted, 'conversations')`                                                     |
-| `events_outbox`: index on `dispatched_at`; retention job for realtime-only rows older than 30 days | Realtime rows are never marked dispatched and accumulate forever; the poll query will sequential-scan             | None                                                                                                |
+| `events_outbox`: partial index on `id` where `dispatched_at` / `failed_at` are null; retention job for realtime-only rows older than 30 days | Realtime rows are never marked dispatched and accumulate forever; the drain (ordered by `id`) will sequential-scan. _Still open — see [docs/events 03](../events/03-implementation-plan.md)._ | None |
 
 ---
 

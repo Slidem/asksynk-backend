@@ -2,11 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
 import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
+import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
 import { generateId } from "@/api/kernel/id";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
-import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import {
   TaskBatchDeleted,
   TaskBatchUpserted,

@@ -130,9 +130,13 @@ export const AttentionSourceUpserted = defineEvent({
     occurredAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention"],
 });
 ```
+
+> **Amended 2026-09-25:** the sample originally carried `groups: ["attention"]`.
+> Events no longer name their consumers; attention declares an `attention`
+> `ConsumerGroup` const (keyed on `userId`) and passes it to its `@EventHandler`s —
+> see [ADR 0006](0006-group-ordered-event-delivery.md).
 
 Each source keeps its own events for its own purposes and _additionally_ publishes
 this one from a thin outbound translator it owns. `mapTaskStatusToAttention` — today a

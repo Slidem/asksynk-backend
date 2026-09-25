@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 
+import { MAX_ATTEMPTS } from "@/api/platform/events/consumer/durable-delivery.constants";
+import { EventsDeadLettersRepository } from "@/api/platform/events/dead-letters/events-dead-letters.repository";
 import {
   DecoratedEventHandler,
   EventHandlerContext,
@@ -23,7 +25,10 @@ export class DurableConsumerRuntime {
     DecoratedEventHandler[]
   >();
 
-  constructor(private readonly bus: MessageBusService) {}
+  constructor(
+    private readonly bus: MessageBusService,
+    private readonly deadLetters: EventsDeadLettersRepository,
+  ) {}
 
   async subscribe(eventHandler: DecoratedEventHandler): Promise<void> {
     const group = eventHandler.meta.group;
@@ -60,33 +65,68 @@ export class DurableConsumerRuntime {
         queueName,
         async (data, job) => {
           const eventName = data.eventType;
-          const handler = handlersPerEvent.get(eventName);
+          const attempt = job.retryCount + 1;
 
-          if (!handler) {
-            throw new Error(
-              `No handler found for event: ${eventName} in group: ${groupName}`,
-            );
-          }
-          const validated = handler.meta.event.schema.parse(
-            data.payload,
-          ) as EventOf<typeof handler.meta.event>;
-
-          const ctx: EventHandlerContext = {
-            eventId: data.eventId,
-            attempt: (job.retryCount ?? 0) + 1,
-          };
-          try {
-            // TODO: Need to consider event idempotency; most likely need to apply some sort of inbox pattern to track processed event IDs.
-            await handler.handler(validated, ctx);
-          } catch (error) {
-            this.logger.error("Error processing durable event", {
+          // Only reachable when the terminal attempt died outside the catch
+          // below (expired, or the worker was killed): never re-run the handler.
+          if (job.retryCount >= MAX_ATTEMPTS) {
+            const error = "attempt abandoned: expired or worker died";
+            this.logger.error("durable event abandoned, dead-lettering", {
               event: eventName,
               eventId: data.eventId,
               group: groupName,
-              attempt: ctx.attempt,
-              error: error instanceof Error ? error.stack : String(error),
+              attempt,
+              error,
             });
-            throw error;
+            await this.deadLetter(groupName, data, job.retryCount, error);
+            return;
+          }
+
+          try {
+            const handler = handlersPerEvent.get(eventName);
+
+            if (!handler) {
+              throw new Error(
+                `No handler found for event: ${eventName} in group: ${groupName}`,
+              );
+            }
+
+            const validated = handler.meta.event.schema.parse(
+              data.payload,
+            ) as EventOf<typeof handler.meta.event>;
+
+            const ctx: EventHandlerContext = {
+              eventId: data.eventId,
+              attempt,
+            };
+
+            // TODO: Need to consider event idempotency; most likely need to apply some sort of inbox pattern to track processed event IDs.
+            await handler.handler(validated, ctx);
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? (error.stack ?? error.message)
+                : String(error);
+            const logContext = {
+              event: eventName,
+              eventId: data.eventId,
+              group: groupName,
+              attempt,
+              error: message,
+            };
+
+            if (attempt < MAX_ATTEMPTS) {
+              // pg-boss retries; the key stays blocked meanwhile.
+              this.logger.warn("durable event failed, retrying", logContext);
+              throw error;
+            }
+
+            // Completing the job (by returning) unblocks the key.
+            this.logger.error(
+              "durable event failed, dead-lettering",
+              logContext,
+            );
+            await this.deadLetter(groupName, data, attempt, message);
           }
         },
         {
@@ -94,5 +134,21 @@ export class DurableConsumerRuntime {
         },
       );
     }
+  }
+
+  private async deadLetter(
+    consumerGroup: string,
+    data: DurableJobData,
+    attempts: number,
+    error: string,
+  ): Promise<void> {
+    await this.deadLetters.record({
+      consumerGroup,
+      eventId: data.eventId,
+      eventType: data.eventType,
+      payload: data.payload,
+      error,
+      attempts,
+    });
   }
 }

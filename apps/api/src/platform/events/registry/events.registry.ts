@@ -191,7 +191,7 @@ export const TaskBatchUpserted = defineEvent({
 
 export const TaskBatchDeleted = defineEvent({
   name: "task.batch.deleted",
-  schema: z.object({ taskBatchId: z.string() }),
+  schema: z.object({ taskBatchId: z.string(), assigneeUserId: z.string() }),
   delivery: DeliveryMode.Durable,
 });
 

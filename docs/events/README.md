@@ -3,40 +3,49 @@
 Workstream docs for making the outbox → pg-boss pipeline deliver durable events
 in a defined order per consumer group.
 
-**Status:** decided, not built. No code written yet.
+**Status:** partially built. Part 1 (`1c3f518`) shipped queue-per-group,
+ordering keys, the single-writer drain and transactional enqueue. Part 2 adds
+retries and the dead-letter table. See
+[03-implementation-plan.md](03-implementation-plan.md) for what is left.
 
-| Doc | What it covers |
-| --- | --- |
-| [01-ordering-design.md](01-ordering-design.md) | Why ordering is not enforceable today, what pg-boss actually enforces, and the target design |
-| [02-consumer-groups.md](02-consumer-groups.md) | The group → ordering-key map, and every producer change it requires |
-| [03-implementation-plan.md](03-implementation-plan.md) | Phased plan, including the `docs/architecture` updates |
+The decision record is
+[ADR 0006](../architecture/adr/0006-group-ordered-event-delivery.md).
 
-A rendered version of 01 lives at
+| Doc                                                    | What it covers                                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| [01-ordering-design.md](01-ordering-design.md)         | Why ordering was not enforceable, what pg-boss actually enforces, and the design as built |
+| [02-consumer-groups.md](02-consumer-groups.md)         | The group → ordering-key map, producer-side fan-out, invariants                           |
+| [03-implementation-plan.md](03-implementation-plan.md) | Status tracker: done, this pass, remaining                                                |
+
+A rendered version of an earlier 01 lives at
 [claude.ai/code/artifact/d8a68027](https://claude.ai/code/artifact/d8a68027-803f-4743-bab2-bdd083a50bab).
-These files are the source of truth; the artifact mirrors them.
+It predates the implementation; these files are the source of truth.
 
 ## The short version
 
-- Ordering is broken in three independent places today, and `singletonKey` as
-  currently passed is **inert** — no index covers it on a `standard` queue.
-- pg-boss 12.18.2 ships `key_strict_fifo`, a Postgres-enforced strict FIFO per
-  `singletonKey`. That is the only ordering primitive here backed by a unique
-  index; `groupConcurrency` is advisory and cannot be relied on.
+- Ordering was broken in three independent places, and `singletonKey` was
+  **inert** — no index covers it on a `standard` queue.
+- pg-boss ships `key_strict_fifo`, a Postgres-enforced strict FIFO per
+  `singletonKey`. It is the only ordering primitive backed by a unique index.
+  **Requires pg-boss ≥ 12.34.0**: on 12.18.2 one blocked key stalls the whole
+  queue.
 - One queue per consumer group, replacing one queue per event × group.
-- Each group declares its own ordering key. Everything keys on the **user**
-  except `messaging`, which keys on the thread.
-- A group's key may fan one event into several jobs — `attention-items` does
-  this for the three message events, which belong to every participant at once.
-- Groups reach the dispatcher through a platform registry bean that each context
-  registers into at `onModuleInit`, the same self-registration seam
-  `attachment-access` already uses. Everything that reads the registry moves to
-  `onApplicationBootstrap`.
-- Terminal failures go to our own dead-letter table and the job **completes**,
-  so a poison event never blocks its key.
+- Each group declares its own ordering key. Almost everything keys on the
+  **user**; `messaging` keys on the message.
+- A consumer group is a typed const owned by its context, passed to
+  `@EventHandler(Event, Group)`. The platform derives the group map from the
+  discovered handlers at `onApplicationBootstrap` — no registration step.
+- Fan-out happens at the **producer**: a message is published once per
+  recipient, so one outbox row is always one job per group.
+- The dispatcher only drains event types that have a durable handler in its
+  process; anything else stays in the outbox rather than being dropped.
+- A failing event retries with backoff while its key waits. On the terminal
+  attempt the runtime writes a row to our own `events_dead_letters` table and
+  **completes** the job, so a poison event never blocks its key.
 
 ## Related
 
 - [../architecture/01-current-state.md](../architecture/01-current-state.md) §4.9 — two of the
-  defects listed there are fixed by this work
+  defects listed there were fixed by this work
 - [../architecture/05-integration.md](../architecture/05-integration.md) — the context-integration
   mechanism this changes

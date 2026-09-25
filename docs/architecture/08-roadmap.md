@@ -22,8 +22,9 @@ very first step is one line of jest config.
 | 0.3c | Rewrite the 26 IDE-generated `"@/api/kernel/...` imports to `@/api/kernel/...`, and add the `no-restricted-imports` rule for `src/*` so it cannot recur                                                                                   | 30min  | none       |
 | 0.3d | **Dissolve `packages/shared` into `platform/` + `kernel/id.ts`** per [04 §1b](04-layering.md). 80 imports, 5 config files. Leave `events.registry.ts` in place for now — it splits per context in Wave 8.1                                | 3h     | low        |
 | 0.4  | `tags.name` → `uniqueIndex(userId, lower(name))` — **the migration must dedupe existing rows first**                                                                                                                                      | 30min  | **medium** |
-| 0.5  | Delete the orphan `tag.created` event and the handler-less `email` group                                                                                                                                                                  | 15min  | none       |
-| 0.6  | Outbox: index on `dispatched_at`; retention job deleting realtime-only rows older than 30 days                                                                                                                                            | 1h     | low        |
+| 0.5  | Delete the orphan `tag.created` event and the handler-less `email` group **✅ done** (events refactor)                                                                                                                                    | 15min  | none       |
+| 0.6a | Outbox: partial index on `id` where `dispatched_at` / `failed_at` are null (the drain orders by `id`)                                                                                                                                     | 15min  | low        |
+| 0.6b | Outbox: retention job deleting realtime-only rows older than 30 days                                                                                                                                                                      | 45min  | low        |
 | 0.7  | Write the first `.spec.ts` files against code that is **already pure** — `recurrence.utils.ts`, `task-status.util.ts`, `oauth-state.util.ts`, `slug.util.ts`, all 20 entities                                                             | 3h     | none       |
 
 **Verification:** `pnpm --filter @asksynk/api test` runs unit tests **with no
@@ -190,6 +191,7 @@ integration suite. Then the same against a restored copy of production data.
 | 8.3 | Merge `user-profile` + `user-settings` → `identity`                                                                                                        |
 | 8.4 | Fix `CLAUDE.md`'s stale `apps/background-worker` reference; add the architecture rules (below)                                                             |
 | 8.5 | Replace the 11 Nest HTTP exceptions in `attachments.service.ts` with domain errors                                                                         |
+| 8.6 | Dead-letter replay: `PATCH /event-dead-letters/:id { status }`, re-enqueue with a fresh job id. Needs an authorization model first — see [docs/events](../events/03-implementation-plan.md) |
 
 ---
 
@@ -454,7 +456,7 @@ Worth stating so these do not get "improved" by accident:
 | Thing                                                                                 | Why                                                                                                                                                                                |
 | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Controllers, DTOs, mappers                                                            | Zero violations. Already the target state.                                                                                                                                         |
-| The outbox / dispatcher / consumer machinery                                          | The strongest code in the repo. Only the _registry file_ moves.                                                                                                                    |
+| The outbox / dispatcher / consumer machinery                                          | The strongest code in the repo. Only the _registry file_ moves. Ordering, retries and dead letters are specified in [docs/events](../events/README.md) / [ADR 0006](adr/0006-group-ordered-event-delivery.md). |
 | The single raw `db.transaction()` in `events-dispatcher.ts`                           | Correct — the dispatcher is outside any request transaction by design.                                                                                                             |
 | `@Transactional()` usage                                                              | Correct and re-entrant.                                                                                                                                                            |
 | `AttachmentAccessService.register()`                                                  | The pattern to copy, not fix.                                                                                                                                                      |

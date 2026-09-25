@@ -178,7 +178,6 @@ export const AttentionSourceUpserted = defineEvent({
     occurredAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention"],
 });
 
 export const AttentionSourceRemoved = defineEvent({
@@ -188,17 +187,43 @@ export const AttentionSourceRemoved = defineEvent({
     source: z.object({ context: z.string(), kind: z.string(), id: z.string() }),
   }),
   delivery: DeliveryMode.Durable,
-  groups: ["attention"],
 });
+
+// attention/presentation/events/attention.consumer-group.ts
+// One user-keyed queue for the ingestion contract AND the tag/calendar recompute
+// events, so every change to a user's attention is applied in order.
+export const AttentionConsumerGroup: ConsumerGroup<
+  | typeof AttentionSourceUpserted
+  | typeof AttentionSourceRemoved
+  | typeof TagUpdated
+  | typeof TagDeleted
+  | typeof CalendarEventCreated
+  | typeof CalendarEventUpdated
+  | typeof CalendarEventDeleted
+> = {
+  name: "attention",
+  orderingKeyFn: (event) => `user:${event.userId}`,
+};
 ```
+
+> **Amended 2026-09-25** for the events refactor ([docs/events](../events/README.md),
+> [ADR 0006](adr/0006-group-ordered-event-delivery.md)): events no longer declare
+> `groups`; the consumer owns a `ConsumerGroup` const and passes it to
+> `@EventHandler`.
 
 Each source keeps publishing its own events for its own reasons — `task.upserted`
 still feeds the `suggestion-sync` group — and **additionally** publishes the attention
 contract from a thin outbound translator it owns:
 
 ```ts
+// tasks/presentation/events/attention-projection.consumer-group.ts
+export const AttentionProjectionConsumerGroup: ConsumerGroup<typeof TaskUpserted> = {
+  name: "attention-projection",
+  orderingKeyFn: (event) => `user:${event.assigneeUserId}`,
+};
+
 // tasks/presentation/events/attention-projection.publisher.ts   <- Tasks' outbound ACL
-@EventHandler(TaskUpserted, { group: "attention-projection" })
+@EventHandler(TaskUpserted, AttentionProjectionConsumerGroup)
 async onTask(p: EventOf<typeof TaskUpserted>): Promise<void> {
   await this.publisher.publish(AttentionSourceUpserted, {
     userId: p.assigneeUserId,

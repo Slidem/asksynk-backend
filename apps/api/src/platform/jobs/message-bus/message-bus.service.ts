@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
-import { Db, JobInsert, PgBoss } from "pg-boss";
+import { Db, JobInsert, PgBoss, Queue } from "pg-boss";
 
 import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import {
@@ -178,17 +178,45 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Ensures a queue exists in the message bus, creating it if necessary.
+   *
+   * When `opts` is given, the non-policy options are also applied to an
+   * existing queue (createQueue is a no-op then), and the policy is verified:
+   * it is immutable, so a mismatch can only be fixed by deleting the queue.
    */
   public async ensureQueue(
     queue: string,
-    isFifoQueue: boolean = false,
+    opts?: Omit<Queue, "name">,
+  ): Promise<void> {
+    await this.createQueue(queue, opts);
+
+    if (!opts) {
+      return;
+    }
+
+    const boss = this.requireBoss();
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { policy, partition: _partition, ...updatable } = opts;
+
+    await boss.updateQueue(queue, updatable);
+
+    const existing = await boss.getQueue(queue);
+    if (policy && existing?.policy !== policy) {
+      throw new Error(
+        `Queue "${queue}" has policy "${existing?.policy}", expected "${policy}". Policy is immutable; delete the queue to recreate it.`,
+      );
+    }
+  }
+
+  private async createQueue(
+    queue: string,
+    opts: Omit<Queue, "name"> = {},
   ): Promise<void> {
     const boss = this.requireBoss();
-    const opt = isFifoQueue ? { policy: "key_strict_fifo" } : {};
 
     for (let attempt = 0; ; attempt++) {
       try {
-        await boss.createQueue(queue, opt);
+        await boss.createQueue(queue, opts);
         return;
       } catch (error) {
         const isDeadlock =

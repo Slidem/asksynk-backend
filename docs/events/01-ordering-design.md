@@ -1,17 +1,18 @@
 # Ordering design
 
-Verified against pg-boss **12.18.2** — `dist/plans.js` (fetch, insert, fail,
-create_queue), `dist/manager.js` (fetch error handling, queue cache),
-`dist/attorney.js`.
+Originally verified against pg-boss **12.18.2** — `dist/plans.js` (fetch,
+insert, fail, create_queue), `dist/manager.js` (fetch error handling, queue
+cache), `dist/attorney.js`. Re-verified against **12.34.0** for the fetch path
+(§3) and the fail/deletion path (§5 "Failures and dead letters").
 
 ## 1. Verdict
 
-Ordering is **not** enforceable in the current pipeline, and the `singletonKey`
-we pass today is **inert**: on a `standard` policy queue with no
-`singletonSeconds`, no index covers the column, so it buys neither uniqueness
+Ordering was **not** enforceable in the original pipeline, and the
+`singletonKey` it passed was **inert**: on a `standard` policy queue with no
+`singletonSeconds`, no index covers the column, so it bought neither uniqueness
 nor dedupe.
 
-Three structural breaks, two amplifiers. The fix needs no new infrastructure.
+Three structural breaks, two amplifiers. The fix needed no new infrastructure.
 
 ## 2. Where ordering breaks
 
@@ -47,11 +48,11 @@ Order within a batch is random. This exists even with a single-node dispatcher.
 
 ### Amplifier — no serialization key, and 5×N workers
 
-The queue is `eventType.group` and `singletonKey` is `${outboxId}.${group}` —
-unique per job, so it partitions nothing. `localConcurrency: 5` across N nodes
-runs up to 5N handlers interleaved on one queue.
+The queue was `eventType.group` and `singletonKey` was `${outboxId}.${group}` —
+unique per job, so it partitioned nothing. `localConcurrency: 5` across N nodes
+ran up to 5N handlers interleaved on one queue.
 
-Separately, queue-per-event-type means there is no ordering at all between
+Separately, queue-per-event-type meant no ordering at all between
 `message.created` and `message.updated` for the same message — different queues.
 
 ### Amplifier — a retry lets its successor overtake it
@@ -67,10 +68,10 @@ unique index covers it, and that is decided by the queue policy set at creation.
 
 | Mechanism                                       | Backing index                                                         | Effect on our events                                                                         |
 | ----------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| policy `standard` _(what we run)_               | none                                                                  | **Inert.** Stored and never read.                                                            |
+| policy `standard` _(what we ran)_               | none                                                                  | **Inert.** Stored and never read.                                                            |
 | `singletonSeconds`                              | `job_i4 (name, singleton_on, key)`                                    | **Wrong tool.** A throttle — silently drops the second event in the window.                  |
 | `short` / `singleton` / `stately` / `exclusive` | `job_i1/2/3/6`, filtered by state                                     | **Drops inserts.** `singleton` serializes but does not block on `retry`, so retries reorder. |
-| `key_strict_fifo`                               | `job_i8 (name, singleton_key)` where state in `active, retry, failed` | **What we want.** Postgres-enforced. Never drops an insert; blocks the key across retries.   |
+| `key_strict_fifo` _(what we run)_               | `job_i8 (name, singleton_key)` where state in `active, retry, failed` | **What we want.** Postgres-enforced. Never drops an insert; blocks the key across retries.   |
 | `group` + `groupConcurrency`                    | none — unlocked count CTE                                             | **Advisory only.** Two concurrent fetches can both read zero active and both proceed.        |
 
 **Groups are for fairness; keys are for correctness.** Only `key_strict_fifo` is
@@ -79,328 +80,281 @@ race between two nodes.
 
 Two consequences of choosing it:
 
-1. Enforcement is a constraint violation, not a queue-side skip. `manager.fetch()`
-   swallows the resulting error and returns an empty batch, so a contended poll
-   fetches nothing at all.
-2. `failed` is in the index predicate, so a poison event blocks its key until the
-   row is removed.
+1. `failed` is in the index predicate, so a job pg-boss marks `failed` blocks its
+   key until the row is removed. This is why terminal failures must never reach
+   pg-boss — see §5.
+2. **The fetch path depends on the pg-boss version.**
+
+### 12.18.2: one blocked key stalls the whole queue
+
+On 12.18.2 the strict-FIFO fetch does **not** skip blocked keys. It selects the
+oldest eligible job, then `UPDATE … SET state = 'active'`. If that job's key
+already has a row in `active`, `retry` or `failed`, the update hits the `job_i8`
+unique violation; `manager.fetch()` swallows the error ("errors from fetchquery
+should only be unique constraint violations") and returns an empty batch.
+
+The head of the queue is then blocked, so **every** fetch returns nothing —
+unrelated keys included. That happens for the whole backoff window of every
+retry, and forever behind a `failed` row.
+
+### 12.34.0: a blocked key blocks only itself
+
+12.34.0 rewrote the fetch for `key_strict_fifo`: a `strict_fifo_heads` CTE picks
+one head per key (`DISTINCT ON (singleton_key)`, retry jobs first), and a
+`NOT EXISTS` clause skips any key that already has a row in `active`, `retry`
+or `failed`. A blocked key is filtered out instead of aborting the statement.
+
+**We require pg-boss ≥ 12.34.0.**
 
 ## 4. Decisions
 
-|                                |                                                                                                                                                                                                                                |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **registry**                   | Consumer groups are declared, not inferred. A static registry owns each group's name, the events it consumes, and the strategy that orders them — separate from the event definitions, so every module declares its own group. |
-| **key**                        | The ordering key belongs to the **group**, not the handler. See [02-consumer-groups.md](02-consumer-groups.md) for the map.                                                                                                    |
-| **fan-out**                    | A group's key may resolve to _several_ keys for one event, producing one job per key. `attention-items` uses this for the three message events.                                                                                |
-| **shape**                      | One queue per group. `eventType.group` → `group`; event type moves into the job payload.                                                                                                                                       |
-| **scope**                      | All durable events are ordered. Every group runs `key_strict_fifo`.                                                                                                                                                            |
-| **failure**                    | Explicit `retryLimit`; on the terminal attempt the runtime writes our own dead-letter row and **completes** the job. Silent toward pg-boss, loud in logs.                                                                      |
-| **replay**                     | Dead-letter replay ships in this pass.                                                                                                                                                                                         |
-| ~~**email group**~~            | Dropped entirely — it has no handler and never did.                                                                                                                                                                            |
-| ~~**outbox `groups` column**~~ | Dropped. The dispatcher resolves event → groups from the registry at drain time, so a newly added group also picks up the backlog.                                                                                             |
+|                          |                                                                                                                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **group**                | A consumer group is a typed const (`ConsumerGroup<E>`: `name` + `orderingKeyFn`) owned by its context and passed to `@EventHandler(Event, Group)`. The platform derives the group map from the discovered handlers. |
+| **key**                  | The ordering key belongs to the **group**, not the handler. See [02-consumer-groups.md](02-consumer-groups.md) for the map.                                                                                         |
+| **fan-out**              | At the **producer**. An event that concerns several users is published once per recipient, so one outbox row is one job per group.                                                                                 |
+| **shape**                | One queue per group. `eventType.group` → `group`; event type moves into the job payload.                                                                                                                            |
+| **scope**                | All durable events are ordered. Every group runs `key_strict_fifo`.                                                                                                                                                 |
+| **retries**              | Owned by the runtime: `MAX_ATTEMPTS = 3`, exponential backoff 2s → 30s cap, 120s expiry.                                                                                                                            |
+| **failure**              | On the terminal attempt the runtime writes our own dead-letter row and **completes** the job. Silent toward pg-boss, loud in logs. pg-boss's own `deadLetter` is not used.                                          |
+| **replay**               | Deferred. The dead-letter row carries a `status` so replay can be added later.                                                                                                                                      |
+| ~~**email group**~~      | Dropped entirely — it had no handler and never did.                                                                                                                                                                 |
+| ~~**`groups` on events**~~ | Dropped from `defineEvent` and from the outbox. The producer no longer names its consumers.                                                                                                                       |
 
-## 5. Target design
+## 5. Design as built
 
-|                |                                                                             |
-| -------------- | --------------------------------------------------------------------------- |
-| queue name     | `${group}` — one per consumer group, created at bootstrap from the registry |
-| policy         | `key_strict_fifo` uniformly; only the key _value_ varies by group           |
-| `singletonKey` | from the group's ordering strategy — see [02](02-consumer-groups.md)        |
-| `retryLimit`   | set explicitly at queue creation, not left to the pg-boss default of 2      |
-| job data       | `{ eventId, eventType, payload }` — the runtime dispatches on `eventType`   |
+|                |                                                                              |
+| -------------- | ---------------------------------------------------------------------------- |
+| queue name     | `${group.name}` — one per consumer group, ensured at bootstrap               |
+| policy         | `key_strict_fifo` uniformly; only the key _value_ varies by group            |
+| `singletonKey` | `group.orderingKeyFn(payload)` — see [02](02-consumer-groups.md)             |
+| job id         | the outbox row id                                                            |
+| job data       | `{ eventId, eventType, payload }` — the runtime dispatches on `eventType`    |
+| queue options  | `DURABLE_GROUP_QUEUE_OPTIONS` in `platform/events/consumer/durable-delivery.constants.ts` |
 
-### The group registry owns the ordering key
+### Consumer groups and handler discovery
 
 ```ts
-defineConsumerGroup({
+// calendar-integrations/calendar-sync.consumer-group.ts
+export const CalendarSyncConsumerGroup: ConsumerGroup<
+  typeof CalendarEventCreated | typeof CalendarEventUpdated | typeof CalendarEventDeleted
+> = {
   name: "calendar-sync",
-  events: [CalendarEventCreated, CalendarEventUpdated, CalendarEventDeleted],
-  ordering: (event, payload) => `user:${payload.userId}`,
-});
+  orderingKeyFn: (event) => event.userId,
+};
+
+// calendar-integrations/sync/calendar-sync.event-handler.ts
+@EventHandler(CalendarEventCreated, CalendarSyncConsumerGroup)
+async onCreated(payload: EventOf<typeof CalendarEventCreated>) { … }
 ```
 
-Three constraints, and each is why this sits on the group rather than on
-`@EventHandler`:
+`ConsumerGroup<E>` is typed over the union of events it consumes, so
+`orderingKeyFn` is written against their payloads.
 
-**It must be total.** `key_strict_fifo` carries a CHECK that `singleton_key` is
-never null, and a single null fails the batch insert for the _entire_ group —
-not just the offending event.
+[`EventHandlersRegistry`](../../apps/api/src/platform/events/decorators/event-handlers.registry.ts)
+(`platform/events/decorators/`) scans providers with Nest's `DiscoveryService`
+at `onApplicationBootstrap` and exposes:
 
-**It must be declarative, not decorator-scanned.** Nest discovery only sees what
-its own process loaded, so a dispatcher deriving groups from decorators gets a
-partial map and events silently never dispatch.
+- `getHandlers()` — every decorated handler, realtime and durable
+- `getConsumerGroups(eventName)` — the distinct groups that handle an event
+- `getAllConsumerGroupHandledEvents()` — the event types this process can
+  consume durably
+- `getAllConsumerGroups()` — throws if two handlers use different objects with
+  the same group name; a group is identified by its **const instance**
 
-**It is a queue-wide contract.** The key is written once per job by the
-dispatcher, and the index is `(name, singleton_key)` where `name` is the group —
-so two handlers in one group cannot disagree about what orders it. Cross-type
-ordering (`message.created` before `message.updated` on the same message) only
-works when both event types emit the same key.
+It then ensures one queue per group with `DURABLE_GROUP_QUEUE_OPTIONS`.
+`MessageBusService.ensureQueue` applies the non-policy options to an existing
+queue via `updateQueue` (`createQueue` is a no-op when the queue exists), then
+reads the policy back and **fails startup on a mismatch** — policy is immutable,
+so a queue created before the change would otherwise keep `standard` forever
+and enforce nothing.
 
-### Registration and wiring
+#### Why decorator discovery is acceptable after all
 
-`defineConsumerGroup` registers nothing by itself. Like `defineEvent`, it is a
-factory plus validator that returns a frozen object, evaluated when its module is
-first imported — not by Nest, not by DI.
+An earlier draft rejected deriving groups from decorators: Nest discovery only
+sees what its own process loaded, so a dispatcher using that map would resolve
+zero groups for some rows, mark them dispatched, and lose them.
 
-That is fine for events today because nothing needs a lookup: consumers import
-the const directly (`@EventHandler(MessageCreated, …)`), and the dispatcher never
-resolves an event at all — it reads `event_type` and `groups` as plain strings
-off the outbox row. Dropping the `groups` column introduces the first real
-lookup in the system, `eventName → groups`, so the group definitions now have to
-be reachable from somewhere.
-
-**A platform-managed registry bean, with each context registering into it.**
-This mirrors the seam already in the codebase and praised in
-[01-current-state.md](../architecture/01-current-state.md):
-[`attachment-access.service.ts`](../../apps/api/src/storage/attachment-access.service.ts)
-exposes `register(resolver)`, and
-[`message-attachment.resolver.ts`](../../apps/api/src/messaging/attachments/message-attachment.resolver.ts)
-self-registers in `onModuleInit`.
-
-```
-platform/events/registry/consumer-group.registry.ts   the injectable — register(), groupsForEvent(), all(), byName()
-<ctx>/contract/<ctx>.consumer-group.ts                defineConsumerGroup(...) — the definition
-<ctx>/<ctx>.consumer-group.registration.ts            injects the registry, registers in onModuleInit
-```
-
-No central array to edit: a context that owns a group owns its registration, and
-platform never imports a context. `register()` throws on a duplicate group name
-or a duplicate event within a group.
-
-Two alternatives were rejected. A **module-level map** that
-`defineConsumerGroup` pushes into is populated only if the defining module
-happens to be in the import graph, and nothing forces that — same failure class
-as the decorator-scanning rejected above. An **explicit array inside
-`platform/`** forces a bad choice: either the definitions live in their contexts
-and platform imports them, inverting the tier boundary from
-[ADR 0005](../architecture/adr/0005-kernel-and-platform-tiers.md), or they live
-in platform and grow the central catalogue that
-[04-layering.md](../architecture/04-layering.md) §240 wants dissolved.
-
-#### Init order is the sharp edge
-
-Nest orders `onModuleInit` bottom-up through the **import** graph. Sibling
-feature modules have no guaranteed order relative to `EventsModule`, so anything
-that _reads_ the registry must not run in `onModuleInit`.
-
-The dispatcher currently does exactly that, and drains immediately:
+The implementation closes that hole at the drain instead. The dispatcher only
+selects rows whose `event_type` is in `getAllConsumerGroupHandledEvents()`:
 
 ```ts
-async onModuleInit(): Promise<void> {
-  await this.connectListen();
-  this.startPollLoop();
-  await this.tick();          // drains before registrations may have run
-}
+inArray(eventsOutbox.eventType, handledEventTypes)
 ```
 
-With a half-populated registry that resolves zero groups for real rows and marks
-them dispatched. Silent loss on every boot race, and it would not reproduce
-reliably. So:
+A row with no durable handler in this process is **left** in the outbox, not
+dropped. The cost moves from silent loss to a visible backlog.
 
-| Runs in                  | What                                                              |
-| ------------------------ | ----------------------------------------------------------------- |
-| `onModuleInit`           | each context's `register()` call — writes only                    |
-| `onApplicationBootstrap` | dispatcher start, queue bootstrap, handler discovery — reads only |
+This buys two things over a platform registry bean: no registration step or
+init-order rules (every read happens in `onApplicationBootstrap`, after all
+providers exist), and no statement of the subscription in two places.
 
-Nest runs `onApplicationBootstrap` only after every module's `onModuleInit` has
-resolved.
-[`event-consumer.discovery.ts`](../../apps/api/src/platform/events/consumer/event-consumer.discovery.ts)
-already uses it for this exact reason; the dispatcher and the queue bootstrap
-must move to it.
+#### `@EventHandler`'s group argument is the lane discriminator
 
-#### Seal the registry
-
-Once bootstrap has read it, `register()` throws. A late registration is a bug —
-its groups would already have been skipped by queue creation and by any drain
-that has run.
-[`realtime-listener.service.ts`](../../apps/api/src/platform/events/consumer/realtime-listener.service.ts)
-already does this: `subscribe()` throws when called after `start()`.
-
-Log the resolved registry at boot — group, event count, key strategy. A static
-array could be grepped in one file; a bean cannot, and one log line buys that
-back.
-
-#### `@EventHandler`'s `group` option stays — it is the lane discriminator
-
-Two different things are called "groups", and only one of them is dropped.
-
-|                                  | Dropped? | What it does                                  |
-| -------------------------------- | -------- | --------------------------------------------- |
-| `groups: [...]` on `defineEvent` | **yes**  | the producer naming its consumers             |
-| `{ group }` on `@EventHandler`   | **no**   | which lane, and which group's handler this is |
-
-A `Dual` event legitimately has handlers on both legs — `ws.gateway.ts` takes
+A `Dual` event has handlers on both legs — `ws.gateway.ts` takes
 `message.created` for the realtime push while `message-attention.handler.ts`
 takes it for `attention-items`. The only thing telling them apart is whether the
-decorator declares a group:
+decorator passes a group:
 
 ```ts
-if ((delivery === Realtime || delivery === Dual) && options?.group === undefined) → realtime
-if ((delivery === Durable  || delivery === Dual) && options?.group !== undefined) → durable
+if ((delivery === Realtime || delivery === Dual) && group === undefined) → realtime
+if ((delivery === Durable  || delivery === Dual) && group !== undefined) → durable
 ```
 
-Remove the option and every `Dual` handler falls into the first branch, leaving
-the durable branch unreachable — the durable leg of `message.created`,
-`message.updated`, `message.status.changed`, `timer.lifecycle` and `tag.updated`
-disappears with no error.
-
-The option is not redundant with the registry. The registry answers _which
-groups consume event E_; the decorator answers _which class implements group G's
-handler for E_, which the registry cannot express. Nor can it be inferred:
-`task.upserted` is consumed by both `attention-items` and `suggestion-sync`, so
-a bare `@EventHandler(TaskUpserted)` would be ambiguous. It is also what makes
-the reverse boot check below possible at all.
-
-The decorator keeps one check, since it needs only `event.delivery`: a realtime
-event must not declare a group. The "is this group declared on this event" check
-is the one that moves to discovery.
-
-> Considered and deferred: making the lane explicit with a class-level
-> `@DurableConsumer("<group>")` plus a bare `@EventHandler(E)` on methods. Every
-> handler class today is already single-lane and single-group, so it would map
-> cleanly — but it touches every handler site for a readability win, and
-> "absent means realtime" is survivable once written down.
-
-#### Validation replaces the event's `groups` field
-
-The event definitions **lose** `groups` rather than keeping it as a cross-check.
-Keeping it would state the same fact in three places:
-
-1. event def — `groups: ["attention-items"]`
-2. registry — `events: [MessageCreated, …]`
-3. handler — `@EventHandler(MessageCreated, AttentionItemsConsumerGroup)`
-
-Only (1) goes. (3) stays — see above; it is the lane discriminator, and it names
-the implementing class rather than restating the subscription.
-
-(1) and (2) are the same information in opposite directions, and (1) re-couples
-producer to consumer, which is the coupling this change exists to remove. It is
-also the shape that produced the `email` defect in the first place: an event
-named a group nobody consumed, so the dispatcher built a queue and filled it
-with jobs nothing works.
-
-Both useful checks run off (2) and (3) alone, at `onApplicationBootstrap`:
-
-- every group named by an `@EventHandler` is registered — catches typos and
-  missing registrations
-- every registered `(group, event)` has a handler — catches the `email` case
-  directly, at boot instead of by inspection
+The decorator rejects a group on a realtime event.
 
 #### The completeness constraint
 
-The dispatcher's map is only as complete as the set of context modules loaded in
-its process. That is fine today — `apps/` holds `api` and `migrations` only, and
-one process loads everything.
+The dispatcher can only create jobs for groups its own process has handlers
+for. That is fine today — one API process loads every context module.
 
-If a worker app ever appears and hosts some handlers, the API's dispatcher will
-stop creating jobs for those groups, silently, because its registry will not
-contain them. **Whatever process runs the dispatcher must load every context
-module.** CLAUDE.md already references an `apps/background-worker` that does not
-exist yet, so this is worth stating rather than assuming.
+If a worker app ever hosts some handlers, split groups break: an event consumed
+by one group in the API and another in the worker is marked dispatched by
+whichever node drains it first, with jobs for **that node's groups only**.
+**Whatever process runs the dispatcher must load every context module that has
+a durable handler.**
 
-> **Knock-on.** [05-integration.md](../architecture/05-integration.md) §4
-> justifies splitting the event catalogue per context on the grounds that
-> "neither runtime component needs the central file: the dispatcher works off
-> database rows". That stops being true the moment `groups` is dropped — the
-> dispatcher now works off the registry. The catalogue can still split per
-> context; what the dispatcher needs is the _consumer-group_ map, assembled at
-> runtime from each context's registration. The sentence needs amending, not
-> deleting.
-
-### Job ids are load-bearing
+### Job ids
 
 Because `created_on` ties across a batch (break C), `id` **is** the sort key.
 
-Without fan-out, `id: <outbox row id>` would be enough — free ordering plus
-dedupe on the `(name, id)` primary key. **Fan-out makes that insufficient:** one
-outbox row produces N jobs in one queue, and reusing the row id collides on the
-primary key, where `ON CONFLICT DO NOTHING` swallows it silently.
+With fan-out at the producer, one outbox row produces at most one job per group
+queue, so `id: <outbox row id>` is enough: uuidv7 gives the row order, and the
+`(name, id)` primary key gives dedupe. A second insert of the same row into the
+same queue hits `ON CONFLICT DO NOTHING`.
 
-So the drain allocates ids from Postgres in row order:
-
-```sql
-SELECT uuidv7() FROM generate_series(1, $n)
-```
-
-Only _cross-row_ order matters — jobs from the same outbox row always carry
-different keys, so their relative order is irrelevant by construction.
-
-Do not reach for `orderByCreatedOn: false` instead. It works in 12.18.2 but is
+Do not reach for `orderByCreatedOn: false` instead. It worked in 12.18.2 but is
 deprecated and ignored from 12.30.0.
 
 ### Exactly-once dispatch
 
-Today `insertJobs` runs on pg-boss's own pool, outside the drizzle transaction —
-a crash between the insert and the `dispatchedAt` update duplicates events.
-`insert()` accepts a `db` option and pg-boss ships a drizzle adapter:
+The insert joins the drain's drizzle transaction:
 
 ```ts
-await this.bus.insertJobs(jobs, { db: fromDrizzle(tx, sql) });
+await this.bus.insertJobs(jobs, fromDrizzleTx(tx));
 ```
 
-Queue creation moves to bootstrap: `createQueue` wraps itself in its own
-`BEGIN/COMMIT` and cannot join the caller's transaction.
+so the jobs and the `dispatched_at` update commit together.
 
-Bootstrap must also **verify** the policy, not merely call `createQueue`. The
-call is a silent no-op when the queue already exists, and policy is immutable —
-so a queue created before this change keeps `standard` forever and enforces
-nothing, with no error raised anywhere. Read the policy back and fail startup on
-a mismatch.
+[`fromDrizzleTx`](../../apps/api/src/platform/jobs/scheduled-job/pgboss-drizzle-db.ts)
+replaces pg-boss's own `fromDrizzle`: that one interpolates raw values into
+drizzle's `sql` tag, and drizzle spreads a JS array into `(a, b, …)`. pg-boss
+passes id arrays for casts like `UNNEST($2::uuid[])`, so the cast receives a
+scalar and Postgres throws `22P02`, aborting the caller's transaction. Wrapping
+each value in `sql.param()` binds an array as one value.
+
+Queue creation happens at bootstrap: `createQueue` wraps itself in its own
+`BEGIN/COMMIT` and cannot join the caller's transaction.
 
 ### Single-writer drain
 
-Wrap the drain in `pg_try_advisory_xact_lock`; a node that fails to acquire
-skips the tick. The lock releases on commit, so any node can take the next batch
-— whoever holds it always takes the oldest undispatched rows, so order holds
-regardless of which node wins. Order the drain by `id`, and add a partial index
-for it.
+The drain takes `pg_try_advisory_xact_lock(hashtext('events_outbox_dispatcher'))`;
+a node that fails to acquire skips the tick. The lock releases on commit, so any
+node can take the next batch — whoever holds it always takes the oldest
+undispatched rows, so order holds regardless of which node wins. The drain is
+ordered by `id`.
 
-### Auto-unblock without pg-boss's dead-letter queue
+The outbox `NOTIFY` trigger only fires for `durable` / `dual` rows
+(migration `0005_narrow_outbox_notify.sql`); realtime rows have their own
+channel.
 
-pg-boss's DLQ _copies_ the payload into the dead-letter queue and **leaves the
-original row in `failed` state** in the source queue. Since `failed` is in the
-`job_i8` predicate, the key stays blocked; the row is only removed by the
-deletion sweep, whose default `deletion_seconds` is **seven days**.
+### Failures and dead letters
 
-So skip it:
+**Why not pg-boss's dead-letter queue.** A queue-level `deadLetter` _copies_ the
+job into another queue and leaves the original row in `failed` in the source
+queue. `failed` is in the `job_i8` predicate and in 12.34's fetch blocker, so
+the key stays blocked until the row is deleted.
+
+**Why not `deleteAfterSeconds`.** It is documented as "how long a job should be
+retained … after it's completed". In the 12.34 code a terminal fail does set
+`completed_on` and the deletion sweep only checks `completed_on`, so failed rows
+_would_ be removed too — but that is undocumented, the sweep is throttled by
+`maintenanceIntervalSeconds`, and the key would stay blocked for minutes. We do
+not rely on it.
+
+**So pg-boss never sees a terminal failure.** The runtime
+([`durable-consumer-runtime.service.ts`](../../apps/api/src/platform/events/consumer/durable-consumer-runtime.service.ts))
+owns the attempt count:
 
 ```ts
-catch (error) {
-  if (job.retryCount >= job.retryLimit) {
-    await this.deadLetters.record({ group, eventType, eventId, payload, error });
-    return;                 // completes the job → key unblocks now
-  }
-  throw error;              // let pg-boss retry, key stays blocked
+// retryLimit = MAX_ATTEMPTS → pg-boss allows MAX_ATTEMPTS + 1 attempts
+if (job.retryCount >= MAX_ATTEMPTS) {       // sentinel attempt, see below
+  await deadLetter("attempt abandoned: expired or worker died");
+  return;                                   // completes → key unblocks
+}
+try {
+  lookup handler; schema.parse(payload); await handler(payload, ctx);
+} catch (error) {
+  if (attempt < MAX_ATTEMPTS) throw error;  // pg-boss retries, key stays blocked
+  await deadLetter(error);
+  return;                                   // completes → key unblocks now
 }
 ```
+
+Everything — the handler lookup, payload validation, the handler — sits inside
+the `try`. Deterministic errors (invalid payload, no handler for the type) are
+not special-cased: they use up their attempts like any other error and then
+dead-letter.
 
 The `throw` branch matters as much as the other one. Swallowing the _first_
 error would drop an event on any transient blip; only the terminal attempt
 dead-letters.
 
-**Silent toward pg-boss, loud in logs.** The row never reaches `failed`, so it
-never blocks the key — but that also means no `failed` rows, no pg-boss error
-event, and an empty `getBlockedKeys`. Every health signal reads clean while
-events are being dropped. Log at error and count it.
+**Failures outside the catch.** Two cases never reach the `catch`:
 
-One table serves every group. Store the outbox row id beside the payload so a
-gap can be located in the outbox afterwards, and put a unique index on
-`(event_id, group)`: write the dead-letter row _before_ returning, so a crash in
-between yields a duplicate row rather than a lost event, and the index absorbs it.
+1. **Expiry** — a handler that runs past `expireInSeconds` (120s) is failed by
+   pg-boss's supervisor. The handler's promise is still pending.
+2. **Worker death** — a deploy kill or OOM leaves the job `active` until it
+   expires, which is case 1.
+
+If either hits the terminal attempt, pg-boss would mark the job `failed`. To
+prevent that, the queue's `retryLimit` is `MAX_ATTEMPTS`, one more pg-boss
+attempt than the runtime uses. That extra attempt only runs when the terminal
+attempt died outside the catch; the runtime sees
+`job.retryCount >= MAX_ATTEMPTS`, dead-letters without invoking the handler, and
+completes. The same attempt covers a dead-letter insert that itself threw.
+
+**The table.** `events_dead_letters` (`apps/migrations/src/schema/eventsDeadLetters.ts`),
+one table for every group:
+
+| column           |                                                          |
+| ---------------- | -------------------------------------------------------- |
+| `id`             | uuidv7                                                   |
+| `consumer_group` | the group / queue name                                   |
+| `event_id`       | outbox row id — no FK, the outbox will be pruned         |
+| `event_type`     |                                                          |
+| `payload`        | jsonb                                                    |
+| `error`          | stack or message of the last failure                     |
+| `attempts`       |                                                          |
+| `status`         | `pending` \| `replayed` \| `discarded`, default `pending` |
+| `created_at`     |                                                          |
+
+Unique on `(event_id, consumer_group)`; the write is `ON CONFLICT DO NOTHING`.
+The row is written _before_ the job completes, so a crash in between re-runs
+the sentinel attempt and the index absorbs the duplicate.
+
+The write goes through `EventsDeadLettersRepository`
+(`platform/events/dead-letters/`), outside the handler's transaction — the
+handler's `@Transactional()` has already rolled back by the time the catch runs.
+
+**Silent toward pg-boss, loud in logs.** The job never reaches `failed`, so
+`getBlockedKeys` stays empty and pg-boss raises nothing. Non-terminal failures
+log at `warn`; dead-lettering logs at `error`. The table is the record.
 
 ### Replay
 
-Replay **must allocate a fresh job id.** The original job carried the outbox row
-id and is now `completed`; re-inserting under that id hits `ON CONFLICT DO
-NOTHING` on `(name, id)` and silently does nothing.
+Deferred. When it lands, replay **must allocate a fresh job id**: the original
+job carried the outbox row id and is now `completed`, so re-inserting under that
+id hits `ON CONFLICT DO NOTHING` on `(name, id)` and silently does nothing.
 
-The dead-letter row carries a `status` (`pending` | `replayed` | `discarded`),
-so replay is a state transition rather than an action endpoint, per the
-project's no-verb-endpoints rule:
+The dead-letter `status` makes replay a state transition rather than an action
+endpoint, per the project's no-verb-endpoints rule:
 
 ```
 PATCH /event-dead-letters/:id  { "status": "replayed" }
 ```
+
+It needs an authorization model first — there is no admin role today.
 
 ## 6. What this costs
 
@@ -408,18 +362,21 @@ PATCH /event-dead-letters/:id  { "status": "replayed" }
 process one at a time cluster-wide. The ceiling is 1 ÷ handler latency _per
 user_, not globally — parallelism across users is unaffected.
 
-**Fan-out multiplies job volume.** A message in a thread with N user
-participants becomes N jobs in `attention-items`. Threads are small, so this is
-a constant factor, but it is a real one.
+**Fan-out multiplies outbox rows.** A message in a thread with N other
+participants becomes N outbox rows, and N jobs in `attention-items`. Threads are
+small, so this is a constant factor, but it is a real one. It also multiplies the
+realtime leg: the gateway receives one `message.created` per recipient.
 
 **A terminal failure skips an event.** Auto-unblock is availability chosen over
-strict FIFO: subsequent events for that user proceed past a gap. The dead-letter
+strict FIFO: subsequent events for that key proceed past a gap. The dead-letter
 row is the only record the gap exists, and replaying it re-orders it by
 definition.
 
-**Contended polls fetch nothing.** When a key is already active, the node that
-loses hits the unique violation and gets an empty batch — including the
-unrelated keys in that batch. Keep `batchSize: 1`.
+**Retries block their key, and only their key.** A failing event holds its key
+for the whole retry sequence — roughly 2–4 s then 4–8 s of backoff between the
+three attempts, plus handler time, or up to 2 × 120 s if attempts expire — before
+dead-lettering. Other keys in the queue keep flowing (pg-boss ≥ 12.34).
 
-**Retries block their key.** With an explicit `retryLimit`, a failing event
-holds its user's stream for the full retry sequence before dead-lettering.
+**An expired attempt is not cancelled.** pg-boss expiry does not abort the
+running handler, so it can overlap with the retry. Handlers must stay
+idempotent, which the outbox already requires.

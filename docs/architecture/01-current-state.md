@@ -112,6 +112,13 @@ The publisher is `@Transactional()`, so the outbox insert joins the caller's
 transaction. This is the [transactional outbox pattern](https://microservices.io/patterns/data/transactional-outbox.html)
 implemented correctly, including the idempotency requirement it imposes on consumers.
 
+> **Since `fcd9922`** ([docs/events](../events/README.md),
+> [ADR 0006](adr/0006-group-ordered-event-delivery.md)): the machinery now lives
+> in `apps/api/src/platform/events/`. The durable leg drains into **one
+> `key_strict_fifo` queue per consumer group**, keyed per user (or message), not
+> `${eventType}.${group}`. Terminal failures are recorded in
+> `events_dead_letters` and the job completes.
+
 **WebSocket broadcasting is already a separate layer.** There are zero
 `server.emit` / `server.to` calls outside [`ws.gateway.ts`](../../apps/api/src/websockets/ws.gateway.ts).
 No domain service holds a reference to the gateway. Services only `publish()` to the
@@ -310,6 +317,11 @@ tests.
 events for every bounded context in the system** — tags, messaging, calendar, timers,
 tasks, suggestions, attention. Every context's contract lives outside that context.
 
+> **Since `fcd9922`:** the file moved to
+> `apps/api/src/platform/events/registry/events.registry.ts` and lost its
+> `groups` fields, but it is still one central catalogue. Consumer groups, by
+> contrast, already live in their owning contexts (`<ctx>/<ctx>.consumer-group.ts`).
+
 It also carries a known duplication: `AttentionItemUpserted`'s zod schema is a
 hand-maintained copy of `AttentionItemResponse` in `apps/api`, because
 `packages/shared` must not depend on `apps/api`. The comment in the file acknowledges
@@ -358,14 +370,15 @@ the system and the least typed thing in it.
 - **`tags.name` is globally `.unique()`** rather than unique per user. A second user
   creating a tag name that already exists anywhere gets a `23505`. This is a live
   bug.
-- **`tag.created` has no publisher and no consumer.** Dead contract.
-- **The `email` group on `tag.created` / `tag.updated` has no handler.** The
-  dispatcher still creates the `tag.updated.email` pg-boss queue and enqueues jobs
-  into it that nothing will ever work.
+- ~~**`tag.created` has no publisher and no consumer.** Dead contract.~~
+  _Fixed — the event no longer exists._
+- ~~**The `email` group on `tag.created` / `tag.updated` has no handler.**~~
+  _Fixed — `groups` was dropped from `defineEvent`; groups are now discovered from
+  handlers, so an orphan group cannot exist ([docs/events](../events/02-consumer-groups.md))._
 - **Realtime-only outbox rows are never marked dispatched.** The dispatcher's
   `WHERE` clause excludes `delivery_mode = 'realtime'`, so those rows accumulate
   forever. There is no retention job, and no index on `dispatched_at` / `failed_at` —
-  the dispatcher's poll query will sequential-scan as the table grows.
+  the dispatcher's poll query will sequential-scan as the table grows. _Still open._
 - **`ws.gateway.ts` (555 LOC) does three jobs**: WebSocket transport, an inbound
   command surface (`@SubscribeMessage("message.send")` with a 128-line handler that
   duplicates the REST path), and an event-consumer surface with 7 realtime

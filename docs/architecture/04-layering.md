@@ -168,9 +168,11 @@ apps/api/src/platform/              # framework-aware. domain/ may NOT import th
   config/{cors,swagger}.config.ts
   events/                           # ex packages/shared — the outbox machinery
     publisher/                      #   abstract EventsPublisher + impl
-    dispatcher/                     #   outbox -> pg-boss drain
-    consumer/                       #   @EventHandler decorator, discovery, realtime listener
-    registry/                       #   defineEvent + event types  (NOT the event catalogue)
+    dispatcher/                     #   outbox -> pg-boss drain, one queue per consumer group
+    decorators/                     #   @EventHandler + EventHandlersRegistry (discovers groups)
+    consumer/                       #   discovery, durable runtime (retries), realtime listener
+    dead-letters/                   #   events_dead_letters repository
+    registry/                       #   defineEvent, ConsumerGroup + event types (NOT the catalogue)
   jobs/                             # ex packages/shared
     message-bus/                    #   pg-boss wrapper
     scheduled-job/                  #   abstract port + pg-boss impl
@@ -241,6 +243,12 @@ it passes the purity ban in §8.
 definitions is not infrastructure; it is every context's published language collected in
 one file. It splits into `<ctx>/contract/<ctx>.events.ts` — see
 [05-integration.md §4](05-integration.md). Only the `defineEvent` machinery is platform.
+
+The same split applies to consumer groups, and there it has already happened:
+each `ConsumerGroup` const (name + ordering key) lives in the context that
+consumes it, and platform discovers groups from `@EventHandler` at bootstrap
+without importing any context. See [docs/events](../events/02-consumer-groups.md)
+and [ADR 0006](adr/0006-group-ordered-event-delivery.md).
 
 ### `email/` stays whole — a deliberate exception
 
@@ -315,6 +323,7 @@ apps/api/src/<context>/
     rest/    <name>.controller.ts, dto/, responses/, <name>.mapper.ts
     ws/      <name>.broadcaster.ts
     events/  <name>.handler.ts     # @EventHandler classes
+             <group>.consumer-group.ts  # ConsumerGroup const — the consumer owns its ordering key
     jobs/    <name>.worker.ts      # pg-boss workers and schedulers
 ```
 

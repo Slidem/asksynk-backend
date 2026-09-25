@@ -1,160 +1,136 @@
 # Consumer groups and ordering keys
 
-The registry contract. Every durable event belongs to one or more consumer
-groups; each group owns one `key_strict_fifo` queue and one ordering strategy.
+The group contract. Every durable event belongs to one or more consumer groups;
+each group owns one `key_strict_fifo` queue and one ordering function.
 
 See [01-ordering-design.md](01-ordering-design.md) §5 for why the key lives on
-the group rather than on `@EventHandler`, and how the definitions reach the
-dispatcher.
+the group rather than on `@EventHandler`, and how groups reach the dispatcher.
 
-Each definition lives in its own context under `<ctx>/contract/`, beside that
-context's event definitions, with a small registration provider that injects the
-platform registry and calls `register()` in `onModuleInit`. There is no central
-array — adding a group touches only its own context.
+Each group is a `ConsumerGroup<E>` const — `{ name, orderingKeyFn }` — in its
+owning context at `<ctx>/<ctx>.consumer-group.ts`, passed to every
+`@EventHandler` of that group. There is no registration step and no central
+list: the platform discovers groups from the handlers.
 
 ## Groups
 
-| Group             | Ordering key            | Events | Producer changes |
-| ----------------- | ----------------------- | ------ | ---------------- |
-| `attention-items` | `user:<id>`             | 15     | 5                |
-| `suggestion-sync` | `user:<assigneeUserId>` | 2      | —                |
-| `calendar-sync`   | `user:<userId>`         | 3      | —                |
-| `messaging`       | `thread:<threadId>`     | 1      | 1                |
-| `timer-event-log` | `user:<userId>`         | 1      | —                |
+| Group             | File                                                   | Ordering key                  | Events |
+| ----------------- | ------------------------------------------------------ | ----------------------------- | ------ |
+| `attention-items` | `attention-items/attention-items.consumer-group.ts`    | `user:<id>` (see below)       | 15     |
+| `suggestion-sync` | `tasks/suggestion-sync.consumer-group.ts`              | `assignee:<assigneeUserId>`   | 2      |
+| `calendar-sync`   | `calendar-integrations/calendar-sync.consumer-group.ts`| `<userId>` (no prefix)        | 3      |
+| `messaging`       | `messaging/messaging.consumer-group.ts`                | `<messageId>` (no prefix)     | 1      |
+| `timer-event-log` | `timers/timer-event-log.consumer-group.ts`             | `user:<userId>`               | 1      |
 
-`email` is **dropped entirely**. It is declared on `TagUpdated` and has no
-handler and never did — the dispatcher currently creates a `tag.updated.email`
-queue and enqueues jobs nothing will ever work
-([architecture/01-current-state.md](../architecture/01-current-state.md) §4.9).
-Building the registry consumer-first removes it by construction.
+Prefixes are not consistent across groups. That is harmless — keys only
+collide within one queue — but worth normalising when next touched.
 
-Note that `attention-items` and `calendar-sync` both key on the user. They are
-separate queues, so they neither block nor order against each other — a calendar
-event is processed once per group, in parallel.
+`email` is **gone**. It was declared on `TagUpdated`, had no handler and never
+did; the old dispatcher created a `tag.updated.email` queue and enqueued jobs
+nothing would ever work. With groups discovered from handlers, an orphan group
+cannot exist.
+
+`attention-items` and `calendar-sync` both key on the user. They are separate
+queues, so they neither block nor order against each other — a calendar event is
+processed once per group, in parallel.
 
 ## attention-items → `user:<id>`
 
-Fifteen events. Three of them belong to several users at once and **fan out**
-into one job per participant.
+Fifteen events, across three handler classes in `attention-items/handlers/`.
+`orderingKeyFn` picks the first field present:
 
-| Event                      | Key from               | Fan-out | Change        |
-| -------------------------- | ---------------------- | ------- | ------------- |
-| `message.created`          | `participantUserIds[]` | yes     | —             |
-| `message.updated`          | `participantUserIds[]` | yes     | —             |
-| `message.status.changed`   | `participantUserIds[]` | yes     | **add field** |
-| `tag.updated`              | `userId`               |         | —             |
-| `tag.deleted`              | `userId`               |         | —             |
-| `calendar.event.created`   | `userId`               |         | —             |
-| `calendar.event.updated`   | `userId`               |         | —             |
-| `calendar.event.deleted`   | `userId`               |         | —             |
-| `task.upserted`            | `assigneeUserId`       |         | —             |
-| `task.deleted`             | `assigneeUserId`       |         | **add field** |
-| `task.batch.upserted`      | `assigneeUserId`       |         | —             |
-| `task.batch.deleted`       | `assigneeUserId`       |         | **add field** |
-| `task.suggestion.created`  | `suggesteeUserId`      |         | —             |
-| `task.suggestion.resolved` | `suggesteeUserId`      |         | **add field** |
-| `task.suggestion.updated`  | `suggesteeUserId`      |         | **add field** |
+| Field             | Events                                                                          |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `sentToUserId`    | `message.created`, `message.updated` (user recipient)                           |
+| `sentToGuestId`   | `message.created`, `message.updated` (guest recipient) — keyed `user:<guestId>` |
+| `assigneeUserId`  | `task.upserted`, `task.deleted`, `task.batch.upserted`, `task.batch.deleted`    |
+| `suggesteeUserId` | `task.suggestion.created`, `task.suggestion.resolved`, `task.suggestion.updated`|
+| `userId`          | `message.status.changed`, `tag.updated`, `tag.deleted`, `calendar.event.*`      |
+
+Anything else falls back to `user:unknown` — one shared key for every such
+event. No current event reaches it; treat reaching it as a bug.
 
 The suggestion events key on the **suggestee**, matching
 `task-attention.handler.ts` — `onTaskSuggested` creates the attention item under
 `payload.suggesteeUserId`.
 
-A thread with only guest participants yields an empty key list, so the event
-produces no `attention-items` job. That is correct: the handler only creates
-items for participant users. The outbox row is still marked dispatched.
+Guest-recipient message events produce jobs the handler ignores
+(`createAttentionItemsForMessage` returns early without `sentToUserId`). They
+are cheap, but they are jobs.
 
-## suggestion-sync → `user:<assigneeUserId>`
+## suggestion-sync → `assignee:<assigneeUserId>`
 
-`task.upserted`, `task.batch.upserted`. Both already carry `assigneeUserId`.
-No changes.
+`task.upserted`, `task.batch.upserted`, handled in `task-suggestions.service.ts`.
 
 Kept deliberately separate from `attention-items` — sharing a queue would split
 each event between the two consumers rather than delivering it to both.
 
-## calendar-sync → `user:<userId>`
+## calendar-sync → `<userId>`
 
-`calendar.event.created`, `calendar.event.updated`, `calendar.event.deleted`.
-All three already carry `userId`. No changes.
+`calendar.event.created`, `calendar.event.updated`, `calendar.event.deleted`,
+handled in `calendar-integrations/sync/calendar-sync.event-handler.ts`. This
+group calls external providers, which is what the 120s expiry is sized for.
 
-## messaging → `thread:<threadId>`
+## messaging → `<messageId>`
 
-`attention.message.synced` only. Needs `threadId` added — see below.
+`attention.message.synced` only, handled in
+`messaging/handlers/attention-message.handler.ts`. Keyed on the message rather
+than the thread: the only ordering that matters here is status changes to the
+same message.
 
 ## timer-event-log → `user:<userId>`
 
-`timer.lifecycle`. Already carries `userId`. No changes.
+`timer.lifecycle`, handled in `timers/timers.event-log.handler.ts`.
 
-## Producer changes
+## Fan-out happens at the producer
 
-Six call sites across five files. Every one has the value in scope already.
+An earlier design had `attention-items` resolve one message event into several
+keys and emit one job per participant. The implementation fans out **before**
+the outbox instead: `MessagingService.notifyMessage` publishes
+`message.created` / `message.updated` once per recipient, each carrying either
+`sentToUserId` or `sentToGuestId`. The sender is excluded.
 
-### 1. `TaskDeleted` — add `assigneeUserId`
+Consequences:
 
-[`tasks.service.ts:130`](../../apps/api/src/tasks/services/tasks.service.ts#L130).
-`task` is loaded and assignee-checked immediately above; use
-`task.assigneeUserId`.
+- `orderingKeyFn` returns a single `string`, never a list.
+- One outbox row is one job per group, so the outbox row id works as the job id.
+- The realtime leg receives one event per recipient too. `ws.gateway.ts` emits
+  to the recipient's room **and** the thread room on each, so the thread room
+  gets N copies; a thread whose only participant is the sender gets none.
 
-### 2. `TaskBatchDeleted` — add `assigneeUserId`
+## Producer changes (all shipped)
 
-[`task-batches.service.ts:101`](../../apps/api/src/tasks/services/task-batches.service.ts#L101).
-`requireAssignee(userId, id)` has already asserted it, so the `userId` parameter
-is the assignee.
-
-### 3. `TaskSuggestionResolved` — add `suggesteeUserId` (×3)
-
-[`task-suggestions.service.ts`](../../apps/api/src/tasks/services/task-suggestions.service.ts)
-at `accept` (:121), `reject` (:135) and `rescind` (:147).
-
-`accept` and `reject` already hold `suggestion`. **`rescind` currently discards
-the `requirePending` return value** and needs to capture it.
-
-### 4. `TaskSuggestionUpdated` — add `suggesteeUserId`
-
-[`task-suggestions.service.ts:194`](../../apps/api/src/tasks/services/task-suggestions.service.ts#L194)
-in `editPayload`; `suggestion.suggesteeUserId` is in scope.
-
-### 5. `MessageManagedStatusChanged` — add `participantUserIds`
-
-[`messaging.service.ts`](../../apps/api/src/messaging/services/messaging.service.ts),
-private `publishManagedStatusChanged(threadId, messageId, managedStatus)`.
-
-Both callers (`updateManagedStatus`, `applyManagedStatusFromAttention`) have the
-thread id but not the participant list. Load it in the helper with
-`messagingRepository.getParticipants(threadId)` and map to user ids, the same
-shape `notifyMessageCreated` / `notifyMessageUpdated` already build.
-
-This is the field that makes the event fan out; without it the third message
-event has no user at all and the group's key function stops being total.
-
-### 6. `AttentionMessageStatusChanged` — add `threadId`
-
-[`attention-items.service.ts:87`](../../apps/api/src/attention-items/attention-items.service.ts#L87).
-`metadata` is already narrowed to `TaggedMessageMetadata`, which carries
-`threadId` — confirm it is non-optional on that type, or assert it, since a
-`tagged_message` item always has one.
+| Event                      | Field added                         | Where                                               |
+| -------------------------- | ----------------------------------- | --------------------------------------------------- |
+| `task.deleted`             | `assigneeUserId`                    | `tasks.service.ts`                                  |
+| `task.batch.deleted`       | `assigneeUserId`                    | `task-batches.service.ts`                           |
+| `task.suggestion.resolved` | `suggesteeUserId`                   | `task-suggestions.service.ts` — accept, reject, rescind |
+| `task.suggestion.updated`  | `suggesteeUserId`                   | `task-suggestions.service.ts#editPayload`           |
+| `message.created/updated`  | `sentToUserId` / `sentToGuestId` (replaces `participantUserIds` / `participantGuestIds`) | `messaging.service.ts#notifyMessage` |
+| `message.status.changed`   | `userId` (not `participantUserIds`, as first planned) | `messaging.service.ts#publishManagedStatusChanged` |
+| `attention.message.synced` | `userId` (not `threadId`, as first planned)           | `attention-items.service.ts`                       |
 
 ## Invariants for anyone adding an event
 
 1. **The key function must be total.** `key_strict_fifo` has a CHECK that
    `singleton_key` is never null; one null fails the INSERT for the whole
    dispatch batch, not just the offending event. If an event has no natural
-   domain, fall back to the outbox row id — unique, so it blocks nothing.
+   domain, key on something unique to it (e.g. its own id) — unique keys block
+   nothing.
 2. **Ordering only exists between events that produce the same key.** If two
    event types must be ordered relative to each other, they must resolve to the
    same key in that group.
 3. **Adding an event to a group is a queue-wide decision.** The key contract is
    shared by every handler in the group.
-4. **Register in `onModuleInit`, read in `onApplicationBootstrap`.** Nest gives
-   no ordering guarantee between sibling modules' `onModuleInit`, so anything
-   that reads the registry — the dispatcher, queue bootstrap, handler discovery
-   — must wait for bootstrap. The registry is sealed once bootstrap reads it;
-   registering after that throws.
-5. **Both directions are checked at boot.** Every group named by an
-   `@EventHandler` must be registered, and every registered `(group, event)`
-   must have a handler. The second check is what keeps another orphan `email`
-   group from ever existing.
-6. **`@EventHandler` still declares its group.** Only `defineEvent` loses its
-   `groups` field. A `Dual` event has handlers on both legs — realtime in
-   `ws.gateway.ts`, durable in its group's handler — and the presence of
-   `{ group }` is the only thing that tells them apart. It also names the
-   implementing class, which the registry cannot.
+4. **One group, one const.** Every `@EventHandler` of a group must pass the same
+   `ConsumerGroup` instance. Two objects with the same `name` throw at
+   bootstrap.
+5. **One handler per `(group, event)`.** The runtime throws at bootstrap on a
+   duplicate.
+6. **A durable handler is what makes an event dispatchable.** The dispatcher
+   only drains event types that have a durable handler in its process; without
+   one, rows stay in the outbox.
+7. **`@EventHandler` without a group is realtime.** A `Dual` event needs one
+   realtime handler (no group) and one durable handler per group; passing a
+   group on a `Realtime` event throws.
+8. **Handlers must be idempotent.** Retries, expiry overlap and a future replay
+   all re-deliver.

@@ -7,12 +7,12 @@ boundaries rot.
 
 ## 1. The decision table
 
-|         | Mechanism                                     | Use when                                                                                                                                                                               | Consistency                                                                    | Cost                                    |
-| ------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------- |
-| **(a)** | **Sync call to `<other>/contract/*.port.ts`** | You need an authoritative answer **now** to validate or decide, the answer is small, you are mid-request. Typically: authorization, existence checks, "give me these ids' attributes". | Strong — joins the caller's transaction through `@Transactional()` re-entrancy | One abstract class + one binding        |
-| **(b)** | **Domain event via the existing outbox**      | Something **happened** and other contexts should react. **Mandatory** for anything that would write to a table you do not own.                                                         | Eventual; handler must be idempotent                                           | One `defineEvent` + one `@EventHandler` |
-| **(c)** | **A projection you own**                      | You repeatedly need another context's data to answer _your_ queries, and joining live would penetrate the boundary. Built by (b).                                                      | Eventual                                                                       | A table + handlers + a backfill         |
-| **(d)** | **ACL translator**                            | The other side speaks a different language, or is **external** (Google, Gmail, Slack)                                                                                                  | n/a                                                                            | One adapter class                       |
+|         | Mechanism                                     | Use when                                                                                                                                                                               | Consistency                                                                    | Cost                                                                                                         |
+| ------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| **(a)** | **Sync call to `<other>/contract/*.port.ts`** | You need an authoritative answer **now** to validate or decide, the answer is small, you are mid-request. Typically: authorization, existence checks, "give me these ids' attributes". | Strong — joins the caller's transaction through `@Transactional()` re-entrancy | One abstract class + one binding                                                                             |
+| **(b)** | **Domain event via the existing outbox**      | Something **happened** and other contexts should react. **Mandatory** for anything that would write to a table you do not own.                                                         | Eventual, ordered per key within a consumer group; handler must be idempotent  | One `defineEvent` + one `@EventHandler(E, Group)`, plus a `ConsumerGroup` const if the consumer has none yet |
+| **(c)** | **A projection you own**                      | You repeatedly need another context's data to answer _your_ queries, and joining live would penetrate the boundary. Built by (b).                                                      | Eventual                                                                       | A table + handlers + a backfill                                                                              |
+| **(d)** | **ACL translator**                            | The other side speaks a different language, or is **external** (Google, Gmail, Slack)                                                                                                  | n/a                                                                            | One adapter class                                                                                            |
 
 ### Hard rules
 
@@ -235,7 +235,7 @@ gateway.
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `messaging` → `TaskSuggestionsService`       | A genuine same-transaction command: sending a message can embed a task suggestion, and both must commit together. This is exactly what mechanism (a) is for. It only needs _publishing_ — `work/contract/task-suggestion.port.ts` — not removing. |
 | `attention_item_tags.tag_id` has no FK       | Deliberate. Ghost rows must survive tag deletion so the tag-deleted handler can find affected items. Add a comment saying so.                                                                                                                     |
-| The outbox / dispatcher / consumer machinery | The strongest code in the repo. Only the _registry file_ is split.                                                                                                                                                                                |
+| The outbox / dispatcher / consumer machinery | The strongest code in the repo. Only the _registry file_ is split. (Since reworked for per-group ordering and dead letters — [docs/events](../events/README.md), [ADR 0006](adr/0006-group-ordered-event-delivery.md).)                           |
 | `AttachmentAccessService.register()`         | The pattern to copy, not fix.                                                                                                                                                                                                                     |
 
 ---
@@ -285,8 +285,8 @@ This single type:
 
 ## 4. The event catalogue moves home
 
-`packages/shared/src/event-registry/events.registry.ts` (347 lines, 24 events) splits
-into per-context files:
+`apps/api/src/platform/events/registry/events.registry.ts` (ex
+`packages/shared/src/event-registry/`, 24 events) splits into per-context files:
 
 ```
 tagging/contract/tagging.events.ts
@@ -302,15 +302,26 @@ infrastructure** — they move to `platform/events/registry/` when `packages/sha
 dissolves ([04-layering.md §1b](04-layering.md)). Only the _catalogue_ of event
 definitions is per-context.
 
-This is safe because neither runtime component needs the central file: the dispatcher
-works off database rows, and the consumer works off decorator metadata gathered at
-bootstrap. It also removes the `AttentionItemUpserted` ↔ `AttentionItemResponse` zod
+This is safe because neither runtime component needs the central file. The dispatcher
+works off database rows plus the consumer-group map that `EventHandlersRegistry`
+derives from `@EventHandler` metadata at bootstrap; the consumer works off the same
+metadata. Neither imports an event definition by name.
+
+That map is only as complete as the modules loaded in the dispatcher's process: the
+dispatcher only drains event types that have a durable handler locally, and leaves the
+rest in the outbox. **Whatever process runs the dispatcher must load every context
+with a durable handler** ([docs/events 01 §5](../events/01-ordering-design.md)).
+
+Consumer groups already follow this rule: each `ConsumerGroup` const — group name
+plus ordering key — lives in the consuming context, not with the event.
+
+It also removes the `AttentionItemUpserted` ↔ `AttentionItemResponse` zod
 duplication, because the event definition ends up next to the response DTO instead of
 in a different package.
 
-**Delete while doing this:** `tag.created` (no publisher, no consumer) and the
-`email` delivery group on `tag.created` / `tag.updated` (no handler anywhere, yet the
-dispatcher still creates the queue and enqueues jobs into it).
+~~**Delete while doing this:** `tag.created` (no publisher, no consumer) and the
+`email` delivery group on `tag.created` / `tag.updated`.~~ _Done — `tag.created` is
+gone and `defineEvent` no longer takes `groups`._
 
 ---
 

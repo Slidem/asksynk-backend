@@ -100,6 +100,7 @@ export class TaskBatchesService {
     await this.batchesRepository.softDelete(batch.id);
     await this.eventsPublisher.publish(TaskBatchDeleted, {
       taskBatchId: batch.id,
+      assigneeUserId: batch.assigneeUserId,
     });
   }
 

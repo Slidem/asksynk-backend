@@ -2,6 +2,7 @@ import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
 import { DiscoveryService, MetadataScanner } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
 
+import { DURABLE_GROUP_QUEUE_OPTIONS } from "@/api/platform/events/consumer/durable-delivery.constants";
 import { EVENT_HANDLERS_METADATA } from "@/api/platform/events/decorators/event-handler.constants";
 import {
   DecoratedEventHandler,
@@ -37,16 +38,14 @@ export class EventHandlersRegistry implements OnApplicationBootstrap {
     );
     await Promise.all(
       groups.map(async (group) => {
-        await this.busService.ensureQueue(group.name);
+        await this.busService.ensureQueue(
+          group.name,
+          DURABLE_GROUP_QUEUE_OPTIONS,
+        );
       }),
     );
   }
 
-  /**
-   * Events this process can consume durably, i.e. that have a handler bound to
-   * a consumer group. Realtime handlers (no group) are excluded: they don't
-   * produce jobs, so dispatching on their behalf would only drop the row.
-   */
   getAllConsumerGroupHandledEvents(): EventDef[] {
     const events = new Map<string, EventDef>();
 
@@ -63,7 +62,6 @@ export class EventHandlersRegistry implements OnApplicationBootstrap {
     return this.handlers;
   }
 
-  /** Distinct consumer groups declared by handlers of the given event. */
   getConsumerGroups(eventName: string): ConsumerGroup<EventDef>[] {
     const groups = new Map<string, ConsumerGroup<EventDef>>();
 
