@@ -34,18 +34,23 @@ export class BetterAuthModule {
               .map((email) => email.trim())
               .filter(Boolean);
 
+            const authUrl = config.getOrThrow<string>("AUTH_URL");
+
+            // Safari may drop Secure cookies on plain http://localhost; local dev is same-site anyway
+            const isHttps = authUrl.startsWith("https://");
+
             return createAuth({
               databaseUrl: config.getOrThrow<string>("DATABASE_URL"),
               secret: config.getOrThrow<string>("AUTH_SECRET"),
-              baseUrl: config.getOrThrow<string>("AUTH_URL"),
+              baseUrl: authUrl,
               advanced: {
-                defaultCookieAttributes: {
-                  sameSite: "none",
-                  secure: true,
-                },
+                defaultCookieAttributes: isHttps
+                  ? { sameSite: "none", secure: true }
+                  : { sameSite: "lax", secure: false },
               },
               trustedOrigins,
               whitelistSignupEmails,
+
               sendMagicLink: async ({ email, url }) => {
                 await emailService.send({
                   to: email,

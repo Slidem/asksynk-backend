@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
-import { Db, JobInsert, PgBoss, Queue } from "pg-boss";
+import { Db, JobInsert, JobWithMetadata, PgBoss, Queue } from "pg-boss";
 
 import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import {
@@ -131,7 +131,7 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
       queue,
       { ...opts, includeMetadata: true },
       async ([job]) => {
-        await handler(job.data, job);
+        await handler(job.data, job as JobWithMetadata<T>);
       },
     );
   }
