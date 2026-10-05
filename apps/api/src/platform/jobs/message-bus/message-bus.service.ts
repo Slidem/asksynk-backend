@@ -137,16 +137,6 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Publishes an event to all subscribers of the specified event. The event will be retried according to the options specified in `opts` in case of failure.
-   *
-   * @param event
-   * @param data
-   */
-  async publish<T extends object>(event: string, data: T): Promise<void> {
-    await this.requireBoss().publish(event, data);
-  }
-
-  /**
    * Registers a recurring (cron) schedule for a queue. pg-boss runs a single
    * clock-monitoring instance, so the job is enqueued on exactly one API
    * instance per tick — no leader election needed. Idempotent: re-registering
@@ -160,8 +150,22 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     opts: SendOptions = {},
   ): Promise<void> {
     const boss = this.requireBoss();
+    this.assertValidCron(boss, queue, cron);
     await this.ensureQueue(queue);
     await boss.schedule(queue, cron, data ?? {}, opts);
+  }
+
+  /**
+   * Validates via pg-boss's own parser (cron-parser, non-strict; also RRULE),
+   * so we fail before creating the queue and accept exactly what pg-boss does.
+   */
+  private assertValidCron(boss: PgBoss, queue: string, cron: string): void {
+    try {
+      boss.previewSchedule(cron, { count: 1 });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(`Invalid cron "${cron}" for queue "${queue}": ${reason}`);
+    }
   }
 
   /** Removes a previously registered cron schedule. */

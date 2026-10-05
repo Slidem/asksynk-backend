@@ -337,6 +337,7 @@ export class TimersService {
           transitionedAt: timer.transitionedAt.toISOString(),
         },
         runAt,
+        name: `timer`,
         jobId: `timer:${timer.userId}`,
       },
     );

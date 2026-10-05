@@ -2,8 +2,11 @@ export interface ScheduleJobInput<T extends object> {
   payload: T;
   runAt: Date;
   /**
-   * Caller-owned identifier for the job. Backend-agnostic name for the
-   * deduplication key — at most one pending job per (queue, jobId).
+   * Job name for the scheduled job.
+   */
+  name: string;
+  /**
+   * Unique job id for deduplication;
    */
   jobId?: string;
 }
