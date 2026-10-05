@@ -13,7 +13,7 @@ import { Client } from "pg";
 import { EventHandlersRegistry } from "@/api/platform/events/decorators/event-handlers.registry";
 import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
 import { QueuedJobInsert } from "@/api/platform/jobs/message-bus/message-bus.types";
-import { fromDrizzleTx } from "@/api/platform/jobs/scheduled-job/pgboss-drizzle-db";
+import { fromDrizzleTx } from "@/api/platform/jobs/message-bus/pgboss-drizzle-db";
 import { eventsOutbox } from "@/migrations/schema/outbox";
 
 export const EVENTS_DISPATCHER_DB = "EVENTS_DISPATCHER_DB";

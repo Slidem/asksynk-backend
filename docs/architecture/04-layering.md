@@ -109,9 +109,9 @@ Both questions fail:
    layer** publishes it. That is the design in §4 — and it is why the domain never needs
    a publisher.
 
-So **both halves go to `platform/events/publisher/`.** Same for `ScheduledJobService`
-(whose abstract is, notably, 100% import-free — it passes question 1 and still fails
-question 2), `RealtimeBroadcaster`, and `ObjectStorage`.
+So **both halves go to `platform/events/publisher/`.** Same for `JobScheduler`
+(its signature takes `QueuedJobDef<T>` from `platform/jobs/`, and no domain code calls
+it — the application layer schedules), `RealtimeBroadcaster`, and `ObjectStorage`.
 
 The abstract/impl split is real and valuable — it is [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md).
 It just runs **port vs adapter**, not **kernel vs platform**:
@@ -120,7 +120,7 @@ It just runs **port vs adapter**, not **kernel vs platform**:
 | ------------------------------------------------------------------------ | --------------------- | -------------------------------------- |
 | `TagRepository`, `AttentionItemsRepository`, …                           | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/`    |
 | `TagCatalogPort`, `CalendarOccurrencePort`, …                            | `<ctx>/contract/`     | the owning context's `infrastructure/` |
-| `EventsPublisher`, `ScheduledJobService`, `RealtimeBroadcaster`, `Clock` | `platform/<area>/`    | `platform/<area>/`                     |
+| `EventsPublisher`, `JobScheduler`, `RealtimeBroadcaster`, `Clock`        | `platform/<area>/`    | `platform/<area>/`                     |
 
 Repository ports **do** split by layer — but _within a context_, `domain/ports/` →
 `infrastructure/`. That is the split the instinct is reaching for; it just does not
@@ -173,9 +173,11 @@ apps/api/src/platform/              # framework-aware. domain/ may NOT import th
     consumer/                       #   discovery, durable runtime (retries), realtime listener
     dead-letters/                   #   events_dead_letters repository
     registry/                       #   defineEvent, ConsumerGroup + event types (NOT the catalogue)
-  jobs/                             # ex packages/shared
+  jobs/                             # ex packages/shared — typed jobs, see ADR 0007
     message-bus/                    #   pg-boss wrapper
-    scheduled-job/                  #   abstract port + pg-boss impl
+    define-job.ts, job.types.ts     #   defineJob / defineCronJob, payload + options types
+    job-scheduler.ts                #   abstract JobScheduler port + pgboss-job-scheduler.ts impl
+    job-handler.decorator.ts        #   @JobHandler + job-handlers.registry.ts (discovery, crons)
   email/                            # ex packages/shared — sender, providers, templates
 ```
 
@@ -229,7 +231,7 @@ configuration and buys nothing. It becomes `platform/` — and one file becomes 
 | `event-registry/events.registration.ts` + `events.types.ts` | 134 | `platform/events/registry/`                               |
 | `event-registry/events.registry.ts`                         | 348 | **splits per context** → `<ctx>/contract/<ctx>.events.ts` |
 | `message-bus/`                                              | 278 | `platform/jobs/message-bus/`                              |
-| `scheduled-job/`                                            | 154 | `platform/jobs/scheduled-job/`                            |
+| `scheduled-job/`                                            | 154 | `platform/jobs/` — replaced by the typed jobs API ([ADR 0007](adr/0007-unified-typed-jobs.md)) |
 | `email/`                                                    | 340 | `platform/email/` — kept whole, see below                 |
 | `logger.config.ts`                                          |  44 | `platform/logger/`                                        |
 | `pg-error-codes.ts`                                         |  16 | `platform/db/`                                            |
@@ -411,7 +413,8 @@ resolves it.
 
 **This is not a new pattern for this codebase.** `packages/shared` already does it —
 `abstract class EventsPublisher` / `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` / `PgBossScheduledJobService`. → [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)
+`abstract class ScheduledJobService` / `PgBossScheduledJobService` (now
+`JobScheduler` / `PgBossJobScheduler`, [ADR 0007](adr/0007-unified-typed-jobs.md)). → [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)
 
 ### Why abstract classes rather than `interface` + `Symbol`
 

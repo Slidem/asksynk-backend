@@ -92,9 +92,11 @@ Question 2 is the one that gets forgotten, and it is what keeps `kernel/` from b
 that declares the need, and both halves live together. `EventsPublisher` fails _both_
 questions: its signature depends on `EventDef`/`EventOf`, which are zod types
 (`EventOf<T> = z.infer<T["schema"]>`), and all 14 of its injectors are services, not
-entities. `ScheduledJobService` is the sharper case — its abstract is entirely
-import-free, so it passes question 1, and still belongs in `platform/` because no domain
-code calls it. The abstract/adapter split runs **port vs adapter** (and for repositories,
+entities. `ScheduledJobService` was the sharper case — its abstract was entirely
+import-free, so it passed question 1, and still belonged in `platform/` because no domain
+code called it. Its replacement, `JobScheduler` ([ADR 0007](0007-unified-typed-jobs.md)),
+fails both: its signature takes `QueuedJobDef<T>`, and scheduling stays in the
+application layer. The abstract/adapter split runs **port vs adapter** (and for repositories,
 `<ctx>/domain/ports/` → `<ctx>/infrastructure/`), never kernel vs platform. Worked
 through in [04-layering.md §1a](../04-layering.md).
 

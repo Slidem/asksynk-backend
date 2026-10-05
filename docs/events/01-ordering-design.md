@@ -236,7 +236,7 @@ await this.bus.insertJobs(jobs, fromDrizzleTx(tx));
 
 so the jobs and the `dispatched_at` update commit together.
 
-[`fromDrizzleTx`](../../apps/api/src/platform/jobs/scheduled-job/pgboss-drizzle-db.ts)
+[`fromDrizzleTx`](../../apps/api/src/platform/jobs/message-bus/pgboss-drizzle-db.ts)
 replaces pg-boss's own `fromDrizzle`: that one interpolates raw values into
 drizzle's `sql` tag, and drizzle spreads a JS array into `(a, b, …)`. pg-boss
 passes id arrays for casts like `UNNEST($2::uuid[])`, so the cast receives a

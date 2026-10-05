@@ -1,11 +1,19 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ContextLogger } from "nestjs-context-logger";
-import { Db, JobInsert, JobWithMetadata, PgBoss, Queue } from "pg-boss";
+import {
+  Db,
+  JobInsert,
+  JobWithMetadata,
+  PgBoss,
+  Queue,
+  Schedule,
+} from "pg-boss";
 
 import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import {
   CancelOptions,
+  DeleteJobOptions,
   MessageHandler,
   QueuedJobInsert,
   SendOptions,
@@ -31,6 +39,9 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     this.boss = new PgBoss({
       connectionString,
       schema: "pgboss",
+      // The deletion sweep must run often for the 1h `deleteAfterSeconds` on
+      // job queues to mean anything (default interval is 24h).
+      maintenanceIntervalSeconds: 300,
     });
 
     this.boss.on("error", (error) =>
@@ -82,6 +93,15 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     opts: CancelOptions = {},
   ): Promise<void> {
     await this.requireBoss().cancel(queue, jobId, opts);
+  }
+
+  /** Deletes jobs in any state, freeing their ids. Missing ids are a no-op. */
+  async deleteJob(
+    queue: string,
+    jobId: string,
+    opts: DeleteJobOptions = {},
+  ): Promise<void> {
+    await this.requireBoss().deleteJob(queue, jobId, opts);
   }
 
   /**
@@ -166,6 +186,10 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(`Invalid cron "${cron}" for queue "${queue}": ${reason}`);
     }
+  }
+
+  async getSchedules(): Promise<Schedule[]> {
+    return this.requireBoss().getSchedules();
   }
 
   /** Removes a previously registered cron schedule. */

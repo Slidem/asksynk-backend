@@ -9,6 +9,8 @@ export type MessageHandler<T> = (
 export type QueuedJobInsert = { name: string } & JobInsert;
 
 export type SendOptions = {
+  /** Explicit job id (uuid). Sending an existing (queue, id) is a silent no-op. */
+  id?: string;
   retryLimit?: number;
   retryDelay?: number;
   retryBackoff?: boolean;
@@ -23,6 +25,8 @@ export type SendOptions = {
 
 /** Run cancel on a caller-supplied connection/tx so it joins the caller's transaction. */
 export type CancelOptions = { db?: Db };
+
+export type DeleteJobOptions = { db?: Db };
 
 export type WorkOptions = {
   pollingIntervalSeconds?: number;

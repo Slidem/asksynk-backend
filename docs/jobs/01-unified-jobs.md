@@ -4,7 +4,9 @@ One typed jobs API for scheduled, async and cron jobs. It replaces
 `ScheduledJobService`, the unused `platform/jobs/cron` stub, and callers using
 `MessageBusService` directly for jobs.
 
-**Status:** design agreed, not built.
+**Status:** design agreed, not built. Decision record:
+[ADR 0007](../architecture/adr/0007-unified-typed-jobs.md). Execution plan:
+[02-execution-plan.md](02-execution-plan.md).
 
 ## Why
 
@@ -33,9 +35,11 @@ The current `ScheduledJobService` leaks pg-boss details into callers:
 | 3   | Drop `user_timers.pending_completion_job_ref`.                                                                                                |
 | 4   | Payload type is TS-only (phantom type on the def). No runtime validation.                                                                     |
 | 5   | Job defs live in the owning module, not in a central registry.                                                                                |
-| 6   | Final failure: log an error and leave the job in pg-boss `failed` state. No DLQ.                                                              |
+| 6   | Final failure: log an error and leave the job in pg-boss `failed` state until the retention sweep removes it. No DLQ. Logs are the record.    |
 | 7   | Handler signature is `(payload, { jobId, attempt })`.                                                                                         |
-| 8   | Single process: producers and workers run in the API.                                                                                         |
+| 8   | Single process: producers and workers run in the API. No separate worker process is planned.                                                 |
+| 9   | Crons are reconciled at bootstrap: a schedule in pg-boss with no cron def in code is unscheduled.                                             |
+| 10  | Short retention: finished jobs (completed, failed, cancelled) are deleted after `deleteAfterSeconds`, default 1h. pg-boss sweeps every 5 min. |
 
 Dropped during review: a "`runAt` beyond retention" check. pg-boss computes
 `keep_until = start_after + retentionSeconds`, so retention counts from
@@ -48,10 +52,17 @@ Verified against pg-boss 12.34 `plans.js` / `manager.js`:
 - Job PK is `(name, id)`, `id uuid`. Insert is `ON CONFLICT DO NOTHING`, so
   sending an existing id is a silent no-op (`send` returns `null`).
 - `cancel` sets `state = cancelled` for `state < completed`, which **includes
-  `active`**. The row stays around for `deleteAfterSeconds` (7d), so the id is
+  `active`**. The row stays around for `deleteAfterSeconds`, so the id is
   blocked for that long.
 - `deleteJob(name, ids)` deletes the rows in any state, which frees the id.
 - `keep_until = start_after + retentionSeconds` (default 14d).
+- The deletion sweep (`plans.deletion`) removes rows where
+  `completed_on + deletion_seconds < now`. `completed_on` is set on complete,
+  fail and cancel, so `deleteAfterSeconds` covers every finished state, not
+  just `completed`. Default 7d.
+- The sweep runs once per queue every `maintenanceIntervalSeconds` (constructor
+  option, default 24h). A short `deleteAfterSeconds` does nothing without a
+  shorter interval: rows would still live up to a day.
 - Queue options (`retryLimit`, `retryDelay`, `retryBackoff`, `expireInSeconds`)
   are set via `createQueue`/`updateQueue`. Worker options
   (`pollingIntervalSeconds`, default 2s, and `localConcurrency`) are set per
@@ -79,6 +90,8 @@ export interface JobOptions {
   retryDelaySeconds: number;
   retryBackoff: boolean;
   expireInSeconds: number;
+  /** How long a finished job row (and so its id) is kept. */
+  deleteAfterSeconds: number;
   pollingIntervalSeconds: number;
   concurrency: number;
 }
@@ -182,15 +195,18 @@ export abstract class JobScheduler {
 ```ts
 export function JobHandler<T extends JobPayload>(
   job: JobDef<T>,
-): (
+): <M extends JobHandlerFn<T>>(
   target: object,
   key: string | symbol,
-  descriptor: TypedPropertyDescriptor<JobHandlerFn<T>>,
+  descriptor: TypedPropertyDescriptor<M>,
 ) => void;
 ```
 
-The `TypedPropertyDescriptor` check makes a handler whose payload type
-doesn't match fail to compile. Cron handlers may take no args.
+The `M extends JobHandlerFn<T>` constraint makes a handler whose payload type
+doesn't match fail to compile. `M` is generic because
+`TypedPropertyDescriptor<T>` is invariant: a fixed `JobHandlerFn<T>` would
+reject handlers that take fewer args than `(payload, ctx)`. Cron handlers may
+take no args.
 
 ## Internals
 
@@ -202,7 +218,12 @@ doesn't match fail to compile. Cron handlers may take no args.
   `messageBus.deleteJob(job.name, toJobUuid(id), { db: fromDrizzleTx(tx) })`.
   Delete rather than cancel, which frees the id and leaves no stale rows.
 - `toJobUuid(id) = uuidv5(id, JOBS_UUID_NAMESPACE)`. pg-boss needs a UUID;
-  callers pass a readable string.
+  callers pass a readable string. Deterministic, so `schedule` and `cancel`
+  map the same caller id to the same row. Implemented with `node:crypto`
+  SHA-1 in about 10 lines (RFC 9562 §5.5). The `uuid` package isn't a direct
+  dep, and from v12 it's ESM-only, which clashes with the CommonJS build and
+  ts-jest. A unit test pins it to a known vector:
+  `uuid5(NAMESPACE_DNS, "python.org") = 886313e1-3b8a-5372-9b90-0c9aee199e5d`.
 - The stored data is the envelope `{ id, payload }`, which lets the runtime hand
   the caller id back through `ctx.jobId`.
 
@@ -220,7 +241,14 @@ Uses the same discovery approach as `EventHandlersRegistry`
    - Cron defs: `scheduleCron(name, cron)`, which is idempotent.
    - `work(name, run, { pollingIntervalSeconds, localConcurrency: concurrency })`,
      giving one worker per registered job.
-4. `assertRegistered(def)`: throws `No handler registered for job "<name>"`.
+4. Reconcile crons (`reconcileCrons()`, a public method so the integration
+   test can call it): `getSchedules()`, then `unscheduleCron(name)` for every
+   schedule whose name isn't a registered cron def. Otherwise a cron removed
+   or renamed in code keeps enqueuing workerless jobs every tick. Safe because
+   cron defs are the only writer of `pgboss.schedule`, and because of decision
+   8: the one process registers every cron def. A second process with a
+   partial module set would unschedule the other's crons.
+5. `assertRegistered(def)`: throws `No handler registered for job "<name>"`.
    This is a clearer fail-fast than letting pg-boss say the queue is missing,
    and it's valid because producers and workers share one process.
 
@@ -247,6 +275,11 @@ themselves, as event handlers do.
 - `enqueue`: drop the implicit `ensureQueue`, since queues are created at
   bootstrap.
 - Replace `cancel` with `deleteJob(queue, id, { db })`.
+- Add `getSchedules()`, a thin wrapper used by the cron reconcile.
+- Construct `PgBoss` with `maintenanceIntervalSeconds: 300`, so the deletion
+  sweep honours a 1h `deleteAfterSeconds` (see pg-boss facts). This is
+  instance-wide. Event group queues keep their 7d `deleteAfterSeconds`; they
+  are just swept more often.
 - Move `pgboss-drizzle-db.ts` into `message-bus/`. The events dispatcher uses it
   too.
 
@@ -257,7 +290,8 @@ platform/jobs/
   message-bus/            pg-boss wrapper (unchanged role)
   job.types.ts
   define-job.ts
-  job-options.constants.ts   DEFAULT_JOB_OPTIONS, JOBS_UUID_NAMESPACE
+  job-options.constants.ts   DEFAULT_JOB_OPTIONS, JOBS_UUID_NAMESPACE (a fixed random UUID; never change it)
+  job-uuid.ts                toJobUuid (uuidv5 via node:crypto)
   job-scheduler.ts           abstract port
   pgboss-job-scheduler.ts
   job-handler.constants.ts   JOB_HANDLER_METADATA
@@ -271,7 +305,19 @@ Delete `platform/jobs/scheduled-job/` and `platform/jobs/cron/`.
 `DEFAULT_JOB_OPTIONS` uses pg-boss's defaults, spelled out so the runtime's
 `final` check matches what's on the queue: `retryLimit: 2`,
 `retryDelaySeconds: 0`, `retryBackoff: false`, `expireInSeconds: 900`,
-`pollingIntervalSeconds: 2`, `concurrency: 1`.
+`pollingIntervalSeconds: 2`, `concurrency: 1`. The one exception is
+`deleteAfterSeconds: 3600` (pg-boss: 7d). Every option is spelled out because
+`updateQueue` keeps the old value for any option left unset.
+
+`toQueueOptions(options)` maps `JobOptions` to pg-boss queue options:
+`retryLimit`, `retryDelay`, `retryBackoff`, `expireInSeconds`,
+`deleteAfterSeconds`. `pollingIntervalSeconds` and `concurrency` go to
+`work()` instead.
+
+**Retention vs dedup:** a finished row is what makes a repeat `schedule` a
+no-op. Once it's swept, the same id schedules again. Domain-derived ids that
+are never reused (timers) don't care. A time-bucketed id (calendar sync) needs
+`deleteAfterSeconds` ≥ its bucket length.
 
 ## Migration: timers (phase 1)
 
@@ -331,7 +377,9 @@ export const CalendarSyncJob = defineJob<CalendarSyncPayload>({
 - The fan-out uses `id: `${calendarId}:${slot}``, where
   `slot = floor(now / 240s)`. That reproduces the old `singletonKey` +
   `singletonSeconds: 240` dedup window using only the id, so no singleton
-  options need to be exposed.
+  options need to be exposed. It holds while `deleteAfterSeconds` (1h) ≥ 240s.
+- Volume at 1h retention is about 15 finished rows per calendar, versus about
+  2.5k at pg-boss's 7d default.
 - `CalendarSyncJobHandlers` has two `@JobHandler` methods: poll → fan-out, and
   sync → `syncService.syncCalendar`. It replaces `CalendarSyncScheduler`.
 - Trim `calendar-sync.constants.ts`: the queues, cron, singleton seconds and the
@@ -363,22 +411,30 @@ where name in ('timer.completion', 'calendar.sync') and state < 'active';
 - It can fire up to `pollingIntervalSeconds` late.
 - Don't schedule from an `onApplicationBootstrap` hook. The registry may not be
   populated yet, so `assertRegistered` throws.
+- The payload shape is a contract across deploys: a queued job can outlive the
+  code that produced it. Change it backward-compatibly, or clear pending jobs
+  with deploy SQL.
+- A final attempt that exceeds `expireInSeconds` is marked `failed` by pg-boss
+  without reaching the runtime's catch, so it isn't logged.
 
 ## Out of scope (YAGNI)
 
-Runtime payload validation, DLQ, dedup keys / singleton options, separate
-worker process, unscheduling crons removed from code, automatic handler tx.
+- Runtime payload validation.
+- DLQ.
+- Dedup keys / singleton options.
+- Automatic handler tx: some handlers (calendar sync) deliberately do network
+  IO outside a tx.
+- Per-calendar sync exclusivity: two syncs of one calendar can overlap when
+  retries cross a slot boundary. Same as today; pg-boss `stately` +
+  `singletonKey` would fix it.
 
 ## Implementation steps
 
-1. `platform/jobs` core: types, `defineJob`/`defineCronJob`, options constants,
-   decorator, registry, port + pg-boss impl, module. Also the
-   `MessageBusService` changes (`deleteJob`, no implicit ensure in
-   `enqueue`, move `pgboss-drizzle-db.ts`).
-2. Compile-time type spec: `// @ts-expect-error` cases for a wrong payload on
-   `schedule`, a mismatched handler, and a `Date` in a payload. Unit tests for
-   name validation and registry duplicate detection.
-3. Timers migration, schema change, and a generated migration.
+Detailed, file-by-file: [02-execution-plan.md](02-execution-plan.md).
+
+1. `platform/jobs` core plus the `MessageBusService` changes.
+2. Tests: type spec, unit, scheduler integration.
+3. Timers migration, including the column drop.
 4. Calendar sync migration.
-5. Delete `scheduled-job/` and `cron/`.
+5. Delete `scheduled-job/` and `cron/`, then flip the doc statuses.
 6. Deploy SQL.

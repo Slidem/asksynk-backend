@@ -29,8 +29,9 @@ Two consequences:
 
 `packages/shared` already solves this correctly, twice:
 `abstract class EventsPublisher` / `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` / `PgBossScheduledJobService`. The pattern is
-understood; it was simply never applied to persistence.
+`abstract class ScheduledJobService` / `PgBossScheduledJobService` (since replaced
+by `JobScheduler` / `PgBossJobScheduler`, same pattern — [ADR 0007](0007-unified-typed-jobs.md)).
+The pattern is understood; it was simply never applied to persistence.
 
 ## Options considered
 

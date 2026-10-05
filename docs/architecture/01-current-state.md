@@ -134,8 +134,9 @@ self-registers at `onModuleInit`. The result: `storage` never depends on `messag
 
 **Ports already exist — just not in `apps/api`.** `packages/shared` declares
 `abstract class EventsPublisher` with `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` with `PgBossScheduledJobService`. The team knows
-the pattern; it simply was not applied to the 21 repositories.
+`abstract class ScheduledJobService` with `PgBossScheduledJobService` (being replaced
+by `JobScheduler` / `PgBossJobScheduler`, [ADR 0007](adr/0007-unified-typed-jobs.md)). The team
+knows the pattern; it simply was not applied to the 21 repositories.
 
 **Domain errors exist.** `AsksynkError` with an `ErrorType` enum plus a global
 `AllExceptionsFilter`. Usage: **107 `AsksynkError.*` calls vs 17 Nest HTTP

@@ -265,9 +265,10 @@ Renamed because "timer" is the mechanism and "focus" is the concept. It owns a r
 five-state machine (`idle | running | paused | completed | stopped`) that is currently
 implemented with string-compare guards. Prime candidate for a rich aggregate.
 
-The pg-boss coupling — `TimersService` injects `ScheduledJobService` — moves to the
-application layer, behind the `ScheduledJobService` port that already exists (moving to
-`platform/jobs/scheduled-job/`).
+The pg-boss coupling moves to the application layer, behind the `JobScheduler` port
+([ADR 0007](adr/0007-unified-typed-jobs.md)). The completion job's id is derived from
+the timer (`userId:transitionedAt`), so the aggregate holds no job ref — the
+`pending_completion_job_ref` column is dropped.
 
 ---
 

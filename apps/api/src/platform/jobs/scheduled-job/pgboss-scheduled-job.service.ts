@@ -5,7 +5,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { MessageBusService } from "@/api/platform/jobs/message-bus/message-bus.service";
-import { fromDrizzleTx } from "@/api/platform/jobs/scheduled-job/pgboss-drizzle-db";
+import { fromDrizzleTx } from "@/api/platform/jobs/message-bus/pgboss-drizzle-db";
 import {
   ScheduledJobService,
   ScheduleJobInput,

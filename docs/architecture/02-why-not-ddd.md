@@ -186,7 +186,8 @@ convention.
 
 The proof that this is a gap rather than a philosophy: `packages/shared` **does** use
 ports — `abstract class EventsPublisher` / `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` / `PgBossScheduledJobService`. The pattern is
+`abstract class ScheduledJobService` / `PgBossScheduledJobService` (since replaced by
+`JobScheduler` / `PgBossJobScheduler`, [ADR 0007](adr/0007-unified-typed-jobs.md)). The pattern is
 already in the codebase, already understood, just never applied to persistence.
 
 **The immediate cost is testability**, which is Finding 6.

@@ -36,7 +36,7 @@ supporting machinery.
 | [07-attention-core.md](07-attention-core.md) | The heart of the product, designed for the channels that are coming              |
 | [08-roadmap.md](08-roadmap.md)               | Eight waves, each independently shippable                                        |
 | [09-references.md](09-references.md)         | Every source, and what specifically it justifies                                 |
-| [adr/](adr/)                                 | The five decisions that are expensive to reverse                                 |
+| [adr/](adr/)                                 | The decisions that are expensive to reverse                                      |
 
 ---
 
@@ -91,7 +91,7 @@ starting with the one that makes everything else safe: turning unit tests on.
 
 ## The decisions
 
-Five choices shape everything else. Each has an ADR.
+These choices shape everything else. Each has an ADR.
 
 | Decision              | Choice                                                              | ADR                                                                 |
 | --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -101,6 +101,7 @@ Five choices shape everything else. Each has an ADR.
 | Attention shape       | Aggregate whose _content_ is a projection; typed source columns     | [0004](adr/0004-attention-as-projection-with-typed-source.md)       |
 | Shared code           | Two tiers — `kernel/` (pure) and `platform/` (framework-aware)      | [0005](adr/0005-kernel-and-platform-tiers.md)                       |
 | Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table | [0006](adr/0006-group-ordered-event-delivery.md)                  |
+| Background jobs       | One typed jobs API; caller-derived ids, no stored pg-boss refs      | [0007](adr/0007-unified-typed-jobs.md)                              |
 
 Code structure stays **in place** — `apps/api/src/<context>/` with layered
 subfolders — enforced by `eslint-plugin-boundaries` and `dependency-cruiser` rather
