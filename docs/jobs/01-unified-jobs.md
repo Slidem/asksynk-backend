@@ -144,12 +144,11 @@ export function defineJob<T extends JobPayload>(input: {
   options?: Partial<JobOptions>;
 }): QueuedJobDef<T>;
 
-export function defineCronJob(input: {
-  name: string;
-  cron: string;
-  options?: Partial<JobOptions>;
-}): CronJobDef;
 ```
+
+Crons have no def object: nothing schedules them by hand, so they're declared
+inline on the handler with `@CronJob` (see Consumer below). Queued jobs keep
+the def because producers need it as a typed handle for `JobScheduler.schedule`.
 
 - Merges `DEFAULT_JOB_OPTIONS` and freezes the result, the same way `defineEvent` does.
 - Validates the name with the event regex, dotted lowercase
@@ -194,7 +193,7 @@ export abstract class JobScheduler {
 
 ```ts
 export function JobHandler<T extends JobPayload>(
-  job: JobDef<T>,
+  job: QueuedJobDef<T>,
 ): <M extends JobHandlerFn<T>>(
   target: object,
   key: string | symbol,
@@ -205,8 +204,18 @@ export function JobHandler<T extends JobPayload>(
 The `M extends JobHandlerFn<T>` constraint makes a handler whose payload type
 doesn't match fail to compile. `M` is generic because
 `TypedPropertyDescriptor<T>` is invariant: a fixed `JobHandlerFn<T>` would
-reject handlers that take fewer args than `(payload, ctx)`. Cron handlers may
-take no args.
+reject handlers that take fewer args than `(payload, ctx)`.
+
+Crons — `platform/jobs/cron-job.decorator.ts`:
+
+```ts
+@CronJob({ name: "calendar.sync.poll", cron: "*/1 * * * *", options?: {...} })
+async poll(): Promise<void> {}
+```
+
+Builds the frozen `CronJobDef` at decoration time (so a bad name throws on
+import) and records it under the same metadata as `@JobHandler`, so the
+registry treats both alike. Cron handlers may take no args.
 
 ## Internals
 
@@ -361,11 +370,6 @@ cancels the old id and schedules a new one in the same tx.
 `calendar-integrations/sync/calendar-sync.jobs.ts`:
 
 ```ts
-export const CalendarSyncPollJob = defineCronJob({
-  name: "calendar.sync.poll",
-  cron: "*/1 * * * *",
-});
-
 export type CalendarSyncPayload = { calendarId: string };
 
 export const CalendarSyncJob = defineJob<CalendarSyncPayload>({
@@ -380,8 +384,8 @@ export const CalendarSyncJob = defineJob<CalendarSyncPayload>({
   options need to be exposed. It holds while `deleteAfterSeconds` (1h) ≥ 240s.
 - Volume at 1h retention is about 15 finished rows per calendar, versus about
   2.5k at pg-boss's 7d default.
-- `CalendarSyncJobHandlers` has two `@JobHandler` methods: poll → fan-out, and
-  sync → `syncService.syncCalendar`. It replaces `CalendarSyncScheduler`.
+- `CalendarSyncJobHandlers` has two handlers: `@CronJob({ name: "calendar.sync.poll", cron: "*/1 * * * *" })`
+  poll → fan-out, and `@JobHandler(CalendarSyncJob)` sync → `syncService.syncCalendar`. It replaces `CalendarSyncScheduler`.
 - Trim `calendar-sync.constants.ts`: the queues, cron, singleton seconds and the
   `CalendarSyncJob` interface all move to the defs.
 

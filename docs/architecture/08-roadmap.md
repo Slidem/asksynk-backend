@@ -23,8 +23,8 @@ very first step is one line of jest config.
 | 0.3d | **Dissolve `packages/shared` into `platform/` + `kernel/id.ts`** per [04 §1b](04-layering.md). 80 imports, 5 config files. Leave `events.registry.ts` in place for now — it splits per context in Wave 8.1                                | 3h     | low        |
 | 0.4  | `tags.name` → `uniqueIndex(userId, lower(name))` — **the migration must dedupe existing rows first**                                                                                                                                      | 30min  | **medium** |
 | 0.5  | Delete the orphan `tag.created` event and the handler-less `email` group **✅ done** (events refactor)                                                                                                                                    | 15min  | none       |
-| 0.6a | Outbox: partial index on `id` where `dispatched_at` / `failed_at` are null (the drain orders by `id`)                                                                                                                                     | 15min  | low        |
-| 0.6b | Outbox: retention job deleting realtime-only rows older than 30 days — a `defineCronJob` ([ADR 0007](adr/0007-unified-typed-jobs.md))                                                                                                   | 45min  | low        |
+| 0.6a | Outbox: partial index on `id` where `dispatched_at` / `failed_at` are null (the drain orders by `id`) **✅ done** (`0008`)                                                                                                                                     | 15min  | low        |
+| 0.6b | Outbox: retention job deleting realtime-only rows older than 30 days — a `@CronJob` **✅ done** (`events.retention`; also prunes dispatched/failed rows and resolved dead letters) ([ADR 0007](adr/0007-unified-typed-jobs.md))                                                                                                   | 45min  | low        |
 | 0.7  | Write the first `.spec.ts` files against code that is **already pure** — `recurrence.utils.ts`, `task-status.util.ts`, `oauth-state.util.ts`, `slug.util.ts`, all 20 entities                                                             | 3h     | none       |
 
 **Verification:** `pnpm --filter @asksynk/api test` runs unit tests **with no
@@ -170,7 +170,7 @@ is a rename rather than a redesign.
 | 7.2 | Drop the 9 cross-context FKs (`ALTER TABLE … DROP CONSTRAINT`); keep every `users` FK                                                                                                        | 1h     | low               |
 | 7.3 | Convert `pgTable` → `<schema>.table` per context; reorganise `apps/migrations/src/schema/<context>/`; add `schemaFilter`                                                                     | 4h     | medium            |
 | 7.4 | Generate and run one migration; verify on a fresh database and on a copy of the real one                                                                                                     | 3h     | **medium-high**   |
-| 7.5 | Add the orphan-consistency check job (replaces what the dropped FKs used to guarantee) — a `defineCronJob`                                                                                                       | 2h     | low               |
+| 7.5 | Add the orphan-consistency check job (replaces what the dropped FKs used to guarantee) — a `@CronJob`                                                                                                       | 2h     | low               |
 
 **Verification:** `drizzle-kit push` against a fresh database, then the full
 integration suite. Then the same against a restored copy of production data.

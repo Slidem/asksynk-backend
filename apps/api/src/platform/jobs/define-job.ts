@@ -22,8 +22,11 @@ export function defineJob<T extends JobPayload>(input: {
   });
 }
 
-/** Cron syntax is checked at bootstrap by `MessageBusService.scheduleCron`. */
-export function defineCronJob(input: {
+/**
+ * Internal: used by `@CronJob`; don't call from feature code. Cron syntax is
+ * checked at bootstrap by `MessageBusService.scheduleCron`.
+ */
+export function buildCronJobDef(input: {
   name: string;
   cron: string;
   options?: Partial<JobOptions>;

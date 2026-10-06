@@ -175,7 +175,7 @@ apps/api/src/platform/              # framework-aware. domain/ may NOT import th
     registry/                       #   defineEvent, ConsumerGroup + event types (NOT the catalogue)
   jobs/                             # ex packages/shared — typed jobs, see ADR 0007
     message-bus/                    #   pg-boss wrapper
-    define-job.ts, job.types.ts     #   defineJob / defineCronJob, payload + options types
+    define-job.ts, job.types.ts     #   defineJob, payload + options types; @CronJob in cron-job.decorator.ts
     job-scheduler.ts                #   abstract JobScheduler port + pgboss-job-scheduler.ts impl
     job-handler.decorator.ts        #   @JobHandler + job-handlers.registry.ts (discovery, crons)
   email/                            # ex packages/shared — sender, providers, templates

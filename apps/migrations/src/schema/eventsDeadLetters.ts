@@ -34,6 +34,10 @@ export const eventsDeadLetters = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Last status transition; retention prunes resolved rows by it.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [
     uniqueIndex("uq_events_dead_letters_event_group").on(

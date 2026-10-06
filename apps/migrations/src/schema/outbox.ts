@@ -31,5 +31,13 @@ export const eventsOutbox = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("idx_events_outbox_event_type").on(t.eventType)],
+  (t) => [
+    // Matches the dispatcher drain. Realtime rows never get dispatched_at, so
+    // the delivery_mode predicate keeps them out of the index.
+    index("idx_events_outbox_pending")
+      .on(t.id)
+      .where(
+        sql`dispatched_at IS NULL AND failed_at IS NULL AND delivery_mode IN ('durable', 'dual')`,
+      ),
+  ],
 );

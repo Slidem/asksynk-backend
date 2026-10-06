@@ -49,7 +49,7 @@ recompute it, so nothing is stored. pg-boss's `(name, id)` primary key with
 ## Decision
 
 1. **One jobs module** (`platform/jobs/`). `defineJob<T>` for queued jobs
-   (scheduled and async differ only by `runAt`), `defineCronJob` for crons,
+   (scheduled and async differ only by `runAt`), `@CronJob({ name, cron })` for crons (see Amendment),
    `@JobHandler(def)` for consumers, `JobScheduler` (abstract class port, per
    [ADR 0002](0002-repository-ports-as-abstract-classes.md)) for producers.
 2. **The caller supplies a deterministic id per occurrence.** It is mapped to
@@ -86,6 +86,15 @@ recompute it, so nothing is stored. pg-boss's `(name, id)` primary key with
   the only dedup in use (calendar sync) without leaking pg-boss options.
 - **An automatic tx around each handler.** Calendar sync deliberately does
   provider HTTP outside a tx. Handlers opt in with `@Transactional()`.
+
+### Amendment — crons declared inline
+
+`defineCronJob` + `@JobHandler(CronDef)` became `@CronJob({ name, cron, options? })`
+on the handler method. A cron's def is never referenced by a producer, so the
+separate object was pure ceremony. Queued jobs keep `defineJob`: the def is
+the producer's typed handle for `JobScheduler.schedule`, and
+`assertRegistered` checks it by identity. `@JobHandler` now only accepts
+`QueuedJobDef`. See [docs/events/04](../../events/04-cleanup-execution-plan.md).
 
 ## Consequences
 

@@ -4,6 +4,7 @@ import { DB_CLIENT_PROVIDER } from "@/api/platform/db/db.module";
 import { EventConsumerModule } from "@/api/platform/events/consumer/event-consumer.module";
 import { EventsConsumerDb } from "@/api/platform/events/consumer/realtime-listener.service";
 import { EventsDispatcherModule } from "@/api/platform/events/dispatcher/events-dispatcher.module";
+import { EventsRetentionModule } from "@/api/platform/events/retention/events-retention.module";
 
 @Module({
   imports: [
@@ -18,6 +19,9 @@ import { EventsDispatcherModule } from "@/api/platform/events/dispatcher/events-
       inject: [DB_CLIENT_PROVIDER],
       useFactory: (db: EventsConsumerDb) => db,
     }),
+
+    // Daily cron pruning old outbox rows and resolved dead letters.
+    EventsRetentionModule,
   ],
   providers: [],
 })

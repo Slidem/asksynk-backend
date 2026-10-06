@@ -1,10 +1,4 @@
-import { defineCronJob, defineJob } from "@/api/platform/jobs/define-job";
-
-/** Cron that fans out one sync job per sync-enabled calendar. Runs every minute; webhooks would supplement this later. */
-export const CalendarSyncPollJob = defineCronJob({
-  name: "calendar.sync.poll",
-  cron: "*/1 * * * *",
-});
+import { defineJob } from "@/api/platform/jobs/define-job";
 
 export type CalendarSyncPayload = { calendarId: string };
 

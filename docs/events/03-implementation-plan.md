@@ -47,12 +47,23 @@ in-queue fan-out; neither was built — see 01 §5 and
 - **Tests:** `test/events/durable-consumer-runtime.unit.test.ts`,
   `test/events/dead-letters.integration.test.ts`.
 
+## Done — part 3 (outbox index + retention)
+
+See [04-cleanup-execution-plan.md](04-cleanup-execution-plan.md) phase 2.
+
+- **`idx_events_outbox_pending`** (migration `0008`): partial index on `id`
+  where `dispatched_at` / `failed_at` are null and `delivery_mode` is
+  `durable` / `dual` — matches the drain. `idx_events_outbox_event_type` dropped.
+- **`events.retention`** cron (`platform/events/retention/`), daily 03:00 UTC:
+  deletes outbox rows older than 30 days that are realtime, dispatched or failed
+  (never undispatched durable rows), and `replayed` / `discarded` dead letters
+  30 days after `updated_at`. Batched by 1000.
+- **Tests:** `test/events/events-retention.integration.test.ts`.
+
 ## Remaining
 
 | Item                             | Notes                                                                                                                                                |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Outbox drain partial index       | On `id` where `dispatched_at is null and failed_at is null`. Only `idx_events_outbox_event_type` exists; the drain will seq-scan as the table grows. |
-| Outbox retention job             | Realtime rows never get `dispatched_at`; prune by age.                                                                                               |
 | Dead-letter replay               | `PATCH /event-dead-letters/:id { status }`, re-enqueue with a **fresh** job id. Needs an authorization model first.                                  |
 | Consumer idempotency / inbox     | `TODO` in the runtime. Retries, expiry overlap and replay all re-deliver.                                                                            |
 | Key prefix consistency           | `calendar-sync` and `messaging` use bare ids, `suggestion-sync` uses `assignee:`.                                                                    |

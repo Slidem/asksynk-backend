@@ -1,4 +1,5 @@
-import { defineCronJob, defineJob } from "@/api/platform/jobs/define-job";
+import { CronJob } from "@/api/platform/jobs/cron-job.decorator";
+import { buildCronJobDef, defineJob } from "@/api/platform/jobs/define-job";
 import { JobHandler } from "@/api/platform/jobs/job-handler.decorator";
 import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
 
@@ -8,7 +9,7 @@ import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
  */
 type P = { a: string };
 const Def = defineJob<P>({ name: "test.types" });
-const CronDef = defineCronJob({ name: "test.types_cron", cron: "* * * * *" });
+const CronDef = buildCronJobDef({ name: "test.types_cron", cron: "* * * * *" });
 declare const s: JobScheduler;
 
 function spec() {
@@ -29,8 +30,19 @@ function spec() {
     ok(p: P) {
       return Promise.resolve();
     }
-    @JobHandler(CronDef)
+    @CronJob({ name: "test.types_cron", cron: "* * * * *" })
     cron() {
+      return Promise.resolve();
+    }
+    // @ts-expect-error crons are bound with @CronJob
+    @JobHandler(CronDef)
+    cronViaJobHandler() {
+      return Promise.resolve();
+    }
+    // @ts-expect-error cron handlers take no typed payload
+    @CronJob({ name: "test.types_cron_bad", cron: "* * * * *" })
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    cronBad(p: P) {
       return Promise.resolve();
     }
     // @ts-expect-error handler payload mismatch

@@ -11,7 +11,8 @@ import * as path from "path";
 import { DB } from "@/api/platform/db/db";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxAdapter, TxModule } from "@/api/platform/db/tx.module";
-import { defineCronJob, defineJob } from "@/api/platform/jobs/define-job";
+import { CronJob } from "@/api/platform/jobs/cron-job.decorator";
+import { defineJob } from "@/api/platform/jobs/define-job";
 import { JobContext } from "@/api/platform/jobs/job.types";
 import { JobHandler } from "@/api/platform/jobs/job-handler.decorator";
 import { JobHandlersRegistry } from "@/api/platform/jobs/job-handlers.registry";
@@ -33,11 +34,7 @@ const FlakyJob = defineJob<N>({
   name: "test.jobs.flaky",
   options: { pollingIntervalSeconds: 0.5 },
 });
-// never fires during the test
-const IdleCron = defineCronJob({
-  name: "test.jobs.idle_cron",
-  cron: "0 0 1 1 *",
-});
+const IDLE_CRON_NAME = "test.jobs.idle_cron";
 const Unhandled = defineJob<N>({ name: "test.jobs.unhandled" });
 
 const IN_AN_HOUR = () => new Date(Date.now() + 60 * 60 * 1000);
@@ -60,7 +57,8 @@ class TestJobHandlers {
     return Promise.resolve();
   }
 
-  @JobHandler(IdleCron)
+  // never fires during the test
+  @CronJob({ name: IDLE_CRON_NAME, cron: "0 0 1 1 *" })
   async idle(): Promise<void> {
     return Promise.resolve();
   }
@@ -208,12 +206,13 @@ describe("JobScheduler (integration)", () => {
   });
 
   it("unschedules crons with no def in code on reconcile", async () => {
+    await bus.ensureQueue("test.jobs.stale");
     await bus.scheduleCron("test.jobs.stale", "0 0 1 1 *");
 
     await registry.reconcileCrons();
 
     const names = (await bus.getSchedules()).map((s) => s.name);
-    expect(names).toContain(IdleCron.name);
+    expect(names).toContain(IDLE_CRON_NAME);
     expect(names).not.toContain("test.jobs.stale");
   });
 });

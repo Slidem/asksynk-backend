@@ -4,7 +4,8 @@ import { Injectable, Type } from "@nestjs/common";
 import { DiscoveryModule } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 
-import { defineCronJob, defineJob } from "@/api/platform/jobs/define-job";
+import { CronJob } from "@/api/platform/jobs/cron-job.decorator";
+import { buildCronJobDef, defineJob } from "@/api/platform/jobs/define-job";
 import { JobContext } from "@/api/platform/jobs/job.types";
 import { JobHandler } from "@/api/platform/jobs/job-handler.decorator";
 import { JobHandlersRegistry } from "@/api/platform/jobs/job-handlers.registry";
@@ -30,10 +31,8 @@ const QueuedDef = defineJob<P>({
     concurrency: 4,
   },
 });
-const CronDef = defineCronJob({
-  name: "test.registry.cron",
-  cron: "*/5 * * * *",
-});
+const CRON_NAME = "test.registry.cron";
+const CRON = "*/5 * * * *";
 
 @Injectable()
 class QueuedHandler {
@@ -60,7 +59,7 @@ class SecondQueuedHandler {
 class CronHandler {
   calls: [unknown, JobContext][] = [];
 
-  @JobHandler(CronDef)
+  @CronJob({ name: CRON_NAME, cron: CRON })
   async handle(payload: unknown, ctx: JobContext): Promise<void> {
     this.calls.push([payload, ctx]);
     return Promise.resolve();
@@ -138,7 +137,7 @@ describe("JobHandlersRegistry", () => {
       retryDelay: 30,
       retryBackoff: true,
       expireInSeconds: 900,
-      deleteAfterSeconds: 3600,
+      deleteAfterSeconds: 172800,
     });
     expect(bus.work).toHaveBeenCalledWith(
       QueuedDef.name,
@@ -151,11 +150,11 @@ describe("JobHandlersRegistry", () => {
   it("schedules the cron for a cron def", async () => {
     await init([CronHandler]);
 
-    expect(bus.scheduleCron).toHaveBeenCalledWith(CronDef.name, "*/5 * * * *");
+    expect(bus.scheduleCron).toHaveBeenCalledWith(CRON_NAME, CRON);
   });
 
   it("unschedules only crons with no def in code", async () => {
-    schedules = [{ name: CronDef.name }, { name: "stale.cron" }];
+    schedules = [{ name: CRON_NAME }, { name: "stale.cron" }];
 
     await init([CronHandler]);
 
@@ -169,7 +168,8 @@ describe("JobHandlersRegistry", () => {
       const registry = module.get(JobHandlersRegistry);
 
       expect(() => registry.assertRegistered(QueuedDef)).not.toThrow();
-      expect(() => registry.assertRegistered(CronDef)).toThrow(
+      const unbound = buildCronJobDef({ name: CRON_NAME, cron: CRON });
+      expect(() => registry.assertRegistered(unbound)).toThrow(
         'No handler registered for job "test.registry.cron"',
       );
     });
@@ -201,7 +201,7 @@ describe("JobHandlersRegistry", () => {
     it("passes {} and the pg-boss id for a cron", async () => {
       const module = await init([CronHandler]);
 
-      await workCb(CronDef.name)({}, { id: "pgboss-uuid", retryCount: 0 });
+      await workCb(CRON_NAME)({}, { id: "pgboss-uuid", retryCount: 0 });
 
       expect(module.get(CronHandler).calls).toEqual([
         [{}, { jobId: "pgboss-uuid", attempt: 1 }],

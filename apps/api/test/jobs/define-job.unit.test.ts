@@ -1,13 +1,13 @@
-import { defineCronJob, defineJob } from "@/api/platform/jobs/define-job";
+import { buildCronJobDef, defineJob } from "@/api/platform/jobs/define-job";
 import { DEFAULT_JOB_OPTIONS } from "@/api/platform/jobs/job-options.constants";
 import { toJobUuid } from "@/api/platform/jobs/job-uuid";
 
-describe("defineJob / defineCronJob", () => {
+describe("defineJob / buildCronJobDef", () => {
   it.each(["timer.completion", "calendar.sync.poll"])(
     "accepts name %s",
     (name) => {
       expect(defineJob({ name }).name).toBe(name);
-      expect(defineCronJob({ name, cron: "* * * * *" }).name).toBe(name);
+      expect(buildCronJobDef({ name, cron: "* * * * *" }).name).toBe(name);
     },
   );
 
@@ -15,7 +15,7 @@ describe("defineJob / defineCronJob", () => {
     "rejects name %s",
     (name) => {
       expect(() => defineJob({ name })).toThrow(`Invalid job name "${name}"`);
-      expect(() => defineCronJob({ name, cron: "* * * * *" })).toThrow(
+      expect(() => buildCronJobDef({ name, cron: "* * * * *" })).toThrow(
         `Invalid job name "${name}"`,
       );
     },
@@ -28,7 +28,7 @@ describe("defineJob / defineCronJob", () => {
   });
 
   it("builds a cron def", () => {
-    const job = defineCronJob({ name: "test.cron", cron: "*/1 * * * *" });
+    const job = buildCronJobDef({ name: "test.cron", cron: "*/1 * * * *" });
 
     expect(job).toMatchObject({ kind: "cron", cron: "*/1 * * * *" });
     expect(job.options).toEqual(DEFAULT_JOB_OPTIONS);

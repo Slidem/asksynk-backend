@@ -16,6 +16,7 @@ The decision record is
 | [01-ordering-design.md](01-ordering-design.md)         | Why ordering was not enforceable, what pg-boss actually enforces, and the design as built |
 | [02-consumer-groups.md](02-consumer-groups.md)         | The group → ordering-key map, producer-side fan-out, invariants                           |
 | [03-implementation-plan.md](03-implementation-plan.md) | Status tracker: done, this pass, remaining                                                |
+| [04-cleanup-execution-plan.md](04-cleanup-execution-plan.md) | Plan: `@CronJob`, outbox index + retention, dead-letter admin API (replay/discard)  |
 
 A rendered version of an earlier 01 lives at
 [claude.ai/code/artifact/d8a68027](https://claude.ai/code/artifact/d8a68027-803f-4743-bab2-bdd083a50bab).

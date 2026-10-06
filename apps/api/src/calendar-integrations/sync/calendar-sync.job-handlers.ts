@@ -8,9 +8,9 @@ import {
   CalendarSyncJob,
   calendarSyncJobId,
   CalendarSyncPayload,
-  CalendarSyncPollJob,
 } from "@/api/calendar-integrations/sync/calendar-sync.jobs";
 import { Clock } from "@/api/platform/clock/clock";
+import { CronJob } from "@/api/platform/jobs/cron-job.decorator";
 import { JobHandler } from "@/api/platform/jobs/job-handler.decorator";
 import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
 
@@ -32,7 +32,8 @@ export class CalendarSyncJobHandlers {
     private readonly clock: Clock,
   ) {}
 
-  @JobHandler(CalendarSyncPollJob)
+  /** Fans out one sync job per sync-enabled calendar. Runs every minute; webhooks would supplement this later. */
+  @CronJob({ name: "calendar.sync.poll", cron: "*/1 * * * *" })
   async poll(): Promise<void> {
     const now = this.clock.now();
     const calendarIds = await this.listDueCalendarIds();
