@@ -3,7 +3,7 @@
 Docs for the typed jobs API: scheduled, async and cron jobs on top of
 pg-boss.
 
-**Status:** design agreed, not built.
+**Status:** built.
 
 Decision record: [ADR 0007](../architecture/adr/0007-unified-typed-jobs.md).
 

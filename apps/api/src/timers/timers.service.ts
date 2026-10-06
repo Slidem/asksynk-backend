@@ -4,25 +4,28 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { Clock } from "@/api/platform/clock/clock";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import { TimerLifecycle } from "@/api/platform/events/registry/events.registry";
-import { ScheduledJobService } from "@/api/platform/jobs/scheduled-job/scheduled-job.service";
+import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
 import { UserTimer } from "@/api/timers/entities/user-timer.entity";
 import { UserTimerSettings } from "@/api/timers/entities/user-timer-settings.entity";
 import {
   BreakSuggestion,
-  TimerCompletionJob,
   TimerEventType,
   TimerSessionType,
   TransitionTimerInput,
   UpdateTimerSettingsInput,
 } from "@/api/timers/models/timer.model";
-import { TIMER_COMPLETION_QUEUE } from "@/api/timers/scheduling/timer-jobs.constants";
+import {
+  TimerCompletionJob,
+  timerCompletionJobId,
+  TimerCompletionPayload,
+} from "@/api/timers/scheduling/timer-completion.job";
 import { TimerSettingsRepository } from "@/api/timers/timer-settings.repository";
 import { timersError } from "@/api/timers/timers.errors";
 import { TimersRepository } from "@/api/timers/timers.repository";
 
 interface PersistResult {
   entity: UserTimer;
-  jobIdToCancel: string | null;
+  jobToCancel: string | null;
 }
 
 @Injectable()
@@ -30,7 +33,7 @@ export class TimersService {
   constructor(
     private readonly timersRepo: TimersRepository,
     private readonly settingsRepo: TimerSettingsRepository,
-    private readonly scheduler: ScheduledJobService,
+    private readonly jobs: JobScheduler,
     private readonly eventsPublisher: EventsPublisher,
     private readonly clock: Clock,
   ) {}
@@ -53,8 +56,8 @@ export class TimersService {
 
   /**
    * Single state-transition entry point for PATCH /timers. Wraps the whole
-   * transition in one tx so the persist, old-job cancel, new-job schedule, and
-   * job-ref write commit (or roll back) atomically.
+   * transition in one tx so the persist, old-job cancel, and new-job schedule
+   * commit (or roll back) atomically.
    */
   @Transactional()
   async applyTransition(
@@ -107,7 +110,9 @@ export class TimersService {
 
   /** Invoked by the scheduled completion job. Idempotent + staleness-guarded. */
   @Transactional()
-  async handleScheduledCompletion(payload: TimerCompletionJob): Promise<void> {
+  async handleScheduledCompletion(
+    payload: TimerCompletionPayload,
+  ): Promise<void> {
     const now = this.clock.now();
     const timer = await this.timersRepo.getByUserId(payload.userId);
     if (!timer || timer.status !== "running" || timer.transitionedAt === null) {
@@ -124,16 +129,16 @@ export class TimersService {
     sessionType: TimerSessionType,
     durationSeconds: number,
   ): Promise<UserTimer> {
-    const { entity, jobIdToCancel } = await this.persistStart(
+    const { entity, jobToCancel } = await this.persistStart(
       userId,
       sessionType,
       durationSeconds,
     );
-    // Cancel the overridden session's job before scheduling the new one so the
-    // `timer:<userId>` singleton key is free.
-    if (jobIdToCancel) {
-      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobIdToCancel);
+
+    if (jobToCancel) {
+      await this.jobs.cancel(TimerCompletionJob, jobToCancel);
     }
+
     await this.scheduleCompletion(entity);
     return entity;
   }
@@ -145,17 +150,17 @@ export class TimersService {
   }
 
   private async pauseSession(userId: string): Promise<UserTimer> {
-    const { entity, jobIdToCancel } = await this.persistPause(userId);
-    if (jobIdToCancel) {
-      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobIdToCancel);
+    const { entity, jobToCancel } = await this.persistPause(userId);
+    if (jobToCancel) {
+      await this.jobs.cancel(TimerCompletionJob, jobToCancel);
     }
     return entity;
   }
 
   private async stopSession(userId: string): Promise<UserTimer> {
-    const { entity, jobIdToCancel } = await this.persistStop(userId);
-    if (jobIdToCancel) {
-      await this.scheduler.cancel(TIMER_COMPLETION_QUEUE, jobIdToCancel);
+    const { entity, jobToCancel } = await this.persistStop(userId);
+    if (jobToCancel) {
+      await this.jobs.cancel(TimerCompletionJob, jobToCancel);
     }
     return entity;
   }
@@ -171,8 +176,7 @@ export class TimersService {
     // Direct switch from a running session: complete the current one first
     // (counts toward the long-break cadence + fires the completion notification),
     // then start the new session and cancel the old completion job.
-    const jobIdToCancel =
-      current.status === "running" ? current.pendingCompletionJobRef : null;
+    const jobToCancel = this.pendingCompletionJobId(current);
 
     if (current.status === "running") {
       await this.complete(current, now);
@@ -193,7 +197,8 @@ export class TimersService {
       remainingSeconds: durationSeconds,
       occurredAt: now,
     });
-    return { entity: updated, jobIdToCancel };
+
+    return { entity: updated, jobToCancel };
   }
 
   private async persistResume(userId: string): Promise<UserTimer> {
@@ -221,13 +226,13 @@ export class TimersService {
     if (current.status !== "running") {
       throw timersError("timer_not_running");
     }
-    const jobIdToCancel = current.pendingCompletionJobRef;
+    const jobToCancel = this.pendingCompletionJobId(current);
     const remaining = current.remainingSeconds(now) ?? 0;
 
     // Past due → complete instead of leaving a "paused at 0" zombie.
     if (remaining <= 0) {
       const completed = await this.complete(current, now);
-      return { entity: completed ?? current, jobIdToCancel };
+      return { entity: completed ?? current, jobToCancel };
     }
 
     const updated = await this.timersRepo.pause(userId, remaining, now);
@@ -240,7 +245,7 @@ export class TimersService {
       remainingSeconds: remaining,
       occurredAt: now,
     });
-    return { entity: updated, jobIdToCancel };
+    return { entity: updated, jobToCancel };
   }
 
   private async persistStop(userId: string): Promise<PersistResult> {
@@ -251,7 +256,7 @@ export class TimersService {
       throw timersError("no_active_timer");
     }
 
-    const jobIdToCancel = current.pendingCompletionJobRef;
+    const jobToCancel = this.pendingCompletionJobId(current);
     const remaining = current.remainingSeconds(now) ?? 0;
     const updated = await this.timersRepo.stop(userId, remaining, now);
 
@@ -267,7 +272,7 @@ export class TimersService {
       remainingSeconds: remaining,
       occurredAt: now,
     });
-    return { entity: updated, jobIdToCancel };
+    return { entity: updated, jobToCancel };
   }
 
   // --- shared helpers ---
@@ -329,27 +334,21 @@ export class TimersService {
   private async scheduleCompletion(timer: UserTimer): Promise<void> {
     const runAt = timer.completesAt();
     if (!runAt || timer.transitionedAt === null) return;
-    const ref = await this.scheduler.schedule<TimerCompletionJob>(
-      TIMER_COMPLETION_QUEUE,
+    await this.jobs.schedule(
+      TimerCompletionJob,
       {
-        payload: {
-          userId: timer.userId,
-          transitionedAt: timer.transitionedAt.toISOString(),
-        },
-        runAt,
-        name: `timer`,
-        jobId: `timer:${timer.userId}`,
+        userId: timer.userId,
+        transitionedAt: timer.transitionedAt.toISOString(),
       },
+      { id: timerCompletionJobId(timer.userId, timer.transitionedAt), runAt },
     );
-    if (ref) await this.attachJobRef(timer.userId, ref, timer.transitionedAt);
   }
 
-  private async attachJobRef(
-    userId: string,
-    ref: string,
-    transitionedAt: Date,
-  ): Promise<void> {
-    await this.timersRepo.setPendingJobRef(userId, ref, transitionedAt);
+  /** Id of the completion job pending for `timer`, if any. Only a running timer has one. */
+  private pendingCompletionJobId(timer: UserTimer): string | null {
+    return timer.status === "running" && timer.transitionedAt
+      ? timerCompletionJobId(timer.userId, timer.transitionedAt)
+      : null;
   }
 
   private validateTransitionInput(input: TransitionTimerInput): void {

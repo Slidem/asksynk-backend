@@ -50,6 +50,13 @@
       "when": 1790307455994,
       "tag": "0006_tiny_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791211241769,
+      "tag": "0007_many_vivisector",
+      "breakpoints": true
     }
   ]
 }

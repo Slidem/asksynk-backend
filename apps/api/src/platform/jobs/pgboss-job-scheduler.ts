@@ -31,7 +31,7 @@ export class PgBossJobScheduler extends JobScheduler {
   ): Promise<void> {
     this.registry.assertRegistered(job);
     const data: JobEnvelope = { id, payload };
-    await this.bus.enqueue(job.name, data, {
+    await this.bus.sendJob(job.name, data, {
       id: toJobUuid(id),
       startAfter: runAt,
       db: fromDrizzleTx(this.txHost.tx),

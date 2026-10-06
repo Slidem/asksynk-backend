@@ -5,7 +5,8 @@ export const DEFAULT_JOB_OPTIONS: JobOptions = {
   retryDelaySeconds: 0,
   retryBackoff: false,
   expireInSeconds: 900,
-  deleteAfterSeconds: 3600,
+  // can be adjusted later, currently it's every 2 days
+  deleteAfterSeconds: 172800,
   pollingIntervalSeconds: 2,
   concurrency: 1,
 };

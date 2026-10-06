@@ -1,0 +1,1 @@
+ALTER TABLE "user_timers" DROP COLUMN "pending_completion_job_ref";

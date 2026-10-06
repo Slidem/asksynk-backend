@@ -10,11 +10,11 @@ import { CalendarIntegrationService } from "@/api/calendar-integrations/services
 import { CalendarOutboundSyncService } from "@/api/calendar-integrations/services/calendar-outbound-sync.service";
 import { CalendarSyncService } from "@/api/calendar-integrations/services/calendar-sync.service";
 import { CalendarSyncEventHandler } from "@/api/calendar-integrations/sync/calendar-sync.event-handler";
-import { CalendarSyncScheduler } from "@/api/calendar-integrations/sync/calendar-sync.scheduler";
-import { MessageBusModule } from "@/api/platform/jobs/message-bus/message-bus.module";
+import { CalendarSyncJobHandlers } from "@/api/calendar-integrations/sync/calendar-sync.job-handlers";
+import { JobsModule } from "@/api/platform/jobs/jobs.module";
 
 @Module({
-  imports: [CalendarEventsModule, MessageBusModule],
+  imports: [CalendarEventsModule, JobsModule],
   providers: [
     GoogleCalendarProvider,
     CalendarProviderRegistry,
@@ -23,7 +23,7 @@ import { MessageBusModule } from "@/api/platform/jobs/message-bus/message-bus.mo
     CalendarIntegrationService,
     CalendarSyncService,
     CalendarOutboundSyncService,
-    CalendarSyncScheduler,
+    CalendarSyncJobHandlers,
     CalendarSyncEventHandler,
   ],
   controllers: [CalendarIntegrationsController],

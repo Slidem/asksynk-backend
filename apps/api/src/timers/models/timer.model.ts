@@ -43,13 +43,6 @@ export interface UpdateTimerSettingsInput {
   longBreakInterval: number;
 }
 
-/** Payload of a scheduled timer-completion job. Addressing + staleness token only. */
-export interface TimerCompletionJob {
-  userId: string;
-  // ISO timestamp of the transition this job was scheduled for.
-  transitionedAt: string;
-}
-
 export interface BreakSuggestion {
   suggestedSessionType: "short_break" | "long_break";
   completedFocusSessions: number;

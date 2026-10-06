@@ -39,7 +39,6 @@ export const userTimers = pgTable(
     sessionDurationSeconds: integer("session_duration_seconds"),
     transitionedAt: timestamp("transitioned_at", { withTimezone: true }),
     remainingAtTransition: integer("remaining_at_transition"),
-    pendingCompletionJobRef: text("pending_completion_job_ref"),
     completedFocusSessions: integer("completed_focus_sessions")
       .notNull()
       .default(0),

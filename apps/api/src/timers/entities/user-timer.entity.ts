@@ -8,7 +8,6 @@ export interface UserTimerProps {
   sessionDurationSeconds: number | null;
   transitionedAt: Date | null;
   remainingAtTransition: number | null;
-  pendingCompletionJobRef: string | null;
   completedFocusSessions: number;
   createdAt: Date;
   updatedAt: Date;
@@ -22,7 +21,6 @@ export class UserTimer {
   readonly sessionDurationSeconds: number | null;
   readonly transitionedAt: Date | null;
   readonly remainingAtTransition: number | null;
-  readonly pendingCompletionJobRef: string | null;
   readonly completedFocusSessions: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -35,7 +33,6 @@ export class UserTimer {
     this.sessionDurationSeconds = props.sessionDurationSeconds;
     this.transitionedAt = props.transitionedAt;
     this.remainingAtTransition = props.remainingAtTransition;
-    this.pendingCompletionJobRef = props.pendingCompletionJobRef;
     this.completedFocusSessions = props.completedFocusSessions;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;

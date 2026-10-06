@@ -12,7 +12,6 @@ import {
 
 import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import {
-  CancelOptions,
   DeleteJobOptions,
   MessageHandler,
   QueuedJobInsert,
@@ -22,6 +21,7 @@ import {
 
 /** Max retries when createQueue hits a deadlock during concurrent partition creation. */
 const QUEUE_CREATE_MAX_RETRIES = 5;
+
 /** Base backoff in ms; per-attempt delay is full-jittered and grows exponentially. */
 const QUEUE_CREATE_BACKOFF_BASE_MS = 50;
 
@@ -39,9 +39,6 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     this.boss = new PgBoss({
       connectionString,
       schema: "pgboss",
-      // The deletion sweep must run often for the 1h `deleteAfterSeconds` on
-      // job queues to mean anything (default interval is 24h).
-      maintenanceIntervalSeconds: 300,
     });
 
     this.boss.on("error", (error) =>
@@ -62,37 +59,51 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Sends a message to the specified queue. If the queue does not exist, it will be created automatically. The message will be retried according to the options specified in `opts` in case of failure.
+   * Ensures a queue exists in the message bus, creating it if necessary.
+   *
+   * When `opts` is given, the non-policy options are also applied to an
+   * existing queue (createQueue is a no-op then), and the policy is verified:
+   * it is immutable, so a mismatch can only be fixed by deleting the queue.
+   */
+  public async ensureQueue(
+    queue: string,
+    opts?: Omit<Queue, "name">,
+  ): Promise<void> {
+    await this.createQueue(queue, opts);
+
+    if (!opts) {
+      return;
+    }
+
+    const boss = this.requireBoss();
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { policy, partition: _partition, ...updatable } = opts;
+
+    await boss.updateQueue(queue, updatable);
+
+    const existing = await boss.getQueue(queue);
+    if (policy && existing?.policy !== policy) {
+      throw new Error(
+        `Queue "${queue}" has policy "${existing?.policy}", expected "${policy}". Policy is immutable; delete the queue to recreate it.`,
+      );
+    }
+  }
+
+  /**
+   * Sends a message to the specified queue. The queue must exist; `JobHandlersRegistry` creates job queues at bootstrap. The message will be retried according to the options specified in `opts` in case of failure.
    *
    * @param queue
    * @param data
    * @param opts
    * @returns
    */
-  async enqueue<T extends object>(
+  async sendJob<T extends object>(
     queue: string,
     data: T,
     opts: SendOptions = {},
   ): Promise<string | null> {
-    await this.ensureQueue(queue);
     return this.requireBoss().send(queue, data, opts);
-  }
-
-  /**
-   * Cancels a previously enqueued job by id. Only affects jobs still pending
-   * (not yet active/completed); cancelling a missing or already-active job
-   * throws, so callers that treat cancellation as best-effort should catch.
-   *
-   * @param queue
-   * @param jobId
-   * @param opts pass `db` (e.g. `fromDrizzle(tx, sql)`) to cancel inside the caller's transaction.
-   */
-  async cancel(
-    queue: string,
-    jobId: string,
-    opts: CancelOptions = {},
-  ): Promise<void> {
-    await this.requireBoss().cancel(queue, jobId, opts);
   }
 
   /** Deletes jobs in any state, freeing their ids. Missing ids are a no-op. */
@@ -143,10 +154,6 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     const boss = this.requireBoss();
 
-    // idempotent operation; ensures the queue exists before we start working on it
-    // we should keep track of created queues in memory to avoid unnecessary calls to pg-boss, but can be done later;
-    // TODO: keep track of created queues in memory to avoid unnecessary calls to pg-boss
-    await this.ensureQueue(queue);
     await boss.work<T>(
       queue,
       { ...opts, includeMetadata: true },
@@ -171,21 +178,7 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     const boss = this.requireBoss();
     this.assertValidCron(boss, queue, cron);
-    await this.ensureQueue(queue);
     await boss.schedule(queue, cron, data ?? {}, opts);
-  }
-
-  /**
-   * Validates via pg-boss's own parser (cron-parser, non-strict; also RRULE),
-   * so we fail before creating the queue and accept exactly what pg-boss does.
-   */
-  private assertValidCron(boss: PgBoss, queue: string, cron: string): void {
-    try {
-      boss.previewSchedule(cron, { count: 1 });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      throw new Error(`Invalid cron "${cron}" for queue "${queue}": ${reason}`);
-    }
   }
 
   async getSchedules(): Promise<Schedule[]> {
@@ -204,35 +197,12 @@ export class MessageBusService implements OnModuleInit, OnModuleDestroy {
     return this.boss;
   }
 
-  /**
-   * Ensures a queue exists in the message bus, creating it if necessary.
-   *
-   * When `opts` is given, the non-policy options are also applied to an
-   * existing queue (createQueue is a no-op then), and the policy is verified:
-   * it is immutable, so a mismatch can only be fixed by deleting the queue.
-   */
-  public async ensureQueue(
-    queue: string,
-    opts?: Omit<Queue, "name">,
-  ): Promise<void> {
-    await this.createQueue(queue, opts);
-
-    if (!opts) {
-      return;
-    }
-
-    const boss = this.requireBoss();
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { policy, partition: _partition, ...updatable } = opts;
-
-    await boss.updateQueue(queue, updatable);
-
-    const existing = await boss.getQueue(queue);
-    if (policy && existing?.policy !== policy) {
-      throw new Error(
-        `Queue "${queue}" has policy "${existing?.policy}", expected "${policy}". Policy is immutable; delete the queue to recreate it.`,
-      );
+  private assertValidCron(boss: PgBoss, queue: string, cron: string): void {
+    try {
+      boss.previewSchedule(cron, { count: 1 });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(`Invalid cron "${cron}" for queue "${queue}": ${reason}`);
     }
   }
 

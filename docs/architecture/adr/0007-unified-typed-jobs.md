@@ -1,6 +1,6 @@
 # ADR 0007 — Unified typed jobs with caller-derived ids
 
-**Status:** Accepted (not built)
+**Status:** Accepted
 **Date:** 2026-10-05
 **Deciders:** Mihai Alexandru
 **Detail:** [docs/jobs](../../jobs/README.md): the design, the pg-boss facts it

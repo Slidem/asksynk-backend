@@ -4,7 +4,7 @@ One typed jobs API for scheduled, async and cron jobs. It replaces
 `ScheduledJobService`, the unused `platform/jobs/cron` stub, and callers using
 `MessageBusService` directly for jobs.
 
-**Status:** design agreed, not built. Decision record:
+**Status:** built. Decision record:
 [ADR 0007](../architecture/adr/0007-unified-typed-jobs.md). Execution plan:
 [02-execution-plan.md](02-execution-plan.md).
 

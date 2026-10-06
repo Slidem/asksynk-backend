@@ -3,7 +3,7 @@
 Implements [01-unified-jobs.md](01-unified-jobs.md)
 ([ADR 0007](../architecture/adr/0007-unified-typed-jobs.md)).
 
-**Status:** not started.
+**Status:** built (deploy SQL in phase 6 still to run).
 
 ## Ground rules
 

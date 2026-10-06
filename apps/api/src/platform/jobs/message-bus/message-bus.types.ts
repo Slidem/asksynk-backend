@@ -23,9 +23,7 @@ export type SendOptions = {
   db?: Db;
 };
 
-/** Run cancel on a caller-supplied connection/tx so it joins the caller's transaction. */
-export type CancelOptions = { db?: Db };
-
+/** Run deleteJob on a caller-supplied connection/tx so it joins the caller's transaction. */
 export type DeleteJobOptions = { db?: Db };
 
 export type WorkOptions = {

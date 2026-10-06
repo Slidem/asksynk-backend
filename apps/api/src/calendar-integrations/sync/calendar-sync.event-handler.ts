@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import { CalendarSyncConsumerGroup } from "@/api/calendar-integrations/calendar-sync.consumer-group";
 import { CalendarOutboundSyncService } from "@/api/calendar-integrations/services/calendar-outbound-sync.service";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
-import { CalendarSyncConsumerGroup } from "@/api/calendar-integrations/calendar-sync.consumer-group";
 import {
   CalendarEventCreated,
   CalendarEventDeleted,

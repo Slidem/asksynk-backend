@@ -67,7 +67,6 @@ export class TimersRepository {
         sessionDurationSeconds: input.durationSeconds,
         remainingAtTransition: input.durationSeconds,
         transitionedAt: input.transitionedAt,
-        pendingCompletionJobRef: null,
         ...(input.resetFocusCounter ? { completedFocusSessions: 0 } : {}),
         updatedAt: input.transitionedAt,
       })
@@ -88,7 +87,6 @@ export class TimersRepository {
         status: "paused",
         remainingAtTransition,
         transitionedAt,
-        pendingCompletionJobRef: null,
         updatedAt: transitionedAt,
       })
       .where(
@@ -108,7 +106,6 @@ export class TimersRepository {
       .set({
         status: "running",
         transitionedAt,
-        pendingCompletionJobRef: null,
         updatedAt: transitionedAt,
       })
       .where(
@@ -130,7 +127,6 @@ export class TimersRepository {
         status: "stopped",
         remainingAtTransition,
         transitionedAt,
-        pendingCompletionJobRef: null,
         updatedAt: transitionedAt,
       })
       .where(
@@ -159,7 +155,6 @@ export class TimersRepository {
       .set({
         status: "completed",
         remainingAtTransition: 0,
-        pendingCompletionJobRef: null,
         completedFocusSessions: sql`${userTimers.completedFocusSessions} + CASE WHEN ${userTimers.sessionType} = 'focus' THEN 1 ELSE 0 END`,
         updatedAt: now,
       })
@@ -172,24 +167,6 @@ export class TimersRepository {
       )
       .returning();
     return row ? this.mapRow(row) : null;
-  }
-
-  /** Attach the scheduled completion job ref, only if the transition still matches. */
-  async setPendingJobRef(
-    userId: string,
-    ref: string,
-    transitionedAtGuard: Date,
-  ): Promise<void> {
-    await this.txHost.tx
-      .update(userTimers)
-      .set({ pendingCompletionJobRef: ref })
-      .where(
-        and(
-          eq(userTimers.userId, userId),
-          eq(userTimers.status, "running"),
-          eq(userTimers.transitionedAt, transitionedAtGuard),
-        ),
-      );
   }
 
   async appendEvent(input: AppendEventInput): Promise<void> {
@@ -212,7 +189,6 @@ export class TimersRepository {
       sessionDurationSeconds: row.sessionDurationSeconds,
       transitionedAt: row.transitionedAt,
       remainingAtTransition: row.remainingAtTransition,
-      pendingCompletionJobRef: row.pendingCompletionJobRef,
       completedFocusSessions: row.completedFocusSessions,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
