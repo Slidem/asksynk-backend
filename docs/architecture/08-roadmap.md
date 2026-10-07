@@ -191,7 +191,7 @@ integration suite. Then the same against a restored copy of production data.
 | 8.3 | Merge `user-profile` + `user-settings` → `identity`                                                                                                        |
 | 8.4 | Fix `CLAUDE.md`'s stale `apps/background-worker` reference; add the architecture rules (below)                                                             |
 | 8.5 | Replace the 11 Nest HTTP exceptions in `attachments.service.ts` with domain errors                                                                         |
-| 8.6 | Dead-letter replay: `PATCH /event-dead-letters/:id { status }`, re-enqueue with a fresh job id. Needs an authorization model first — see [docs/events](../events/03-implementation-plan.md) |
+| 8.6 | Dead-letter replay: **✅ done** (admin API key, not a role — see [docs/events 01 §Replay](../events/01-ordering-design.md#replay)) `PATCH /event-dead-letters/:id { status }`, re-enqueue with a fresh job id. Needs an authorization model first — see [docs/events](../events/03-implementation-plan.md) |
 
 ---
 

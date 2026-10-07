@@ -10,7 +10,7 @@ Three follow-ups to the unified jobs ([docs/jobs](../jobs/README.md),
 3. Dead-letter admin API: list, replay and discard (single and bulk), guarded
    by an admin API key.
 
-**Status:** planned.
+**Status:** built (phases 1–3). Deploy steps below still to run.
 
 ## Ground rules
 

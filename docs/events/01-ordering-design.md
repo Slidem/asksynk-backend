@@ -343,18 +343,33 @@ log at `warn`; dead-lettering logs at `error`. The table is the record.
 
 ### Replay
 
-Deferred. When it lands, replay **must allocate a fresh job id**: the original
-job carried the outbox row id and is now `completed`, so re-inserting under that
-id hits `ON CONFLICT DO NOTHING` on `(name, id)` and silently does nothing.
-
-The dead-letter `status` makes replay a state transition rather than an action
-endpoint, per the project's no-verb-endpoints rule:
+Built as an admin API (`src/events/rest/event-dead-letters.admin.controller.ts`,
+service `platform/events/dead-letters/events-dead-letters.service.ts`). Replay
+and discard are status transitions, per the no-verb-endpoints rule:
 
 ```
-PATCH /event-dead-letters/:id  { "status": "replayed" }
+GET   /admin/events/dead-letters?status=&consumerGroup=&eventType=&from=&to=&cursor=&limit=
+PATCH /admin/events/dead-letters/:id  { "status": "replayed" | "discarded" }
+PATCH /admin/events/dead-letters      { "status": …, "ids": [...] }                 # up to 500
+PATCH /admin/events/dead-letters      { "status": …, "filter": {...}, "limit": n }  # pending only, ≤ 500 per call
 ```
 
-It needs an authorization model first — there is no admin role today.
+- **Auth:** `x-admin-api-key` must match `ADMIN_API_KEY` (≥ 32 chars; unset
+  disables the API). `@AdminApi()` bundles `Public()` with the key guard and
+  hides the controller from Swagger.
+- **Fresh job id.** The original job carried the outbox row id and is now
+  `completed`; re-inserting under that id hits `ON CONFLICT DO NOTHING` on
+  `(name, id)` and silently does nothing.
+- **Same transaction.** Rows are locked (`FOR UPDATE`), jobs are inserted into
+  the row's consumer-group queue with `singletonKey = orderingKeyFn(payload)`,
+  and the rows flip to `replayed` (`replay_count + 1`) — all in one tx.
+- **Oldest first.** Bulk replays process rows by id, so a key's dead letters
+  are re-enqueued in their original relative order.
+- **Re-failure.** `record()` upserts on `(event_id, consumer_group)`: a replayed
+  event that dead-letters again goes back to `pending` with the new error.
+- **Skips.** A row whose group is no longer registered, or whose ordering key
+  throws, is skipped (bulk: listed in `skipped`; single: `422`). Single PATCH
+  also returns `404` / `409` for unknown / non-pending ids.
 
 ## 6. What this costs
 

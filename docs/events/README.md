@@ -44,6 +44,17 @@ It predates the implementation; these files are the source of truth.
   attempt the runtime writes a row to our own `events_dead_letters` table and
   **completes** the job, so a poison event never blocks its key.
 
+## Admin API
+
+Dead letters can be listed, replayed and discarded via
+`/admin/events/dead-letters` (see [01 §Replay](01-ordering-design.md#replay)):
+
+```sh
+curl -H "x-admin-api-key: $ADMIN_API_KEY" "$API/admin/events/dead-letters?consumerGroup=attention-items"
+curl -X PATCH -H "x-admin-api-key: $ADMIN_API_KEY" -H 'content-type: application/json' \
+  -d '{"status":"replayed","filter":{"consumerGroup":"attention-items"}}' "$API/admin/events/dead-letters"
+```
+
 ## Related
 
 - [../architecture/01-current-state.md](../architecture/01-current-state.md) §4.9 — two of the

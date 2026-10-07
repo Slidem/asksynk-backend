@@ -1,0 +1,1 @@
+ALTER TABLE "events_dead_letters" ADD COLUMN "replay_count" integer DEFAULT 0 NOT NULL;

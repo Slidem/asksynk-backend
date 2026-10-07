@@ -31,6 +31,7 @@ export const eventsDeadLetters = pgTable(
     error: text("error").notNull(),
     attempts: integer("attempts").notNull(),
     status: eventsDeadLetterStatus("status").notNull().default("pending"),
+    replayCount: integer("replay_count").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

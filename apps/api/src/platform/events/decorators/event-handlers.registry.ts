@@ -74,6 +74,10 @@ export class EventHandlersRegistry implements OnApplicationBootstrap {
     return [...groups.values()];
   }
 
+  getConsumerGroup(name: string): ConsumerGroup<EventDef> | undefined {
+    return this.getAllConsumerGroups().find((g) => g.name === name);
+  }
+
   getAllConsumerGroups(): ConsumerGroup<EventDef>[] {
     const groups = new Map<string, ConsumerGroup<EventDef>>();
 

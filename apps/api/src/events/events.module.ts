@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
 
+import { EventDeadLettersAdminController } from "@/api/events/rest/event-dead-letters.admin.controller";
 import { DB_CLIENT_PROVIDER } from "@/api/platform/db/db.module";
 import { EventConsumerModule } from "@/api/platform/events/consumer/event-consumer.module";
 import { EventsConsumerDb } from "@/api/platform/events/consumer/realtime-listener.service";
+import { EventsDeadLettersModule } from "@/api/platform/events/dead-letters/events-dead-letters.module";
 import { EventsDispatcherModule } from "@/api/platform/events/dispatcher/events-dispatcher.module";
 import { EventsRetentionModule } from "@/api/platform/events/retention/events-retention.module";
 
@@ -22,7 +24,11 @@ import { EventsRetentionModule } from "@/api/platform/events/retention/events-re
 
     // Daily cron pruning old outbox rows and resolved dead letters.
     EventsRetentionModule,
+
+    // Admin API: list, replay and discard dead letters.
+    EventsDeadLettersModule,
   ],
+  controllers: [EventDeadLettersAdminController],
   providers: [],
 })
 export class EventsModule {}

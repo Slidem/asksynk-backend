@@ -5,6 +5,7 @@ import { buildErrorRegistry } from "@/api/kernel/errors/error-registry";
 import { coreErrorsCatalog } from "@/api/kernel/errors/kernel.errors";
 import { messagingCatalog } from "@/api/messaging/messaging.errors";
 import { networksCatalog } from "@/api/networks/networks.errors";
+import { deadLettersCatalog } from "@/api/platform/events/dead-letters/dead-letters.errors";
 import { publicViewsCatalog } from "@/api/public-views/public-views.errors";
 import { tagsCatalog } from "@/api/tags/tags.errors";
 import { tasksCatalog } from "@/api/tasks/tasks.errors";
@@ -16,6 +17,7 @@ export const ERROR_REGISTRY = buildErrorRegistry([
   attentionItemsCatalog,
   calendarEventsCatalog,
   calendarIntegrationsCatalog,
+  deadLettersCatalog,
   messagingCatalog,
   networksCatalog,
   publicViewsCatalog,

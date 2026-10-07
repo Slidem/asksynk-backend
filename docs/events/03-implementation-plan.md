@@ -60,11 +60,23 @@ See [04-cleanup-execution-plan.md](04-cleanup-execution-plan.md) phase 2.
   30 days after `updated_at`. Batched by 1000.
 - **Tests:** `test/events/events-retention.integration.test.ts`.
 
+## Done — part 4 (dead-letter admin API)
+
+See [04-cleanup-execution-plan.md](04-cleanup-execution-plan.md) phase 3 and
+[01 §Replay](01-ordering-design.md#replay).
+
+- `replay_count` on `events_dead_letters` (migration `0009`); `record()` is now
+  an upsert back to `pending`.
+- `EventsDeadLettersModule` (repository + service), used by the consumer
+  runtime, the retention cron and the admin controller.
+- `AdminApiKeyGuard` + `@AdminApi()` (`src/auth/`), `ADMIN_API_KEY` env.
+- **Tests:** `test/auth/admin-api-key.guard.unit.test.ts`,
+  `test/events/dead-letters-admin.integration.test.ts`.
+
 ## Remaining
 
 | Item                             | Notes                                                                                                                                                |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dead-letter replay               | `PATCH /event-dead-letters/:id { status }`, re-enqueue with a **fresh** job id. Needs an authorization model first.                                  |
 | Consumer idempotency / inbox     | `TODO` in the runtime. Retries, expiry overlap and replay all re-deliver.                                                                            |
 | Key prefix consistency           | `calendar-sync` and `messaging` use bare ids, `suggestion-sync` uses `assignee:`.                                                                    |
 | Guest-recipient jobs             | `attention-items` enqueues jobs for guest recipients that its handler ignores.                                                                       |
