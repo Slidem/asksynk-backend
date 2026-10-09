@@ -11,7 +11,7 @@ sanctioned exception. Repositories return aggregates; queries return views.
 
 ## 1. Schema ownership
 
-All 33 tables, each assigned to exactly one context.
+All 34 tables, each assigned to exactly one context.
 
 | Schema          | Tables                                                                                                                              |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -128,7 +128,8 @@ view.
 
 ### Why `users` is excepted
 
-`user_id` appears on 17 tables. It is not really a cross-context reference — it is the
+`user_id` appears on ~18 tables with an FK to `users(id)` (`tags.user_id` is the odd one
+out — it has no FK today; add it during Wave 7). It is not really a cross-context reference — it is the
 **tenant key**, present in every context because every row in the system belongs to
 exactly one person.
 
@@ -184,9 +185,12 @@ deleted suggestion.
 
 Three mitigations, in order of importance:
 
-1. **Most of these already have event-driven cleanup.** `tag.deleted` already fans out
-   to a handler that removes associations. That path becomes the _only_ path rather
-   than a belt alongside the database's braces.
+1. **Event-driven cleanup exists for one of them, and is the pattern for the rest.**
+   `tag.deleted` has a single handler today (attention's, `tag-calendar-attention.handler.ts`),
+   and it cleans only `attention_item_tags`. `message_tags`, `task_tags`,
+   `task_batch_tags` and `calendar_event_tags` still rely on `ON DELETE CASCADE`.
+   **Before 7.2 drops those FKs, each owning context needs its own `tag.deleted`
+   handler** — otherwise tag deletion silently leaves junction rows behind.
 2. **`attention` already lives without these FKs and relies on it.**
    `attention_item_tags.tag_id` has no FK _by design_, so ghost rows survive tag
    deletion and remain findable by the tag-deleted handler. The pattern is proven
@@ -272,7 +276,7 @@ gets its own decision when it arrives.
 
 | Change                                                                                             | Why                                                                                                               | Risk                                                                                                |
 | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `tags.name` `.unique()` → `uniqueIndex on (userId, lower(name))`                                   | **Live bug.** Two users cannot both have a tag called "urgent".                                                   | Medium — the migration **must dedupe existing rows first**, or it will fail on a non-empty database |
+| `tags.name` `.unique()` → `uniqueIndex on (userId, lower(name))`                                   | ~~**Live bug.** Two users cannot both have a tag called "urgent".~~ **✅ fixed** — `uq_tags_user_name (user_id, name)`, migration `0003`. Left (optional): case-insensitivity | Medium for the `lower(name)` part — dedupe case-variants first |
 | `attention_items`: typed `source_channel` / `source_id` + unique index; drop the `metadata` probes | Kills four unindexed jsonb scans and three speculative enum values; precondition for adding channels cheaply      | **High** — a real data migration. See [07](07-attention-core.md)                                    |
 | `attachments.placement` (`public \| message`) → `visibility` + `owner_context`                     | Removes consumer-context names from the storage table; the existing resolver registry already dispatches on a key | Low — `message → (restricted, 'conversations')`                                                     |
 | `events_outbox`: partial index on `id` where `dispatched_at` / `failed_at` are null; retention job for realtime-only rows older than 30 days | Realtime rows are never marked dispatched and accumulate forever; the drain (ordered by `id`) will sequential-scan. **✅ done** (migration `0008`, `events.retention` cron; retention covers all terminal rows) — see [docs/events 03](../events/03-implementation-plan.md). | None |
@@ -284,7 +288,7 @@ gets its own decision when it arrives.
 Two mechanisms, because they are good at different things.
 
 **`dependency-cruiser` for the cross-boundary rules.** It resolves the `@/api/*`,
-`@/shared/*` and `@/migrations/*` aliases from `tsconfig.json` natively, and expresses
+`@/migrations/*` and `@/test/*` aliases from `tsconfig.json` natively, and expresses
 "context A may reach context B only via `contract/`" directly with captured groups.
 
 ```js

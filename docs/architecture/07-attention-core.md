@@ -237,6 +237,11 @@ async onTask(p: EventOf<typeof TaskUpserted>): Promise<void> {
 }
 ```
 
+> **Today `TaskUpserted.status` is already the attention status** — `tasks.service.ts`
+> maps it before publishing. Read literally, the sketch maps twice. Part of step 6.2 is
+> making `TaskUpserted` carry tasks' own `TaskStatus` again, so the translation happens
+> exactly once, here.
+
 Note where `mapTaskStatusToAttention` ends up. It currently sits in
 `tasks/task-status.util.ts`, a _supporting_ context importing the _core_ context's
 vocabulary. As an outbound translator it is exactly right: tasks speaks attention's
@@ -398,7 +403,7 @@ export function decideDueDate(input: {
 ```
 
 Roughly 25 lines. No `@Injectable()`, no repositories, no clock. **This should be the
-first `.spec.ts` in the repository** — immediate wins, timeblock wins, mixed tie,
+first domain unit test** (`due-date.policy.unit.test.ts`, roadmap 1.2) — immediate wins, timeblock wins, mixed tie,
 no tags, timeblock with no upcoming occurrence.
 
 ### (b) Two inbound ports, declared by attention in _its_ language
@@ -511,7 +516,7 @@ Under schema-per-context this stops being a preference: the query names three
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Gmail / Slack / WhatsApp**    | A `channels/<provider>/` context publishing `AttentionSourceUpserted` with `source.context = "channels.gmail"`. **Attention: zero lines.** | Nothing beyond the `source_*` columns and the generic event. Do **not** create `channels/` speculatively.                                                                                                 |
 | **Gamification**                | A `momentum/` context consuming `attention.item.resolved` and `timer.lifecycle`, owning its own tables.                                    | **Publish `attention.item.resolved { userId, itemId, resolvedAt, dueDate, wasOverdue }` now.** Six lines, and it means the history exists when you want it — instead of needing a backfill you cannot do. |
-| **Calendar analytics**          | An `insights` context with projections from `scheduling.*`, `focus.*` and `attention.*` events.                                            | Nothing. Do **not** repurpose the outbox as an event log; add the retention job and build a real `event_log` if and when needed.                                                                          |
+| **Calendar analytics**          | An `insights` context with projections from `scheduling.*`, `focus.*` and `attention.*` events.                                            | Nothing. Do **not** repurpose the outbox as an event log (the `events.retention` job ✅ now prunes it after 30 days); build a real `event_log` if and when needed.                                                                          |
 | **AI planning agents**          | An agent is an **actor** issuing the same commands through the same application services.                                                  | Make every application service take `Actor`, never a bare `userId: string`, and leave the `Actor` union open. **Free today, expensive to retrofit.**                                                      |
 | **Agents querying the network** | `network/contract/connection-policy.port.ts` — which is being built anyway.                                                                | Nothing extra.                                                                                                                                                                                            |
 

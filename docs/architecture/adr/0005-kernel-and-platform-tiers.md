@@ -1,6 +1,6 @@
 # ADR 0005 — Two shared tiers: `kernel/` (pure) and `platform/` (framework-aware)
 
-**Status:** Accepted
+**Status:** Accepted — executed, see [Amendment](#amendment--2026-10-07-after-execution)
 **Date:** 2026-08-07
 **Deciders:** Mihai Alexandru
 **Supersedes:** the single-`kernel/` sketch in the first draft of
@@ -185,7 +185,7 @@ published `TagPolicy` value object ([03 §3.3](../03-context-map.md)).
   exchange for a lint-enforced one.
 - The `kernel/time/decorators.ts` file already created has to move again, and its 27
   import sites rewritten. Mechanical, and they need rewriting anyway — the IDE
-  generated them as non-aliased `"@/api/kernel/...`, which `CLAUDE.md` forbids.
+  generated them as non-aliased `src/kernel/...`, which `CLAUDE.md` forbids.
 
 ### Neutral
 
@@ -199,7 +199,7 @@ published `TagPolicy` value object ([03 §3.3](../03-context-map.md)).
 
 ```bash
 # kernel imports nothing but kernel and libraries (no framework, no context)
-grep -rn 'from "@/' apps/api/"@/api/kernel/ | grep -v 'from "@/api/kernel/'  # → empty
+grep -rn 'from "@/' apps/api/src/kernel/ | grep -v 'from "@/api/kernel/'  # → empty
 
 # no domain layer reaches platform
 grep -rn '@/api/platform' apps/api/src/*/domain/                          # → empty
@@ -214,6 +214,32 @@ grep -rn '@/shared/' apps/api/ --include='*.ts'                           # → 
 
 Plus `pnpm lint:boundaries` passing with the four rules added in
 [08-roadmap.md](../08-roadmap.md).
+
+## Amendment — 2026-10-07, after execution
+
+Executed in Wave 0.3b/0.3d. The decision held; three things came out differently.
+
+1. **`kernel/` is five files, not four**, and imports two libraries (`uuidv7`, `lodash`).
+   The error type became a small catalog system ([04 §7](../04-layering.md#7-errors)):
+   `domain-errors.ts`, `error-catalog.ts` and `kernel.errors.ts` pass both questions —
+   aggregates throw from catalogs. A sixth file, `error-registry.ts`, **failed question 2**
+   (only the composition root builds a registry). It was folded into
+   `platform/errors/errors.translator.ts` (0.3e, 2026-10-08). `actor.ts` is
+   not built yet (Wave 1.1). "Imports nothing" now reads **"no framework, no context,
+   no `platform/`"** — a library like `lodash` passes the purity ban, exactly as
+   `uuidv7` already did.
+2. **The HTTP status map did not land in `platform/errors/http-status.ts`.** It first
+   landed in `apps/api/src/errors/resolve-domain-error.ts`, next to the registry root
+   that imports every context's catalog. `platform/errors/errors.filter.ts` imported it,
+   so `platform/` reached every context transitively, the one violation of this ADR.
+   **Resolved** by [roadmap 0.3e](../08-roadmap.md#03e--the-error-registry-leak-done)
+   (2026-10-08). The map now lives in `platform/errors/errors.translator.ts`
+   (`DomainErrorsTranslator`), which receives the catalogs through
+   `ErrorsModule.forRoot(ERROR_CATALOGUES)`. The list itself sits in the composition root
+   `src/error-catalogs.root.ts`, and `platform/` imports only `kernel/`.
+3. **Naming:** the DTO decorators live in `platform/decorators/` (two files), not
+   `platform/validation/decorators.ts`. `kernel/time/decorators.ts` — the file this ADR's
+   Context is about — was never committed; it existed only in the working tree.
 
 ## References
 

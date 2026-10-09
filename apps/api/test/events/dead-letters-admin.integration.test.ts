@@ -2,7 +2,6 @@ import "reflect-metadata";
 
 import { INestApplication, Injectable, ValidationPipe } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_FILTER } from "@nestjs/core";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as dotenv from "dotenv";
 import { eq } from "drizzle-orm";
@@ -14,7 +13,8 @@ import { EventsModule } from "@/api/events/events.module";
 import { generateId } from "@/api/kernel/id";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
-import { AllExceptionsFilter } from "@/api/platform/errors/errors.filter";
+import { ErrorsModule } from "@/api/platform/errors/errors.module";
+import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import { TaskDeleted } from "@/api/platform/events/registry/events.registry";
 import {
@@ -64,11 +64,9 @@ describe("Dead-letter admin API (integration)", () => {
         DbModule,
         TxModule,
         EventsModule,
+        ErrorsModule.forRoot(ERROR_CATALOGUES),
       ],
-      providers: [
-        ReplayTestHandler,
-        { provide: APP_FILTER, useClass: AllExceptionsFilter },
-      ],
+      providers: [ReplayTestHandler],
     }).compile();
 
     app = module.createNestApplication();

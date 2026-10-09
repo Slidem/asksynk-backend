@@ -11,7 +11,6 @@ import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
 
-import { resolveDomainError } from "@/api/errors/resolve-domain-error";
 import { DomainError } from "@/api/kernel/errors/domain-errors";
 import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/api/messaging/attachments/message-attachment.constants";
 import {
@@ -20,6 +19,7 @@ import {
 } from "@/api/messaging/entities/message.entity";
 import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
+import { DomainErrorsTranslator } from "@/api/platform/errors/errors.translator";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import {
   AttentionItemRemoved,
@@ -52,6 +52,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly wsAuthService: WsAuthService,
     private readonly messagingService: MessagingService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly errorTranslator: DomainErrorsTranslator,
   ) {}
 
   /**
@@ -247,7 +248,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: true, messageId: message.id };
     } catch (error) {
       if (error instanceof DomainError) {
-        return { ok: false, error: resolveDomainError(error).message };
+        return { ok: false, error: this.errorTranslator.translate(error).message };
       }
       this.logger.error("message.send failed", { error });
       return { ok: false, error: "internal_error" };
@@ -295,7 +296,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: true };
     } catch (error) {
       if (error instanceof DomainError) {
-        return { ok: false, error: resolveDomainError(error).message };
+        return { ok: false, error: this.errorTranslator.translate(error).message };
       }
       this.logger.error("message.tag failed", { error });
       return { ok: false, error: "internal_error" };
@@ -342,7 +343,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: true };
     } catch (error) {
       if (error instanceof DomainError) {
-        return { ok: false, error: resolveDomainError(error).message };
+        return { ok: false, error: this.errorTranslator.translate(error).message };
       }
       this.logger.error("message.updateStatus failed", { error });
       return { ok: false, error: "internal_error" };

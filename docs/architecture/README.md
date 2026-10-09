@@ -4,7 +4,20 @@ An analysis of the current backend and a plan to restructure it around pragmatic
 Domain-Driven Design.
 
 Written 2026-08-07 against commit `fcd9922`. All metrics and file references were
-derived mechanically from the tree at that commit.
+derived mechanically from the tree at that commit. **Re-audited 2026-10-07 at
+`01de2f3`:** paths and statuses updated throughout; [01](01-current-state.md#0-status-at-01de2f3-2026-10-07)
+keeps the baseline numbers and lists what has changed.
+
+## Progress
+
+| Wave                         | Status                                                                                                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — safety net, free wins    | **10 / 12 done.** Left: 0.3c lint rule, 0.7 unit tests for pure code ([details](08-roadmap.md#wave-0--safety-net-and-free-wins))            |
+| 1–8                          | not started — except pieces done alongside the events / jobs work: timers on `JobScheduler`, outbox retention, dead-letter replay (8.6)                                      |
+
+Alongside: the events refactor ([ADR 0006](adr/0006-group-ordered-event-delivery.md),
+[docs/events](../events/README.md)) and unified jobs ([ADR 0007](adr/0007-unified-typed-jobs.md),
+[docs/jobs](../jobs/README.md)) are built.
 
 ---
 
@@ -63,8 +76,8 @@ Eight findings, in descending order of how much they will cost as the app grows:
 
 1. **Modules have no contract, so callers reach into internals.** 16 cross-module
    imports of another module's _repository_, across 13 files. `TagRepository` is
-   provided four separate times because `TagsModule` exports only its service.
-2. **The database is the real integration layer.** Nine foreign keys cross module
+   provided by three modules because `TagsModule` exports only its service.
+2. **The database is the real integration layer.** Ten foreign keys cross module
    boundaries. Two modules query tables they do not own — one of them in raw SQL.
 3. **The core domain is the least-modelled part of the system.** The tag → due-date
    policy is a private method on a DI-injected class, and its calendar lookup is a
@@ -74,11 +87,11 @@ Eight findings, in descending order of how much they will cost as the app grows:
    49 ownership checks live in services; 16 in entities.
 5. **There are no ports.** 21 concrete Drizzle repositories, injected by concrete
    type. The dependency arrow is never inverted.
-6. **Unit tests cannot run.** `testMatch` only matches `*.integration.test.ts`, so a
-   `*.spec.ts` would be silently ignored. Roughly 700 lines of already-pure logic is
-   untested and untestable by configuration.
+6. ~~**Unit tests cannot run.** `testMatch` only matches `*.integration.test.ts`.~~
+   _Fixed (0.1)._ Roughly 700 lines of already-pure logic is still untested (0.7).
 7. **The published language lives outside every context** — one 347-line event
-   registry in `packages/shared` holding all 24 event contracts.
+   registry (then in `packages/shared`, now `platform/events/registry/`) holding every
+   event contract — 21 then, 20 now.
 8. **`attention_items` is a projection wearing an aggregate's clothes** — source
    identity hides in an unindexed `metadata` jsonb, probed with `metadata->>'key'`.
 
@@ -102,6 +115,7 @@ These choices shape everything else. Each has an ADR.
 | Shared code           | Two tiers — `kernel/` (pure) and `platform/` (framework-aware)      | [0005](adr/0005-kernel-and-platform-tiers.md)                       |
 | Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table | [0006](adr/0006-group-ordered-event-delivery.md)                  |
 | Background jobs       | One typed jobs API; caller-derived ids, no stored pg-boss refs      | [0007](adr/0007-unified-typed-jobs.md)                              |
+| Domain errors         | One `DomainError` + per-context catalogs; HTTP status at the edge   | — ([04 §7](04-layering.md#7-errors))                                |
 
 Code structure stays **in place** — `apps/api/src/<context>/` with layered
 subfolders — enforced by `eslint-plugin-boundaries` and `dependency-cruiser` rather

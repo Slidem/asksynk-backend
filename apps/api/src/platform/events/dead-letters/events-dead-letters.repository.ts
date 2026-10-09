@@ -9,11 +9,13 @@ import {
 } from "@/migrations/schema/eventsDeadLetters";
 
 export type DeadLetter = typeof eventsDeadLetters.$inferSelect;
-export type DeadLetterStatus = (typeof eventsDeadLetterStatus.enumValues)[number];
+export type DeadLetterStatus =
+  (typeof eventsDeadLetterStatus.enumValues)[number];
 
 export interface DeadLetterFilter {
   consumerGroup?: string;
   eventType?: string;
+
   /** Inclusive bounds on `created_at`. */
   from?: Date;
   to?: Date;
@@ -21,6 +23,7 @@ export interface DeadLetterFilter {
 
 export interface ListDeadLettersQuery extends DeadLetterFilter {
   status: DeadLetterStatus;
+
   /** Id of the last row of the previous page. */
   cursor?: string;
   limit: number;
@@ -109,7 +112,10 @@ export class EventsDeadLettersRepository {
       .select()
       .from(eventsDeadLetters)
       .where(
-        and(eq(eventsDeadLetters.status, "pending"), ...filterConditions(filter)),
+        and(
+          eq(eventsDeadLetters.status, "pending"),
+          ...filterConditions(filter),
+        ),
       )
       .orderBy(eventsDeadLetters.id)
       .limit(limit)

@@ -202,7 +202,8 @@ testMatch: ["**/*.integration.test.ts"],
 ```
 
 A `*.spec.ts` file is not merely absent — it would be **silently ignored** if written.
-There are currently zero of them.
+There are currently zero of them. _(Fixed since — roadmap 0.1. The rest of this
+finding still holds until the pure logic actually gets tests.)_
 
 Combined with Finding 5, the result is that no business rule in this system can be
 tested without booting Nest, running `drizzle-kit push`, and truncating a live
@@ -227,7 +228,7 @@ Refactoring 16,000 lines with no safety net is how refactors fail.
 **Measured against:** Evans' _Published Language_ and _Open Host Service_ context-map
 patterns.
 
-`packages/shared/src/event-registry/events.registry.ts` — 347 lines — defines all 24
+`packages/shared/src/event-registry/events.registry.ts` — 347 lines — defines all 21
 domain events for all contexts in one file: tags, messaging, calendar, timers, tasks,
 suggestions, attention.
 

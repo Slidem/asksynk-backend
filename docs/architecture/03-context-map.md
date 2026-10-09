@@ -57,9 +57,9 @@ problem. **The classification decides how much modelling each context earns.**
 | **focus**         | `timers`                                                        | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
 | **files**         | `storage`                                                       | Generic    | `attachments`                                                                                                                       |
 | **identity**      | `auth` + `user-profile` + `user-settings`                       | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
-| _(platform)_      | `packages/shared` — **dissolves**, see [04 §1b](04-layering.md) | —          | `events_outbox`                                                                                                                     |
+| _(platform)_      | `platform/` (ex `packages/shared`, ✅ dissolved — [04 §1b](04-layering.md)) | —  | `events_outbox`, `events_dead_letters`                                                                                              |
 
-All 33 tables are assigned; none appears twice.
+All 34 tables are assigned; none appears twice.
 
 **Investment budget that follows from this table:**
 
@@ -265,10 +265,11 @@ Renamed because "timer" is the mechanism and "focus" is the concept. It owns a r
 five-state machine (`idle | running | paused | completed | stopped`) that is currently
 implemented with string-compare guards. Prime candidate for a rich aggregate.
 
-The pg-boss coupling moves to the application layer, behind the `JobScheduler` port
-([ADR 0007](adr/0007-unified-typed-jobs.md)). The completion job's id is derived from
-the timer (`userId:transitionedAt`), so the aggregate holds no job ref — the
-`pending_completion_job_ref` column is dropped.
+✅ The pg-boss coupling already sits behind the `JobScheduler` port
+([ADR 0007](adr/0007-unified-typed-jobs.md)): `timers.service.ts` injects it, the
+completion job's id is derived from the timer (`userId:transitionedAt`,
+`timers/scheduling/timer-completion.job.ts`), and the `pending_completion_job_ref`
+column was dropped (migration `0007`). The aggregate holds no job ref.
 
 ---
 
@@ -302,7 +303,7 @@ home and does not disturb the core.
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
 | **Gmail / Slack / WhatsApp**        | A new context per channel, publishing events that a channel adapter in `attention/presentation/events/` translates | One adapter + one enum value. No change to attention's core.         |
 | **Calendar analytics / statistics** | A new `insights` context, read-only, subscribing to `scheduling.*` and `attention.*` events                        | Its own schema, its own projections. Zero writes into core contexts. |
-| **Gamification**                    | A new `momentum` context, subscribing to `attention.item.resolved`                                                 | Nothing in `attention` changes — it already publishes the event.     |
+| **Gamification**                    | A new `momentum` context, subscribing to `attention.item.resolved`                                                 | One new event from `attention` (roadmap 6.5 — not published yet).    |
 | **AI planning agents**              | Not a context. Agents are **another actor** issuing the same commands through the same application facades.        | A new inbound adapter alongside `rest/` and `ws/`.                   |
 
 That last row is the important one. An AI agent that plans a calendar is not a new
@@ -317,23 +318,29 @@ integration re-implements them.
 
 - **`common` / `infrastructure`** → split across **two shared tiers**, neither of them
   a context:
-  - **`kernel/`** — pure domain vocabulary: `Actor`, `generateId`, the domain error
-    base, time predicates. **Imports nothing at all**, not even a framework — and every
-    file in it is genuinely referenced by `domain/`. This is the only shared code
-    `domain/` may see, and keeping it pure is what cures the current
-    `common → calendar-events` inversion.
+  - **`kernel/`** — pure domain vocabulary: `Actor` (Wave 1.1), `generateId`,
+    `DomainError` + `defineCatalog`, time predicates. **No framework, no context, no
+    `platform/`** — plain libraries only (`uuidv7`, `lodash`) — and every file in it is
+    referenced by (planned) `domain/` code. This is the only shared code `domain/` may
+    see. Keeping it pure is what cured the `common → calendar-events` inversion.
   - **`platform/`** — framework-aware shared infrastructure: the db and transaction
-    modules, the outbox publisher/dispatcher/consumer, pg-boss, email, the exception
-    filter, DTO validation decorators, `Clock`/`SystemClock`, `RealtimeBroadcaster`,
-    bootstrap config. **`domain/` may never import it.** Note that infrastructure
+    modules, the outbox publisher/dispatcher/consumer + dead letters + retention, the
+    typed jobs API (`JobScheduler`, `@JobHandler`, `@CronJob`) over pg-boss, email, the
+    exception filter, DTO validation decorators, `Clock`/`SystemClock`,
+    `RealtimeBroadcaster` (Wave 4), bootstrap config. **`domain/` may never import it.** Note that infrastructure
     _ports_ live here too, next to their adapters — the abstract/adapter split does not
     run along this seam ([04 §1a](04-layering.md)).
 
   Full rationale and the per-file mapping in
   [04-layering.md §1a](04-layering.md) and [ADR 0005](adr/0005-kernel-and-platform-tiers.md).
 
+- **`src/error-catalogs.root.ts`** → composition root, not a context and not a shared
+  tier: the one file that imports every context's `*.errors.ts` catalog. It sits beside
+  `app.module.ts` and has the same role (there is no `errors/` folder any more). See
+  [04 §7](04-layering.md#7-errors).
 - **`websockets`** → transport, not a context. See [04-layering.md §5](04-layering.md).
-- **`events`** → `platform/` wiring.
+- **`events`** → the dead-letter admin REST surface (`admin/events/dead-letters`) over
+  `platform/events/dead-letters/`. An operator tool, not a context.
 - **`health`** → one endpoint; it can stay where it is.
 
 ---

@@ -10,7 +10,7 @@ boundaries rot.
 |         | Mechanism                                     | Use when                                                                                                                                                                               | Consistency                                                                    | Cost                                                                                                         |
 | ------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | **(a)** | **Sync call to `<other>/contract/*.port.ts`** | You need an authoritative answer **now** to validate or decide, the answer is small, you are mid-request. Typically: authorization, existence checks, "give me these ids' attributes". | Strong — joins the caller's transaction through `@Transactional()` re-entrancy | One abstract class + one binding                                                                             |
-| **(b)** | **Domain event via the existing outbox**      | Something **happened** and other contexts should react. **Mandatory** for anything that would write to a table you do not own.                                                         | Eventual, ordered per key within a consumer group; handler must be idempotent  | One `defineEvent` + one `@EventHandler(E, Group)`, plus a `ConsumerGroup` const if the consumer has none yet |
+| **(b)** | **Domain event via the existing outbox**      | Something **happened** and other contexts should react. **Mandatory** for anything that would write to a table you do not own.                                                         | Eventual, ordered per key within a consumer group; handler must be idempotent (retries and dead-letter replay re-deliver) | One `defineEvent` + one `@EventHandler(E, Group)`, plus a `ConsumerGroup` const if the consumer has none yet |
 | **(c)** | **A projection you own**                      | You repeatedly need another context's data to answer _your_ queries, and joining live would penetrate the boundary. Built by (b).                                                      | Eventual                                                                       | A table + handlers + a backfill                                                                              |
 | **(d)** | **ACL translator**                            | The other side speaks a different language, or is **external** (Google, Gmail, Slack)                                                                                                  | n/a                                                                            | One adapter class                                                                                            |
 
@@ -22,12 +22,20 @@ boundaries rot.
 3. **A `@Module`'s `exports` may contain only classes declared under `contract/`.**
    This one rule prevents the whole class of problem mechanically — and it is why the
    current situation exists: `MessagingModule` exports `MessagingRepository`,
-   `CalendarEventsModule` exports two repositories, and `TagsModule` exports
-   _nothing_, which is why `TagRepository` gets re-provided four times. All three are
+   `CalendarEventsModule` exports two repositories, and `TagsModule` exports only
+   `TagsService`, which is why `TagRepository` gets provided by three modules. All three are
    the same bug.
 4. **Need a JOIN across contexts?** Use (c), or a port method inside the _owning_
    context. Never a cross-context database view — a view is a JOIN with a nicer name,
    and it is invisible to the boundary linter.
+5. **Jobs are not a fifth mechanism.** `JobScheduler`, `@JobHandler` and `@CronJob`
+   ([ADR 0007](adr/0007-unified-typed-jobs.md)) are for a context's _own_ deferred or
+   periodic work (timer completion, calendar polling, retention). To make another
+   context act, publish an event.
+6. **Errors cross boundaries unchanged.** A context throws only from its own
+   `<ctx>.errors.ts` catalog. A caller of another context's port lets that
+   `DomainError` propagate — its code is already namespaced (`tags.tag_not_found`) and
+   registered ([04 §7](04-layering.md#7-errors)).
 5. **Prefer `useExisting` over writing an adapter class** when the port shape already
    matches the other context's contract. Write a (d) translator only when you must
    actually translate.
@@ -72,13 +80,13 @@ deliberately stays.)
 | `calendar-integrations/services/calendar-sync.service.ts`          | `CalendarRepository`, `CalendarEventsRepository` | intra-context call |
 | `calendar-integrations/services/calendar-integration.service.ts`   | `CalendarRepository`, `CalendarEventsRepository` | intra-context call |
 | `calendar-integrations/services/calendar-outbound-sync.service.ts` | `CalendarRepository`, `CalendarEventsRepository` | intra-context call |
-| `calendar-integrations/sync/calendar-sync.scheduler.ts`            | `CalendarRepository`                             | intra-context call |
+| `calendar-integrations/sync/calendar-sync.job-handlers.ts`         | `CalendarRepository`                             | intra-context call |
 
 Plus the 8 non-repository imports on the same edge (`Calendar`, `CalendarEvent`,
 `utcToIso`, `parseIsoWallClockInTimezone`, the module import).
 
 **The single largest coupling reduction in the plan, and it is a file move.**
-`calendar-sync.service.ts:283` currently does `applyFields(event, fields)` — mutating
+`calendar-sync.service.ts:139` currently calls `applyFields(event, fields)` (defined at `:283`) — mutating
 another module's entity field by field from outside. That is not two contexts; it is
 one context with a folder in the way. → [ADR 0003](adr/0003-merge-calendar-events-and-calendar-integrations.md)
 
@@ -158,9 +166,9 @@ optional** — the query would otherwise cross schemas.
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `auth/guest-auth.service.ts` → `PublicViewGuestsRepository`, `auth.module.ts` → `PublicViewsModule` | **Invert.** `identity` declares `GuestIdentityProvider`; `sharing` registers into it at bootstrap.                                                                             |
 | `messaging/services/messaging.service.ts` → `PublicViewsRepository`                                 | `sharing/contract/public-link.port.ts` → `isLive(publicViewId): Promise<boolean>`. The call site only uses `view.isLive()`, so the port returns a boolean, never an aggregate. |
-| `common/decorators/*` → `calendar-events/utils/recurrence.utils`                                    | **Move down.** `isIsoDateWithOffset` / `isValidIanaTimezone` are pure predicates, not calendar domain → `kernel/time/iso.ts`.                                                  |
-| `auth/auth.guard.ts:16` → `CalendarEventsRepository` (logger name only)                             | **Delete.** `new ContextLogger(AuthGuard.name)`. Five minutes.                                                                                                                 |
-| `messaging/services/messaging.service.ts:3` → `WsIdentity` from `src/websockets/…`                  | **Kernel VO.** Becomes `Actor` — see §3.                                                                                                                                       |
+| ~~`common/decorators/*` → `calendar-events/utils/recurrence.utils`~~                                | ✅ **Done.** Moved down to `kernel/time/iso.ts`; `platform/decorators/*` import it from there.                                                                                 |
+| ~~`auth/auth.guard.ts:16` → `CalendarEventsRepository` (logger name only)~~                         | ✅ **Done.** `new ContextLogger(AuthGuard.name)`.                                                                                                                               |
+| `messaging/services/messaging.service.ts:33` → `WsIdentity` from `@/api/websockets/…`               | **Kernel VO.** Becomes `Actor` — see §3.                                                                                                                                       |
 
 ```ts
 // identity/contract/guest-identity.provider.ts
@@ -216,8 +224,10 @@ Controllers stop injecting a service to work out whose data they are touching.
 ### Group G — the WebSocket gateway inverts
 
 `ws.gateway.ts` imports `MessagingService`, `AttachmentsService`,
-`TaskSuggestionPayload`, `MANAGED_MESSAGE_STATUSES`, `MessageResponseDto`, plus a
-non-aliased `src/messaging/...` constant.
+`TaskSuggestionPayload`, `MANAGED_MESSAGE_STATUSES`, `MessageResponseDto`,
+`MAX_ATTACHMENTS_PER_MESSAGE` and `toAttachmentResponse`. For error acks it injects
+`DomainErrorsTranslator` from `platform/errors/`, which is fine because that is the
+shared tier, not a context.
 
 **Inverted.** Contexts push to a `RealtimeBroadcaster` port that the transport
 implements; the transport imports zero feature code. Inbound commands move into the
@@ -286,7 +296,8 @@ This single type:
 ## 4. The event catalogue moves home
 
 `apps/api/src/platform/events/registry/events.registry.ts` (ex
-`packages/shared/src/event-registry/`, 24 events) splits into per-context files:
+`packages/shared/src/event-registry/`; 319 lines, 20 events) splits into per-context
+files:
 
 ```
 tagging/contract/tagging.events.ts
@@ -298,8 +309,8 @@ attention/contract/attention.events.ts
 ```
 
 `defineEvent`, `DeliveryMode` and the registry types **stay together as
-infrastructure** — they move to `platform/events/registry/` when `packages/shared`
-dissolves ([04-layering.md §1b](04-layering.md)). Only the _catalogue_ of event
+infrastructure** — ✅ already in `platform/events/registry/`
+(`events.registration.ts`, `events.types.ts`). Only the _catalogue_ of event
 definitions is per-context.
 
 This is safe because neither runtime component needs the central file. The dispatcher
@@ -313,7 +324,11 @@ rest in the outbox. **Whatever process runs the dispatcher must load every conte
 with a durable handler** ([docs/events 01 §5](../events/01-ordering-design.md)).
 
 Consumer groups already follow this rule: each `ConsumerGroup` const — group name
-plus ordering key — lives in the consuming context, not with the event.
+plus ordering key — lives in the consuming context, not with the event (5 today:
+`attention-items`, `calendar-sync`, `messaging`, `suggestion-sync`,
+`timer-event-log`). Delivery mechanics — one pg-boss queue per group, ordering key as
+`singletonKey`, retries, dead letters and replay — are in
+[docs/events](../events/README.md) and [ADR 0006](adr/0006-group-ordered-event-delivery.md).
 
 It also removes the `AttentionItemUpserted` ↔ `AttentionItemResponse` zod
 duplication, because the event definition ends up next to the response DTO instead of

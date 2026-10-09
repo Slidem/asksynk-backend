@@ -33,7 +33,7 @@ tiers (`kernel/` and `platform/`). The rule is enforced by lint, not by discipli
 | `application/`    | own `domain/`, own `application/`, `kernel/`, `platform/`, **other contexts' `contract/`** |
 | `infrastructure/` | own `domain/`, own `application/`, `kernel/`, `platform/`, Drizzle, SDKs                   |
 | `presentation/`   | own `application/`, own `domain/` (types), `kernel/`, `platform/`                          |
-| `kernel/`         | **nothing** — not a context, not `platform/`                                               |
+| `kernel/`         | **no framework**, no context, not `platform/` — plain libraries only (`uuidv7`, `lodash`)  |
 | `platform/`       | `kernel/` only — never a context                                                           |
 
 **No context ever imports another context's `domain/`, `application/`,
@@ -52,7 +52,13 @@ Three corollaries worth spelling out:
 
 ## 1a. `kernel/` vs `platform/` — the two shared tiers
 
-Today's `common/` and `infrastructure/` hold two genuinely different kinds of thing,
+> **Status: ✅ executed** (Wave 0.3b/0.3d, Aug–Sep 2026). `common/`, `infrastructure/`
+> and `packages/shared` are gone. "Target contents" below is the tree **as built**;
+> deviations from the original plan are marked. The last leak (`platform/errors/`
+> depending on every context through the error registry) was fixed by
+> [roadmap 0.3e](08-roadmap.md#03e--the-error-registry-leak-done).
+
+The old `common/` and `infrastructure/` held two genuinely different kinds of thing,
 and merging them into one shared folder breaks the rule above.
 
 |                   | `kernel/`                                                   | `platform/`                                                                                                                       |
@@ -74,10 +80,18 @@ Question 2 is the one that gets forgotten. Purity is _necessary_ but not _suffic
 otherwise `kernel/` slowly accumulates every dependency-free file in the codebase and
 becomes `common/` again.
 
-Applying it to the four kernel files: `Actor` appears in domain signatures
-(`message.changeManagedStatus(actor, …)`); `generateId` is called by aggregate
-factories; `DomainError` is thrown by aggregates; `isValidIanaTimezone` is called by
-`RecurrenceRule`'s constructor. All four pass both questions.
+Applying it to the kernel files. No `domain/` folder exists yet, so question 2 is
+answered against the planned domain code:
+
+| File                            | Q2 — who in `domain/` uses it                                    | Verdict                                       |
+| ------------------------------- | ---------------------------------------------------------------- | --------------------------------------------- |
+| `actor.ts`                      | domain signatures (`message.changeManagedStatus(actor, …)`)      | passes — **not built yet** (Wave 1.1)         |
+| `id.ts`                         | aggregate factories call `generateId`                            | passes                                        |
+| `errors/domain-errors.ts`       | aggregates throw `DomainError`                                   | passes                                        |
+| `errors/error-catalog.ts`       | each context's `*.errors.ts` catalog, which aggregates throw from | passes                                        |
+| `errors/kernel.errors.ts`       | `invalidValueError` — `RecurrenceRule`'s constructor              | passes (weakly: one generic code)             |
+| `time/iso.ts`                   | `isValidIanaTimezone` — `RecurrenceRule`'s constructor            | passes                                        |
+| `errors/error-registry.ts`      | nobody — only the composition root builds a registry             | **failed** → folded into `platform/errors/errors.translator.ts` (0.3e ✅) |
 
 ### Ports: the abstract/impl split does **not** run along the kernel/platform seam
 
@@ -88,7 +102,7 @@ halves live together.
 Worked example — `EventsPublisher`, the port that most invites the split:
 
 ```ts
-// today: packages/shared/src/event-publisher/events-publisher.ts
+// apps/api/src/platform/events/publisher/events-publisher.ts
 export abstract class EventsPublisher {
   abstract publish<T extends EventDef>(
     def: T,
@@ -133,8 +147,8 @@ makes the policies deterministic and testable. So `Clock` is `platform/`, both h
 If a domain signature ever genuinely needs a clock, that is the signal to revisit — and
 also a signal the design has drifted.
 
-**Why this is not over-engineering.** `kernel/time/decorators.ts` — the file created
-when `common/decorators/*` was first moved — imports `@nestjs/common` and
+**Why this is not over-engineering.** `kernel/time/decorators.ts` — the file first
+created (never committed) when `common/decorators/*` was moved — imports `@nestjs/common` and
 `class-validator`. If `domain/` may import `kernel/`, then `domain/` can transitively
 reach Nest, and the most important rule in this document is unenforceable. All 27 of
 that file's consumers are controllers and DTOs, so it was never kernel material.
@@ -142,61 +156,69 @@ that file's consumers are controllers and DTOs, so it was never kernel material.
 Two folders means two lint rules, both trivially expressible. One folder means a
 purity carve-out that no linter can state.
 
-### Target contents
+### Target contents (as built)
 
 ```
-apps/api/"@/api/kernel/                # pure. four files — this is what domain/ can see.
-  actor.ts                          # Actor VO — appears in domain method signatures
-  id.ts                             # generateId — called by aggregate factories
-  errors/domain-error.ts            # DomainError base — thrown by aggregates
-  time/iso.ts                       # isValidIanaTimezone — called by RecurrenceRule's ctor
+apps/api/src/kernel/                # pure. what domain/ can see. no framework; libraries ok
+  actor.ts                          # ⬜ Wave 1.1 — Actor VO, appears in domain method signatures
+  id.ts                             # generateId (aggregate factories), isValidId
+  errors/domain-errors.ts           # DomainError + DomainErrorCategory — thrown by aggregates
+  errors/error-catalog.ts           # defineCatalog → { catalog, createError } (lodash template); ErrorCode
+  errors/kernel.errors.ts           # "core" catalog: invalidValueError
+  time/iso.ts                       # isValidIanaTimezone, isIsoDateWithOffset
 
 apps/api/src/platform/              # framework-aware. domain/ may NOT import this.
-  clock/clock.ts                    # abstract Clock  — see §1a "ports"
-  clock/system-clock.ts             # @Injectable
+  clock/clock.ts                    # abstract Clock + SystemClock (one file; plan had two)
   clock/clock.module.ts
-  db/{db.ts,db.module.ts,tx.module.ts}
-  db/pg-error-codes.ts              # ex packages/shared
-  errors/errors.filter.ts           # AllExceptionsFilter
-  errors/http-status.ts             # DomainError -> HTTP status
-  errors/api-error-responses.decorator.ts
-  validation/decorators.ts          # IsUuidV7, IsIanaTimezone, UuidV7Param, …
-  http/query-parsers.ts             # toOptionalBoolean, toOptionalDate, …
+  db/{db.ts,db.module.ts,tx.module.ts,pg-error-codes.ts}
+  errors/errors.module.ts           # @Global ErrorsModule.forRoot(catalogs): translator + APP_FILTER
+  errors/errors.translator.ts       # DomainErrorsTranslator: catalogs → map, category → status, fails closed
+  errors/errors.filter.ts           # AllExceptionsFilter — injects DomainErrorsTranslator
+  errors/swagger.decorator.ts       # ApiErrorDto, ApiStandardErrors (plan: api-error-responses.decorator.ts)
+  decorators/fieldValidators.decorators.ts  # IsUuidV7, IsIanaTimezone, … (plan: validation/decorators.ts)
+  decorators/paramValidators.decorators.ts  # UuidV7Param, …
+  mappers/string.utils.ts           # toNonNegativeNumberOptional (plan: http/query-parsers.ts)
   http/bearer-token.ts
-  realtime/realtime-broadcaster.ts  # the port the WS transport implements
-  logger/logger.config.ts           # ex packages/shared
+  logger/logger.config.ts
   config/{cors,swagger}.config.ts
-  events/                           # ex packages/shared — the outbox machinery
+  events/                           # ex packages/shared — the outbox machinery, see ADR 0006
     publisher/                      #   abstract EventsPublisher + impl
+    outbox/                         #   events_outbox repository
     dispatcher/                     #   outbox -> pg-boss drain, one queue per consumer group
     decorators/                     #   @EventHandler + EventHandlersRegistry (discovers groups)
     consumer/                       #   discovery, durable runtime (retries), realtime listener
-    dead-letters/                   #   events_dead_letters repository
-    registry/                       #   defineEvent, ConsumerGroup + event types (NOT the catalogue)
+    dead-letters/                   #   events_dead_letters repository + service + catalog
+    retention/                      #   events.retention @CronJob
+    registry/                       #   defineEvent, ConsumerGroup, types — and, until 8.1, the catalogue
   jobs/                             # ex packages/shared — typed jobs, see ADR 0007
     message-bus/                    #   pg-boss wrapper
     define-job.ts, job.types.ts     #   defineJob, payload + options types; @CronJob in cron-job.decorator.ts
     job-scheduler.ts                #   abstract JobScheduler port + pgboss-job-scheduler.ts impl
     job-handler.decorator.ts        #   @JobHandler + job-handlers.registry.ts (discovery, crons)
   email/                            # ex packages/shared — sender, providers, templates
+  realtime/realtime-broadcaster.ts  # ⬜ Wave 4.1
+
+apps/api/src/                       # composition root files, NOT a shared tier — see §7
+  app.module.ts, main.ts
+  error-catalogs.root.ts            #   ERROR_CATALOGUES: every context's catalog
 ```
 
-`common/`, `infrastructure/` **and `packages/shared` all disappear.** See §1b.
+`common/`, `infrastructure/` **and `packages/shared` are gone.** See §1b.
 
-### Where each current file lands
+### Where each file went (✅ done)
 
-| Today                                            | Goes to                                                                        | Why                                                                                    |
+| Was                                              | Planned                                                                        | Why                                                                                    |
 | ------------------------------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | `kernel/time/iso.ts`                             | **stays**                                                                      | pure predicates, zero imports                                                          |
-| `kernel/time/decorators.ts`                      | `platform/validation/decorators.ts`                                            | Nest + class-validator; 27/27 consumers are `rest/`                                    |
+| `common/decorators/*`                            | `platform/validation/decorators.ts` → **built as** `platform/decorators/*`     | Nest + class-validator; 27/27 consumers are `rest/`                                    |
 | `common/clock/clock.ts` → `abstract Clock`       | `platform/clock/clock.ts`                                                      | pure, but no domain signature takes a `Clock` — time reaches domain as `now: Date`     |
 | `common/clock/clock.ts` → `SystemClock`          | `platform/clock/system-clock.ts`                                               | `@Injectable`                                                                          |
 | `common/clock/clock.module.ts`                   | `platform/clock/`                                                              | Nest module                                                                            |
-| `common/errors/errors.model.ts`                  | **split** → `kernel/errors/domain-error.ts` + `platform/errors/http-status.ts` | `AsksynkError.statusCode` is an HTTP concern — see §7                                  |
+| `common/errors/errors.model.ts`                  | **replaced** — `DomainError` + catalogs in `kernel/errors/`, status map in `platform/errors/errors.translator.ts` | `AsksynkError.statusCode` is an HTTP concern — see §7                             |
 | `common/errors/errors.filter.ts`                 | `platform/errors/`                                                             | Nest exception filter                                                                  |
 | `common/errors/api-error-responses.decorator.ts` | `platform/errors/`                                                             | Swagger                                                                                |
 | `common/config/{cors,swagger}.config.ts`         | `platform/config/`                                                             | bootstrap wiring                                                                       |
-| `common/utils/inputs.ts`                         | `platform/http/query-parsers.ts`                                               | every function takes `string \| undefined` — query-string parsing                      |
+| `common/utils/inputs.ts`                         | **built as** `platform/mappers/string.utils.ts` (unused parsers deleted)      | every function takes `string \| undefined` — query-string parsing                      |
 | `common/utils/token.ts`                          | `platform/http/bearer-token.ts`                                                | reads HTTP headers                                                                     |
 | `common/logger/logger.config.ts`                 | **delete**                                                                     | a one-line re-export of `@/shared/logger.config` — a barrel, which `CLAUDE.md` forbids |
 | `infrastructure/db/*`                            | `platform/db/*`                                                                | same tier; no reason for a third folder                                                |
@@ -205,7 +227,11 @@ apps/api/src/platform/              # framework-aware. domain/ may NOT import th
 
 ## 1b. `packages/shared` dissolves into the same two tiers
 
-`packages/shared` (36 files, 2,180 LOC) is a package in name only:
+> **Status: ✅ done** (Wave 0.3d). Kept below as the rationale. Leftovers: the
+> `packages/*` glob in `pnpm-workspace.yaml`, and `events.registry.ts` still in
+> `platform/events/registry/` until Wave 8.1.
+
+`packages/shared` (36 files, 2,180 LOC) was a package in name only:
 
 - **It has no `src/index.ts`.** `package.json` declares `main: "dist/index.js"`, but
   nothing imports the built artifact — every consumer goes through the `@/shared/*`
@@ -411,10 +437,10 @@ No `@Inject()`, no `Symbol` token, no string constant. TypeScript's
 `emitDecoratorMetadata` emits the abstract class as the design-time type, and Nest
 resolves it.
 
-**This is not a new pattern for this codebase.** `packages/shared` already does it —
+**This is not a new pattern for this codebase.** `platform/` already does it —
 `abstract class EventsPublisher` / `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` / `PgBossScheduledJobService` (now
-`JobScheduler` / `PgBossJobScheduler`, [ADR 0007](adr/0007-unified-typed-jobs.md)). → [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)
+`abstract class JobScheduler` / `PgBossJobScheduler` ([ADR 0007](adr/0007-unified-typed-jobs.md)),
+`abstract class Clock` / `SystemClock`. → [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)
 
 ### Why abstract classes rather than `interface` + `Symbol`
 
@@ -479,7 +505,7 @@ today, lifted out of a private method on a DI class. It is now a function anyone
 call and anyone can test:
 
 ```ts
-// domain/due-date.policy.spec.ts — no Nest, no Postgres, milliseconds
+// test/attention/due-date.policy.unit.test.ts — no Nest, no Postgres, milliseconds
 it("prefers the earliest candidate across mixed tag modes", () => {
   const base = new Date("2026-01-01T09:00:00Z");
   const result = deriveDueDate(
@@ -721,37 +747,45 @@ on smaller projects; that applies here.
 
 ## 7. Errors
 
-`AsksynkError` currently carries HTTP status codes via a `statusCode` getter, which
-makes the "domain" error type HTTP-aware by construction.
+> **Status: ✅ built** (Wave 0.3b), differently from the first draft of this section —
+> one data-driven error class plus per-context catalogs, instead of a class hierarchy.
+> The principle survived intact: **the error type knows nothing about HTTP; the status
+> is decided at the edge.**
 
-Split it:
+`AsksynkError` carried HTTP status codes via a `statusCode` getter, which made the
+"domain" error type HTTP-aware by construction. It is gone (0 references). What
+replaced it:
 
-```ts
-// kernel/errors/domain-error.ts — no HTTP
-export abstract class DomainError extends Error {
-  abstract readonly code: string;
-}
-export class NotFoundError extends DomainError {
-  readonly code = "not_found"; /* ... */
-}
-export class RuleViolation extends DomainError {
-  readonly code = "rule_violation"; /* ... */
-}
-```
+| Piece                                  | Where                                     | What                                                                                                                  |
+| -------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `DomainError`, `DomainErrorCategory`   | `kernel/errors/domain-errors.ts`          | one concrete class `(code, message?, options?)`. Categories: `NOT_FOUND`, `INVALID_VALUE`, `FORBIDDEN`, `CONFLICT`, `RULE_VIOLATION`, `INTERNAL` |
+| `defineCatalog(namespace, defs)`       | `kernel/errors/error-catalog.ts`          | each def is `{ category, message, exposable }`; returns `{ catalog, createError }`. Code is `namespace.key`; `{ param }` interpolation |
+| `<ctx>.errors.ts`                      | each context (12 catalogs)                | `throw tagsError("tag_not_found", { tagId })`. No catalog yet: `storage`, `auth`, `user-settings`                     |
+| `ERROR_CATALOGUES`                     | `src/error-catalogs.root.ts`              | composition root — the one file that imports every catalog (`ErrorCatalog[]`, plain data)                             |
+| `ErrorsModule.forRoot(catalogs)`       | `platform/errors/errors.module.ts`        | `@Global`; provides `DomainErrorsTranslator` (`useValue`) and registers `AllExceptionsFilter` as `APP_FILTER`. `app.module.ts` passes `ERROR_CATALOGUES` |
+| `DomainErrorsTranslator`               | `platform/errors/errors.translator.ts`    | builds `Map<ErrorCode, definition>`, throws on duplicate namespace / code (at boot). `translate()`: category → status (400/403/404/409/422/500). **Fails closed**: unknown code → 500, generic message; message sent only if `exposable` |
+| `AllExceptionsFilter`                  | `platform/errors/errors.filter.ts`        | `DomainError` → translator; `HttpException` → passthrough; anything else → 500. `ws.gateway.ts` injects the same translator |
 
-Contexts subclass with meaningful names — `TimerNotRunning`, `SuggestionNotPending`,
-`ThreadFrozen`, `AttentionItemNotFound`. The status mapping moves to
-`platform/errors/http-status.ts`, and the existing `AllExceptionsFilter` — itself
-moving to `platform/errors/` — applies it at the edge, where that translation belongs.
+**Why catalogs instead of subclasses** (`TimerNotRunning extends RuleViolation`, the
+first draft): the category lives in data, so the registry can list every code the API
+can return, refuse duplicates at boot, and decide per code whether the message is safe
+to expose. Subclasses would have spread that across ~100 classes.
 
-This is the concrete reason `AsksynkError` splits across the two shared tiers: the
-error _type_ is domain vocabulary (`kernel/`), the _status code_ is transport
-(`platform/`).
+**Dependency direction** (roadmap 0.3e ✅): `platform/` never imports the catalog list.
+It receives the catalogs through `ErrorsModule.forRoot()`, so its imports stop at
+`kernel/`. See [docs/errors/01](../errors/01-error-registry-inversion.md).
 
-The one genuinely leaky file is
+**Across contexts:** a context throws only from its own catalog. A caller of another
+context's `contract/` port lets the owner's `DomainError` propagate — the code is
+already namespaced (`tags.tag_not_found`) and already registered, so translating it
+adds nothing.
+
+The one genuinely leaky file is still
 [`attachments.service.ts`](../../apps/api/src/storage/attachments/services/attachments.service.ts):
-**11 of the 17 Nest HTTP exceptions in the whole codebase live there.** The other 6
-are at the auth boundary, where they are fine.
+**11 of the 20 Nest HTTP exceptions in the codebase live there** (roadmap 8.5). The
+others are 7 `UnauthorizedException`s at the auth boundary and 2 `BadRequestException`s
+in `platform/decorators/paramValidators.decorators.ts` — transport code, where they are
+fine.
 
 ---
 
@@ -763,7 +797,7 @@ Nothing above survives without lint. `eslint-plugin-boundaries`, added in Wave 3
 // eslint.config.js (additions)
 settings: {
   "boundaries/elements": [
-    { type: "kernel",         pattern: "apps/api/"@/api/kernel/**" },
+    { type: "kernel",         pattern: "apps/api/src/kernel/**" },
     { type: "platform",       pattern: "apps/api/src/platform/**" },
     { type: "contract",       pattern: "apps/api/src/*/contract/**",       capture: ["context"] },
     { type: "domain",         pattern: "apps/api/src/*/domain/**",         capture: ["context"] },
@@ -826,14 +860,10 @@ Roll out per context: add the context's folders, set the rule to `warn`, clean i
 then promote to `error`. `dependency-cruiser` is a viable alternative if more
 expressive rules are needed later; it is not needed for this ruleset.
 
-**Also required, and it is one line** — split the jest config so unit tests run:
-
-```ts
-// apps/api/jest.unit.config.ts   (no globalSetup — no Postgres)
-testMatch: ["**/*.spec.ts"],
-```
-
-leaving `jest.config.ts` as the integration runner.
+**Also required** — the jest split so unit tests run. ✅ Done in Wave 0.1: `unit` and
+`integration` projects in `apps/api/jest.config.ts`, unit tests match
+`**/*.unit.test.ts` and need no Postgres (`pnpm test:unit`). See
+[08 §Guardrails](08-roadmap.md#guardrails).
 
 ---
 

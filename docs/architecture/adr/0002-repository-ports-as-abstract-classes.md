@@ -27,10 +27,11 @@ Two consequences:
 2. Nothing prevents another context from importing the concrete class — which is
    exactly what happens 16 times.
 
-`packages/shared` already solves this correctly, twice:
-`abstract class EventsPublisher` / `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` / `PgBossScheduledJobService` (since replaced
-by `JobScheduler` / `PgBossJobScheduler`, same pattern — [ADR 0007](0007-unified-typed-jobs.md)).
+The shared infrastructure (then `packages/shared`, now `platform/`) already solves this
+correctly: `abstract class EventsPublisher` / `EventsPublisherImpl`, and
+`abstract class JobScheduler` / `PgBossJobScheduler` ([ADR 0007](0007-unified-typed-jobs.md);
+it replaced `ScheduledJobService`, same pattern). `Clock`, `ObjectStorage`,
+`EmailProvider` and `CalendarProvider` follow it too.
 The pattern is understood; it was simply never applied to persistence.
 
 ## Options considered
@@ -65,7 +66,7 @@ constructor(private readonly repo: TasksRepository) {}   // no @Inject needed
 **For:** an abstract class is a runtime value, so `emitDecoratorMetadata` records it
 as the design-time type and Nest resolves it with no decorator. One declaration serves
 as contract, type annotation and token. Binds cleanly with `useClass`, `useExisting`
-and `useValue`. **And it matches the existing precedent in `packages/shared`.**
+and `useValue`. **And it matches the existing precedent in `platform/`.**
 
 **Against:** it emits a small runtime class. It is nominally typed, so a test double
 must `extends` it rather than merely match its shape. Someone could put an
@@ -183,7 +184,7 @@ Sequenced in Wave 2 of the roadmap, smallest contexts first.
 
 ## References
 
-- `packages/shared/src/event-publisher/events-publisher.ts` — the in-repo precedent
+- `apps/api/src/platform/events/publisher/events-publisher.ts` — the in-repo precedent
 - [NestJS — Custom providers](https://docs.nestjs.com/fundamentals/custom-providers)
 - [NestJS DI with abstract classes](https://dev.to/ef/nestjs-dependency-injection-with-abstract-classes-4g65)
 - [Sairyss/domain-driven-hexagon](https://github.com/Sairyss/domain-driven-hexagon)

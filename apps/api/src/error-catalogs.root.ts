@@ -1,7 +1,7 @@
 import { attentionItemsCatalog } from "@/api/attention-items/attention-items.errors";
 import { calendarEventsCatalog } from "@/api/calendar-events/calendar-events.errors";
 import { calendarIntegrationsCatalog } from "@/api/calendar-integrations/calendar-integration.errors";
-import { buildErrorRegistry } from "@/api/kernel/errors/error-registry";
+import { ErrorCatalog } from "@/api/kernel/errors/error-catalog";
 import { coreErrorsCatalog } from "@/api/kernel/errors/kernel.errors";
 import { messagingCatalog } from "@/api/messaging/messaging.errors";
 import { networksCatalog } from "@/api/networks/networks.errors";
@@ -12,7 +12,8 @@ import { tasksCatalog } from "@/api/tasks/tasks.errors";
 import { timersCatalog } from "@/api/timers/timers.errors";
 import { userProfileCatalog } from "@/api/user-profile/user-profile.errors";
 
-export const ERROR_REGISTRY = buildErrorRegistry([
+/** Composition root: every context's catalog. Register new catalogs here. */
+export const ERROR_CATALOGUES: ErrorCatalog[] = [
   coreErrorsCatalog,
   attentionItemsCatalog,
   calendarEventsCatalog,
@@ -25,4 +26,4 @@ export const ERROR_REGISTRY = buildErrorRegistry([
   tasksCatalog,
   timersCatalog,
   userProfileCatalog,
-]);
+];

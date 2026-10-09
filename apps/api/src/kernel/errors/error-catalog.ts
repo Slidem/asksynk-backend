@@ -12,6 +12,9 @@ export type NameSpaceKey = string;
 
 export type ErrorKey = string;
 
+/** Full error code: "namespace.key". */
+export type ErrorCode = string;
+
 export type ErrorDefinition = {
   category: DomainErrorCategory;
   message: string;

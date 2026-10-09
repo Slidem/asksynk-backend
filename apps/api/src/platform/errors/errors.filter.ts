@@ -6,12 +6,14 @@ import {
 } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { resolveDomainError } from "@/api/errors/resolve-domain-error";
 import { DomainError } from "@/api/kernel/errors/domain-errors";
+import { DomainErrorsTranslator } from "@/api/platform/errors/errors.translator";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new ContextLogger(AllExceptionsFilter.name);
+
+  constructor(private readonly translator: DomainErrorsTranslator) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -47,7 +49,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       category,
       statusCode,
       message: clientMessage,
-    } = resolveDomainError(exception);
+    } = this.translator.translate(exception);
 
     if (statusCode >= 500) {
       this.logger.error("DomainError occurred", {

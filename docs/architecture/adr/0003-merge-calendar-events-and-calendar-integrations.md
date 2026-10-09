@@ -22,7 +22,7 @@ NestJS modules. They are also the most tightly coupled pair in the codebase.
   | `calendar-integrations/services/calendar-sync.service.ts`          | `CalendarRepository`, `CalendarEventsRepository` |
   | `calendar-integrations/services/calendar-integration.service.ts`   | `CalendarRepository`, `CalendarEventsRepository` |
   | `calendar-integrations/services/calendar-outbound-sync.service.ts` | `CalendarRepository`, `CalendarEventsRepository` |
-  | `calendar-integrations/sync/calendar-sync.scheduler.ts`            | `CalendarRepository`                             |
+  | `calendar-integrations/sync/calendar-sync.job-handlers.ts`         | `CalendarRepository`                             |
 
 - The rest import each other's **entities** (`Calendar`, `CalendarEvent`) and
   **utilities** (`utcToIso`, `parseIsoWallClockInTimezone`).

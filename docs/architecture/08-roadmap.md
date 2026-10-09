@@ -13,25 +13,86 @@ very first step is one line of jest config.
 
 **~1 day. Risk: near zero. Do this even if nothing else in this plan ever happens.**
 
-| #    | Step                                                                                                                                                                                                                                      | Effort | Risk       |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- |
-| 0.1  | **Split the jest config so unit tests run** (§Guardrails below)                                                                                                                                                                           | 1h     | none       |
-| 0.2  | Delete the `CalendarEventsRepository` import in `auth.guard.ts:16`; use `new ContextLogger(AuthGuard.name)`                                                                                                                               | 5min   | none       |
-| 0.3  | Move `isIsoDateWithOffset` / `isValidIanaTimezone` → `kernel/time/iso.ts`; kills the `common → calendar-events` inversion **✅ done**                                                                                                     | 30min  | none       |
-| 0.3b | **Split `common/` + `infrastructure/` into `kernel/` + `platform/`** per [04 §1a](04-layering.md). Includes moving `kernel/time/decorators.ts` → `platform/validation/`, splitting `AsksynkError`, deleting the `logger.config.ts` barrel | 2h     | low        |
-| 0.3c | Rewrite the 26 IDE-generated `"@/api/kernel/...` imports to `@/api/kernel/...`, and add the `no-restricted-imports` rule for `src/*` so it cannot recur                                                                                   | 30min  | none       |
-| 0.3d | **Dissolve `packages/shared` into `platform/` + `kernel/id.ts`** per [04 §1b](04-layering.md). 80 imports, 5 config files. Leave `events.registry.ts` in place for now — it splits per context in Wave 8.1                                | 3h     | low        |
-| 0.4  | `tags.name` → `uniqueIndex(userId, lower(name))` — **the migration must dedupe existing rows first**                                                                                                                                      | 30min  | **medium** |
-| 0.5  | Delete the orphan `tag.created` event and the handler-less `email` group **✅ done** (events refactor)                                                                                                                                    | 15min  | none       |
-| 0.6a | Outbox: partial index on `id` where `dispatched_at` / `failed_at` are null (the drain orders by `id`) **✅ done** (`0008`)                                                                                                                                     | 15min  | low        |
-| 0.6b | Outbox: retention job deleting realtime-only rows older than 30 days — a `@CronJob` **✅ done** (`events.retention`; also prunes dispatched/failed rows and resolved dead letters) ([ADR 0007](adr/0007-unified-typed-jobs.md))                                                                                                   | 45min  | low        |
-| 0.7  | Write the first `.spec.ts` files against code that is **already pure** — `recurrence.utils.ts`, `task-status.util.ts`, `oauth-state.util.ts`, `slug.util.ts`, all 20 entities                                                             | 3h     | none       |
+**Status (audited 2026-10-07 at `01de2f3`, 0.3e done 2026-10-08): 10 of 12 steps
+done.** Left: 0.3c (lint rule only), 0.7 (the tests). 0.4 has an optional remainder.
 
-**Verification:** `pnpm --filter @asksynk/api test` runs unit tests **with no
-Postgres**, in milliseconds. The existing integration suite still passes.
+| #    | Step                                                                                                                                                                                                                                      | Status                                                                                                                                                                                                                                                                                                                                                                         |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0.1  | **Split the jest config so unit tests run** (§Guardrails below)                                                                                                                                                                           | ✅ `unit` + `integration` jest projects. Unit tests are **`*.unit.test.ts`**, not `*.spec.ts`; run with `pnpm test:unit`. 6 exist (jobs ×4, durable consumer runtime, admin-api-key guard)                                                                                                                                                                                   |
+| 0.2  | Delete the `CalendarEventsRepository` import in `auth.guard.ts:16`; use `new ContextLogger(AuthGuard.name)`                                                                                                                               | ✅                                                                                                                                                                                                                                                                                                                                                                              |
+| 0.3  | Move `isIsoDateWithOffset` / `isValidIanaTimezone` → `kernel/time/iso.ts`; kills the `common → calendar-events` inversion                                                                                                                | ✅                                                                                                                                                                                                                                                                                                                                                                              |
+| 0.3b | **Split `common/` + `infrastructure/` into `kernel/` + `platform/`** per [04 §1a](04-layering.md). Includes moving the DTO decorators to `platform/`, splitting `AsksynkError`, deleting the `logger.config.ts` barrel                     | ✅ with deviations: decorators → `platform/decorators/{field,param}Validators.decorators.ts`; `AsksynkError` → `DomainError` + per-context **error catalogs** ([04 §7](04-layering.md#7-errors)). Its one leak is 0.3e                                                                                                                                                      |
+| 0.3c | Rewrite the 26 IDE-generated `src/kernel/...` imports to `@/api/kernel/...`, and add the `no-restricted-imports` rule for `src/*` so it cannot recur                                                                                      | 🟡 imports done — 0 `src/` and 0 relative imports left (`pnpm fix-imports`, `scripts/src/fix-import-aliases.ts`). **The lint rule was not added**                                                                                                                                                                                                                           |
+| 0.3d | **Dissolve `packages/shared` into `platform/` + `kernel/id.ts`** per [04 §1b](04-layering.md). 80 imports, 5 config files. Leave `events.registry.ts` in place for now — it splits per context in Wave 8.1                                | ✅ Leftovers (cosmetic): the `packages/*` glob in `pnpm-workspace.yaml`; comments in `events.registry.ts` still justifying zod copies with "shared must not depend on apps/api"                                                                                                                                                                                              |
+| 0.3e | **New.** Stop `platform/` depending on every context through the error registry (below)                                                                                                                                                  | ✅ `platform/` takes the catalogs via `ErrorsModule.forRoot(ERROR_CATALOGUES)`; `DomainErrorsTranslator` replaces `buildErrorRegistry` + `resolveDomainError`; `errors/` folder gone                                                                                                                                                                                         |
+| 0.4  | `tags.name` → `uniqueIndex(userId, lower(name))` — **the migration must dedupe existing rows first**                                                                                                                                      | ✅ the bug: `uq_tags_user_name (user_id, name)`, migration `0003`. **Not done:** case-insensitivity (`lower(name)`) — that part does need the dedupe. Optional                                                                                                                                                                                                              |
+| 0.5  | Delete the orphan `tag.created` event and the handler-less `email` group                                                                                                                                                                 | ✅ (events refactor)                                                                                                                                                                                                                                                                                                                                                            |
+| 0.6a | Outbox: partial index on `id` where `dispatched_at` / `failed_at` are null (the drain orders by `id`)                                                                                                                                    | ✅ `idx_events_outbox_pending`, migration `0008`                                                                                                                                                                                                                                                                                                                               |
+| 0.6b | Outbox: retention job deleting realtime-only rows older than 30 days — a `@CronJob`                                                                                                                                                       | ✅ `events.retention` (also prunes dispatched/failed rows and resolved dead letters) ([ADR 0007](adr/0007-unified-typed-jobs.md))                                                                                                                                                                                                                                              |
+| 0.7  | Write the first unit tests against code that is **already pure** — scope defined in [§0.7 below](#07--what-already-pure-means-and-what-all-20-entities-meant)                                                                         | ⬜ 3h, none                                                                                                                                                                                                                                                                                                                                                                     |
+
+**Verification:** `pnpm test:unit` runs unit tests **with no Postgres**, in
+milliseconds. `pnpm test:integration` still passes.
 
 > 0.1 is the unlock. Every step after this can be defended by a test that runs in
 > 200 ms. 0.7 buys real coverage over ~700 lines for zero refactoring.
+
+### 0.3e — the error registry leak (done)
+
+> Full write-up, file by file: [docs/errors/01-error-registry-inversion.md](../errors/01-error-registry-inversion.md).
+
+**Was:** `platform/errors/errors.filter.ts` imported `@/api/errors/resolve-domain-error`,
+which imported `errors/error-registry.root.ts`, which imports **every context's
+`*.errors.ts`**. So `platform/` depended on all contexts, which is exactly what the
+`platform-imports-no-context` rule forbids.
+
+**Now:** platform _receives_ the catalogs instead of importing them.
+
+| File                                                  | Change                                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `kernel/errors/error-registry.ts`, `errors/resolve-domain-error.ts` | deleted; folded into `platform/errors/errors.translator.ts` (`DomainErrorsTranslator`: builds the map, throws on duplicates, `translate()`) |
+| `errors/error-registry.root.ts`                      | → `src/error-catalogs.root.ts`: `ERROR_CATALOGUES: ErrorCatalog[]`, beside `app.module.ts`                                             |
+| `platform/errors/errors.module.ts` (new)             | `@Global` `ErrorsModule.forRoot(catalogs)`: provides the translator and registers `APP_FILTER`                                          |
+| `platform/errors/errors.filter.ts`, `ws.gateway.ts`   | inject `DomainErrorsTranslator`                                                                                                         |
+
+Verification: `grep -rn '@/api/' apps/api/src/platform/ | grep -vE '@/api/(kernel|platform)/'`
+→ empty.
+
+### 0.7 — what "already pure" means, and what "all 20 entities" meant
+
+"All 20 entities" was 01 §4.3's count of `*.entity.ts` classes. Read literally it means
+a test per one-line getter. They split three ways:
+
+| Group                     | Entities                                                                                                                                  | Test now?                                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **No behaviour** (5)      | `NetworkConnection`, `PublicViewGuest`, `UserTimerSettings`, `UserProfile`, `UserSettings`                                                | **No.** Only `static create`. On the "leave alone" list — they stay typed records                                     |
+| **Field comparisons** (11) | `AttentionItem`, `CalendarEvent`, `Calendar`, `CalendarEventLink`, `Message`, `Thread`, `Attachment`, `Tag`, `Task`, `TaskBatch`, `TaskSuggestion` | **No.** Every method is a one-line `===` / `!== null` (`belongsTo`, `isDeleted`, `isPending`, …). Five of them (`Task`, `TaskBatch`, `TaskSuggestion`, `AttentionItem`, `CalendarEvent`) become rich aggregates in Wave 5, and their specs get written then, against the real transitions |
+| **Has a rule** (4)        | `UserTimer`, `CalendarIntegration`, `PublicView`, `Invite`                                                                                | **Yes**                                                                                                               |
+
+So **0.7 means: every pure function, plus the 4 entities that encode a rule.** Concretely:
+
+| Target                                                        | What to pin down                                                                                                                                     |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `calendar-events/utils/recurrence.utils.ts` (215 LOC)         | `parseIsoWallClockInTimezone` / `utcToIso` across DST; `validateAndNormalizeRrule` rejects bad input; `replaceRruleUntil`. **Highest value** — it is the safety net for 1.5 |
+| `tasks/task-status.util.ts`                                   | both mappings, incl. empty batch → `created`. Safety net for 1.3                                                                                      |
+| `calendar-integrations/utils/oauth-state.util.ts`             | sign → verify round-trip; tampered payload, tampered sig, wrong secret, malformed token → `null`                                                     |
+| `public-views/utils/slug.util.ts`                             | length + alphabet only                                                                                                                               |
+| `timers/entities/user-timer.entity.ts`                        | `completesAt` / `remainingSeconds` / `isDue` for running, paused, idle; clamp at 0                                                                   |
+| `calendar-integrations/entities/calendar-integration.entity.ts` | `accessTokenExpired`: no expiry ⇒ expired; 60 s refresh skew boundary                                                                              |
+| `public-views/entities/public-view.entity.ts`                 | `isLive`: revoked, expired, live                                                                                                                     |
+| `networks/entities/invite.entity.ts`                          | `isForEmail` is case-insensitive                                                                                                                     |
+| `kernel/time/iso.ts`                                          | offset required; invalid calendar date; IANA zone                                                                                                    |
+| `kernel/id.ts`                                                | `isValidId` — **expect this one red**: `UUID.parse` throws on malformed input, so `@UuidV7Param` / `@IsUuidV7` answer 500, not 400, and any UUID version passes |
+| `kernel/errors/error-catalog.ts`                              | `{ param }` interpolation; code is `namespace.key`                                                                                                   |
+| `platform/errors/errors.translator.ts`                        | ✅ `test/platform/errors.translator.unit.test.ts`: category → status; fails closed on an unknown code; message only when `exposable`; duplicate namespace throws |
+| `platform/http/bearer-token.ts`                               | scheme case, missing token, array header                                                                                                             |
+
+**Dropped from the original list:** `AsksynkError` (gone) and the due-date policy
+(does not exist until 1.2).
+
+**Placement:** follow the six existing unit tests — `apps/api/test/<module>/<file>.unit.test.ts`.
+Tests target the public function, so when 1.3 / 1.5 move the code only the import
+changes.
 
 ---
 
@@ -42,10 +103,10 @@ Postgres**, in milliseconds. The existing integration suite still passes.
 | #   | Step                                                                                                                               | Effort | Risk       |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- |
 | 1.1 | `kernel/actor.ts` — the `Actor` value object. `@RequestActor()` and `ws-auth.service` both produce it                              | 3h     | low        |
-| 1.2 | `attention/domain/due-date.policy.ts` — `decideDueDate()` + **`due-date.policy.spec.ts`** (5 cases)                                | 2h     | none       |
-| 1.3 | `task-status.util.ts` → `tasks/domain/task-batch.ts` (`TaskBatch.statusFrom`) + spec. Tasks stops importing attention's vocabulary | 1h     | none       |
-| 1.4 | `focus/domain/timer.ts` — the five-state machine; move every guard out of `timers.service.ts:163-274`; **~12 spec cases**          | 4h     | **medium** |
-| 1.5 | `recurrence.utils.ts` → `scheduling/domain/recurrence.ts` + spec; `RecurrenceRule` VO validates in its constructor                 | 2h     | low        |
+| 1.2 | `attention/domain/due-date.policy.ts` — `decideDueDate()` + **`due-date.policy.unit.test.ts`** (5 cases)                            | 2h     | none       |
+| 1.3 | `task-status.util.ts` → `tasks/domain/task-batch.ts` (`TaskBatch.statusFrom`) + test. Tasks stops importing attention's vocabulary | 1h     | none       |
+| 1.4 | `focus/domain/timer.ts` — the five-state machine; move every guard out of `timers.service.ts:168-280`; **~12 test cases**          | 4h     | **medium** |
+| 1.5 | `recurrence.utils.ts` → `scheduling/domain/recurrence.ts` + test; `RecurrenceRule` VO validates in its constructor                 | 2h     | low        |
 
 **Verification:** the existing `timers.integration.test.ts` and
 `calendar-events.integration.test.ts` stay green throughout — they are the safety net
@@ -77,13 +138,13 @@ offender.
 grep -rn "TagRepository" apps/api/src | grep -v "^apps/api/src/tagging/"   # must be empty
 ```
 
-That single step closes 6 of the cross-context edges and the 4× duplicate provider.
+That single step closes 6 of the cross-context edges and the 3× duplicate provider.
 
 **Verification after 2.2:** both calendar integration tests green; the 15-import edge
 is gone.
 
 **2.6 needs a test first** — guest sign-in has **no test at all** today. Write
-`guest-session.spec.ts` before touching it.
+`guest-session.unit.test.ts` before touching it.
 
 ---
 
@@ -186,71 +247,51 @@ integration suite. Then the same against a restored copy of production data.
 
 | #   | Step                                                                                                                                                       |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 8.1 | Split `events.registry.ts` (347 LOC) into per-context `contract/<ctx>.events.ts`. `defineEvent` and the registry types stay in `platform/events/registry/` |
+| 8.1 | Split `platform/events/registry/events.registry.ts` (319 LOC, 20 events) into per-context `contract/<ctx>.events.ts`. `defineEvent` and the registry types stay in `platform/events/registry/`. Error catalogs already live per context — the same shape |
 | 8.2 | `attachments.placement` → `visibility` + `owner_context`                                                                                                   |
 | 8.3 | Merge `user-profile` + `user-settings` → `identity`                                                                                                        |
-| 8.4 | Fix `CLAUDE.md`'s stale `apps/background-worker` reference; add the architecture rules (below)                                                             |
-| 8.5 | Replace the 11 Nest HTTP exceptions in `attachments.service.ts` with domain errors                                                                         |
-| 8.6 | Dead-letter replay: **✅ done** (admin API key, not a role — see [docs/events 01 §Replay](../events/01-ordering-design.md#replay)) `PATCH /event-dead-letters/:id { status }`, re-enqueue with a fresh job id. Needs an authorization model first — see [docs/events](../events/03-implementation-plan.md) |
+| 8.4 | Add the architecture rules (below) to `CLAUDE.md`. (The stale `apps/background-worker` reference is ✅ already gone)                                      |
+| 8.5 | Replace the 11 Nest HTTP exceptions in `attachments.service.ts` with domain errors — needs a `storage` catalog (it has none), registered in `src/error-catalogs.root.ts` |
+| 8.6 | Dead-letter replay: **✅ done** (admin API key, not a role — see [docs/events 01 §Replay](../events/01-ordering-design.md#replay)) `GET` + `PATCH /admin/events/dead-letters[/:id]`, re-enqueue with a fresh job id. Design in [docs/events](../events/03-implementation-plan.md) |
 
 ---
 
 ## Guardrails
 
-### Jest — the Wave 0.1 change
+### Jest — the Wave 0.1 change ✅ (as built)
 
 ```ts
-// apps/api/jest.config.ts
-const moduleNameMapper = {
-  "^@/api/(.*)$": "<rootDir>/src/$1",
-  "^@/migrations/(.*)$": "<rootDir>/../migrations/src/$1",
-  // drop this line once step 0.3d dissolves packages/shared
-  "^@/shared/(.*)$": "<rootDir>/../../packages/shared/src/$1",
-  "^@/test/(.*)$": "<rootDir>/test/$1",
-};
-const transform = {
-  /* …unchanged ts-jest block… */
-};
-const transformIgnorePatterns = [
-  "/node_modules/(?!.*(?:pg-boss|serialize-error|non-error|@smithy))",
-];
-
+// apps/api/jest.config.ts — abridged
 const config: Config = {
+  forceExit: true,
+  testTimeout: 30000,
   projects: [
     {
       displayName: "unit",
-      preset: "ts-jest",
-      testEnvironment: "node",
-      testMatch: ["<rootDir>/src/**/*.spec.ts"], // no globalSetup → no Postgres
-      moduleNameMapper,
-      transform,
-      transformIgnorePatterns,
+      testMatch: ["**/*.unit.test.ts"], // no globalSetup → no Postgres
+      moduleNameMapper, transform, transformIgnorePatterns, preset: "ts-jest", testEnvironment: "node",
     },
     {
       displayName: "integration",
-      preset: "ts-jest",
-      testEnvironment: "node",
-      testMatch: ["<rootDir>/test/**/*.integration.test.ts"],
-      globalSetup: "<rootDir>/test/helpers/globalSetup.ts",
-      testTimeout: 30000,
-      moduleNameMapper,
-      transform,
-      transformIgnorePatterns,
+      testMatch: ["**/*.integration.test.ts"],
+      globalSetup: "<rootDir>/test/helpers/globalSetup.ts", // drizzle-kit migrate + truncate
+      moduleNameMapper, transform, transformIgnorePatterns, preset: "ts-jest", testEnvironment: "node",
     },
   ],
-  forceExit: true,
 };
-export default config;
 ```
 
 ```jsonc
 // apps/api/package.json
-"test":             "jest --selectProjects unit",
-"test:integration": "jest --selectProjects integration"
+"test:unit":        "jest --config jest.config.ts --selectProjects unit --passWithNoTests",
+"test:integration": "jest --config jest.config.ts --selectProjects integration --runInBand",
+"test:all":         "jest --config jest.config.ts"
+// root: pnpm test:unit / pnpm test:integration (+ test:integration:{up,down,reset})
 ```
 
-**Convention:** unit tests live next to the code (`src/**/*.spec.ts`); integration
-tests stay in `test/`.
+**Convention:** `*.unit.test.ts` and `*.integration.test.ts`, both under
+`apps/api/test/<module>/`. (The original plan said `src/**/*.spec.ts` next to the code;
+the suffix-based `testMatch` would still pick that up if co-location is wanted later.)
 
 ### dependency-cruiser — the cross-boundary rules
 
@@ -263,7 +304,7 @@ module.exports = {
   options: {
     tsConfig: { fileName: "apps/api/tsconfig.json" },
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "\\.(spec|integration\\.test)\\.ts$" },
+    exclude: { path: "\\.(unit|integration)\\.test\\.ts$" },
   },
   forbidden: [
     {
@@ -271,6 +312,8 @@ module.exports = {
       comment:
         "Contexts talk through contract/. Never application/, infrastructure/, domain/.",
       severity: "error",
+      // Root-level files (app.module.ts, error-catalogs.root.ts) are composition roots
+      // and don't match `from`, so they may import every context.
       from: { path: "^apps/api/src/([^/]+)/" },
       to: {
         path: "^apps/api/src/(?!kernel/|platform/)([^/]+)/(?!contract/)",
@@ -305,7 +348,7 @@ module.exports = {
       comment:
         "kernel/ imports nothing — not a context, not platform/, no framework.",
       severity: "error",
-      from: { path: "^apps/api/"@/api/kernel/" },
+      from: { path: "^apps/api/src/kernel/" },
       to: { path: "^apps/api/src/(?!kernel/)" },
     },
     {
@@ -313,7 +356,7 @@ module.exports = {
       comment:
         "kernel/ is the only shared code domain/ may import, so it must stay pure.",
       severity: "error",
-      from: { path: "^apps/api/"@/api/kernel/" },
+      from: { path: "^apps/api/src/kernel/" },
       to: {
         path: "^(node_modules/)?(@nestjs|drizzle-orm|class-validator|class-transformer|zod|socket\\.io|pg-boss|@nestjs-cls)",
       },
@@ -394,10 +437,12 @@ config:
 }
 ```
 
-The `src/*` rule catches the four existing non-aliased imports —
-`messaging.service.ts:3`, `ws.gateway.ts:13`, `messaging.mapper.ts:1` — which are, not
-coincidentally, exactly the places where boundaries were crossed. **Import style has
-been a reliable smell detector in this codebase.**
+The `src/*` rule is now preventive: the four non-aliased imports it was written for
+(`messaging.service.ts`, `ws.gateway.ts`, `messaging.mapper.ts`) were rewritten by
+`pnpm fix-imports` in step 0.3c, and 0 remain. They were, not coincidentally, exactly
+the places where boundaries were crossed. **Import style has been a reliable smell
+detector in this codebase** — which is why the rule is worth adding even with nothing
+left to catch.
 
 ### CLAUDE.md additions
 
@@ -407,13 +452,15 @@ been a reliable smell detector in this codebase.**
 - Bounded contexts live at `apps/api/src/<context>/`.
   Layers: `contract / domain / application / infrastructure / presentation`.
 - Two shared tiers, neither a context:
-  - **`kernel/`** — pure domain vocabulary (`Actor`, `generateId`, `DomainError`, time
-    predicates). **Imports nothing, including frameworks.** The only shared code
+  - **`kernel/`** — pure domain vocabulary (`Actor`, `generateId`, `DomainError` +
+    `defineCatalog`, time predicates). **No framework imports, no context, no
+    `platform/`** — plain libraries (`uuidv7`, `lodash`) only. The only shared code
     `domain/` may import. A file earns a place here only if it passes both tests: it is
     pure **and** `domain/` actually references it.
   - **`platform/`** — framework-aware shared infra (db, tx, exception filter, DTO
     validation decorators, `Clock`/`SystemClock`, `RealtimeBroadcaster`, the outbox
-    publisher/dispatcher/consumer, pg-boss, email, bootstrap config).
+    publisher/dispatcher/consumer + dead letters, the typed jobs API, email, bootstrap
+    config).
     **`domain/` may never import it.**
 - **Infrastructure ports live beside their adapters in `platform/`**, not in `kernel/`.
   Only _repository_ ports split by layer, and that split is within a context
@@ -437,13 +484,17 @@ Never a repository, never `application/`, never `domain/`, never `infrastructure
 - A context owns tables under `apps/migrations/src/schema/<context>/` and may import
   only those (plus `identity/`).
 - Application services take `Actor` (`@/api/kernel/actor`), never a bare `userId: string`.
+- Errors: throw `DomainError`s from your own context's `<ctx>.errors.ts` catalog
+  (`defineCatalog`), never a Nest `HttpException`. Register a new catalog in
+  `src/error-catalogs.root.ts`; HTTP status comes from the catalog's category.
 - Run `pnpm lint:boundaries` before opening a PR.
 
 ## Testing
 
-- Unit: `src/**/*.spec.ts`, no Postgres — `pnpm --filter @asksynk/api test`.
-- Integration: `test/**/*.integration.test.ts` — needs the localdev stack.
-- New domain logic ships with a `.spec.ts`. New cross-context wiring ships with a
+- Unit: `test/<module>/*.unit.test.ts`, no Postgres — `pnpm test:unit`.
+- Integration: `test/<module>/*.integration.test.ts` — needs the test stack
+  (`pnpm test:integration:up`), then `pnpm test:integration`.
+- New domain logic ships with a unit test. New cross-context wiring ships with a
   fake-port unit test.
 ```
 
@@ -470,10 +521,10 @@ Worth stating so these do not get "improved" by accident:
 
 ## If you only do three things
 
-1. **Wave 0.1 + 0.7** — jest config plus specs for already-pure code. Half a day,
-   700 lines covered, zero refactoring.
+1. **Wave 0.1 + 0.7** — jest config (✅ done) plus unit tests for already-pure code
+   (left). Half a day, ~700 lines covered, zero refactoring.
 2. **Wave 2.1** — the `tagging` contract. Four hours, closes 6 cross-context edges and
-   removes 3 duplicate provider instances.
+   removes the 2 duplicate provider instances.
 3. **Wave 2.2** — the `scheduling` merge. One day, mostly file moves, removes the
    heaviest coupling edge in the codebase.
 

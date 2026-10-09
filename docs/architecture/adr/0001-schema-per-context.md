@@ -8,7 +8,7 @@
 
 ## Context
 
-All 33 tables live in `public`. Nine foreign keys cross module boundaries, and two
+All 34 tables live in `public`. Ten foreign keys cross module boundaries, and two
 modules issue queries against tables they do not own — one of them raw SQL naming
 three foreign tables plus a Postgres extension function.
 
@@ -104,7 +104,7 @@ That is a legitimate exit, not a failure.
   concentrated in `attention-items.repository.ts` (8),
   `calendar-events.repository.ts` (7), `messaging.repository.ts` (4). This is the
   main risk and the reason the step is sequenced last.
-- **Nine foreign keys are dropped**, so the database no longer prevents orphaned
+- **Nine foreign keys are dropped** (of the ten; `calendars.integration_id` stays inside `scheduling`), so the database no longer prevents orphaned
   `message_tags` or a `messages.suggestion_id` pointing at a deleted suggestion.
   Mitigated by: existing event-driven cleanup (`tag.deleted` already fans out), the
   proven precedent of `attention_item_tags` living without an FK by design, and a new
