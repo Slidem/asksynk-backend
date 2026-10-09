@@ -9,12 +9,12 @@ import * as path from "path";
 import request from "supertest";
 
 import { ADMIN_API_KEY_HEADER } from "@/api/auth/admin-api-key.guard";
+import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
 import { generateId } from "@/api/kernel/id";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
 import { ErrorsModule } from "@/api/platform/errors/errors.module";
-import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import { TaskDeleted } from "@/api/platform/events/registry/events.registry";
 import {

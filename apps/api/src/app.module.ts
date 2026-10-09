@@ -28,6 +28,7 @@ import { WebsocketsModule } from "@/api/websockets/ws.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ErrorsModule.forRoot(ERROR_CATALOGUES),
     LoggerConfigModule,
     ClockModule,
     DbModule,
@@ -47,7 +48,6 @@ import { WebsocketsModule } from "@/api/websockets/ws.module";
     TimersModule,
     UserProfileModule,
     UserSettingsModule,
-    ErrorsModule.forRoot(ERROR_CATALOGUES),
   ],
   controllers: [HealthController, AuthController],
 })

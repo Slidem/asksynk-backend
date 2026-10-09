@@ -10,11 +10,17 @@ export function parseIsoWallClockInTimezone(
   iso: string,
   timezone: string,
 ): Date {
-  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  const match = iso.match(
+    // Milliseconds: exactly 3 digits or none (rejects ".5", ".1234")
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{3})?(?![.\d])/,
+  );
   if (!match) {
     throw invalidValueError(`Invalid ISO 8601 date: ${iso}`);
   }
   const [, year, month, day, hour, minute, second] = match.map(Number);
+  const [, , , , , , , fractionalPart] = match;
+  const millisecond = fractionalPart ? Number(fractionalPart.substring(1)) : 0;
+
   return wallClockPartsToUtc({
     year,
     month,
@@ -22,6 +28,7 @@ export function parseIsoWallClockInTimezone(
     hour,
     minute,
     second,
+    millisecond,
     timezone,
   });
 }
@@ -33,6 +40,7 @@ function wallClockPartsToUtc({
   hour,
   minute,
   second,
+  millisecond,
   timezone,
 }: {
   year: number;
@@ -41,11 +49,12 @@ function wallClockPartsToUtc({
   hour: number;
   minute: number;
   second: number;
+  millisecond: number;
   timezone: string;
 }): Date {
   // Estimate UTC by treating digits as UTC, then correct using the actual offset.
   const estimatedUtc = new Date(
-    Date.UTC(year, month - 1, day, hour, minute, second),
+    Date.UTC(year, month - 1, day, hour, minute, second, millisecond),
   );
   const offsetMs = getUtcOffsetMs(estimatedUtc, timezone);
   const corrected = new Date(estimatedUtc.getTime() - offsetMs);
@@ -70,7 +79,8 @@ function getUtcOffsetMs(utc: Date, timezone: string): number {
 
 /**
  * Converts a true UTC Date + IANA timezone to an ISO 8601 string with offset,
- * e.g. "2026-03-15T10:00:00+02:00".
+ * e.g. "2026-03-15T10:00:00+02:00". Milliseconds are appended only when
+ * non-zero, e.g. "2026-03-15T10:00:00.250+02:00".
  */
 export function utcToIso(utc: Date, timezone: string): string {
   // Get local date parts in the given timezone
@@ -97,6 +107,10 @@ export function utcToIso(utc: Date, timezone: string): string {
       .find((p) => p.type === "timeZoneName")?.value ?? "";
   const offset = parseOffsetString(offsetPart);
 
+  // Offsets are whole minutes, so UTC milliseconds equal local milliseconds
+  const ms = utc.getUTCMilliseconds();
+  const fraction = ms ? `.${pad(ms, 3)}` : "";
+
   return (
     get("year") +
     "-" +
@@ -109,6 +123,7 @@ export function utcToIso(utc: Date, timezone: string): string {
     get("minute") +
     ":" +
     get("second") +
+    fraction +
     formatOffset(offset)
   );
 }
@@ -154,7 +169,9 @@ export function validateAndNormalizeRrule(
   }
 
   const untilMatch = rrule.match(/UNTIL=([^;]+)/i);
+
   let until: Date;
+
   if (!untilMatch) {
     const defaultUntil = new Date(start);
     defaultUntil.setUTCFullYear(defaultUntil.getUTCFullYear() + 1);
@@ -172,6 +189,7 @@ export function validateAndNormalizeRrule(
 
   const maxUntil = new Date(start);
   maxUntil.setUTCMonth(maxUntil.getUTCMonth() + maxMonths);
+
   if (until > maxUntil) {
     throw invalidValueError(
       `rrule UNTIL must be within ${maxMonths} months of start`,
