@@ -1,214 +1,105 @@
 # 01 — Current state
 
-Everything here was derived mechanically from the tree at commit `fcd9922`. Where a
-number appears, the command that produced it is reproducible.
+Audited at `5129fc8` (2026-10-10). Paths are relative to `apps/api/src/` unless noted.
 
-**This is the baseline snapshot** — the "before" the roadmap is measured against.
-Numbers in §1–§5 are left at `fcd9922` on purpose; findings that have since been fixed
-are marked inline. Three counts that were wrong even at `fcd9922` are corrected
-(TagRepository providers, cross-module FKs, events).
+## 1. Shape
 
-## 0. Status at `01de2f3` (2026-10-07)
+pnpm workspace: `apps/api` (the whole backend — HTTP, WebSockets, event consumers,
+jobs), `apps/migrations` (Drizzle schema + SQL), `scripts`. One process; no worker app.
 
-| Finding                                       | Status                                                                                                                                       |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| §1 `packages/shared`, `common/`, `infrastructure/` | ✅ dissolved into `kernel/` + `platform/` (roadmap 0.3b/0.3d)                                                                          |
-| §3 `AsksynkError`                             | ✅ replaced by `DomainError` + per-context catalogs ([04 §7](04-layering.md#7-errors))                                                   |
-| §4.1 cross-module repo imports, missing contracts | ⬜ unchanged — still 16 imports / 13 files / 7 edges; 19 service imports                                                               |
-| §4.2 cross-module FKs, foreign-table queries | ⬜ unchanged — 10 FKs                                                                                                                       |
-| §4.3 anemic model                             | ⬜ unchanged — 20 entities, predicates only                                                                                                 |
-| §4.4 no ports                                 | ⬜ unchanged for repositories (21 + 2 new platform ones). Infra ports: 6 abstract classes now                                              |
-| §4.5 unit tests cannot run                    | ✅ jest split; 6 `*.unit.test.ts`. The ~700 pure lines are **still untested** (roadmap 0.7)                                               |
-| §4.6 central event registry                   | ⬜ moved to `platform/events/registry/`, still central (319 LOC, 20 events)                                                                |
-| §4.7 `attention_items` shape                  | ⬜ unchanged (Wave 6)                                                                                                                       |
-| §4.8 inverted deps                            | ✅ `common → calendar-events` and `auth.guard` logger fixed. ⬜ `auth → public-views` and `messaging → WsIdentity` remain                   |
-| §4.9 smaller defects                          | ✅ per-user tag uniqueness, outbox index + retention, `src/` imports. ⬜ the rest                                                          |
-| **New since `fcd9922`**                       | ~~`platform/` imports every context via `errors/`~~ (fixed, roadmap 0.3e); `isValidId` throws on malformed ids → 500 (roadmap 0.7)                    |
+`apps/api/src`: ~20.7k LOC. `apps/api/test`: ~5k LOC.
 
-Size today: `apps/api/src` is 321 files / 20,673 LOC; `platform/` (3,723) is the largest
-directory. Tests: 6 unit + 9 integration files.
+| Module                  |   LOC | Notes                                         |
+| ----------------------- | ----: | --------------------------------------------- |
+| `platform/`             | 3,833 | shared framework-aware infra (tier, not a context) |
+| `tasks`                 | 2,301 |                                               |
+| `calendar-integrations` | 2,153 | merges into `scheduling` (ADR 0003)           |
+| `messaging`             | 2,106 | no direct tests                               |
+| `calendar-events`       | 2,094 | merges into `scheduling`                      |
+| `attention-items`       | 1,758 | the core domain                               |
+| `timers`                | 1,142 |                                               |
+| `storage`               |   867 |                                               |
+| `public-views`          |   827 |                                               |
+| `networks`              |   779 |                                               |
+| `tags`                  |   726 |                                               |
+| `auth`                  |   619 |                                               |
+| `websockets`            |   554 | `ws.gateway.ts` 459 LOC                       |
+| `user-profile`          |   285 |                                               |
+| `events`                |   262 | dead-letter admin REST only                   |
+| `user-settings`         |   192 |                                               |
+| `kernel/`               |   115 | pure shared tier                              |
 
----
-
-## 1. Shape of the repo
-
-pnpm workspace, no Turbo/Nx — orchestration is plain `pnpm -r`.
-
-| Workspace         | Purpose                                                                            |
-| ----------------- | ---------------------------------------------------------------------------------- |
-| `apps/api`        | The entire backend: HTTP, WebSockets, event consumers, schedulers, pg-boss workers |
-| `apps/migrations` | Drizzle schema + generated SQL                                                     |
-| `packages/shared` | Event bus, event registry, email, pg-boss wrapper, scheduled jobs                  |
-| `scripts`         | Two standalone `tsx` scripts                                                       |
-
-> **`apps/background-worker` does not exist.** `CLAUDE.md` still references
-> `apps/background-worker/.env.example`. All background work runs inside `apps/api`.
-> Worth fixing in `CLAUDE.md`. _✅ Fixed._
-
-The three workspaces are **one TypeScript program**, not built artifacts —
-`apps/api/tsconfig.json` `include`s `../migrations/src/**` and
-`../../packages/shared/src/**`. There is no compile-time boundary between them.
-
-> **`packages/shared` is a package in name only.** It has no `src/index.ts`; its
-> declared `main: "dist/index.js"` is never imported — all 76 consumer imports go
-> through the `@/shared/*` path alias directly into `src/`. `apps/api/package.json`
-> already declares **12 of its 15 dependencies**; only `nodemailer`, `pg-boss` and
-> `zod` are unique to it. There is one application consuming it. It is 2,180 lines of
-> framework infrastructure behind a workspace boundary that costs configuration and
-> buys nothing — see [04-layering.md §1b](04-layering.md).
->
-> To its credit, it imports **zero** from `apps/api`, so the dependency direction is
-> clean. That is the one property worth preserving when it dissolves.
-
-```
-"@/api/*"        -> apps/api/src/*
-"@/migrations/*" -> apps/migrations/src/*
-"@/shared/*"     -> packages/shared/src/*
-```
+Module folder shapes are inconsistent (`entities/ models/ repositories/ services/ rest/`
+in some, services at the root in `attention-items`, flat in `timers`). Nothing is
+layered as `domain / application / infrastructure` yet.
 
 ---
 
-## 2. Size
+## 2. What is solid — keep it
 
-`apps/api/src`: **239 files, 16,745 lines**, 19 top-level directories.
-
-| Module                            | Files |   LOC | Share |
-| --------------------------------- | ----: | ----: | ----: |
-| `tasks`                           |    27 | 2,249 | 13.4% |
-| `calendar-integrations`           |    23 | 2,135 | 12.8% |
-| `calendar-events`                 |    27 | 2,076 | 12.4% |
-| `messaging`                       |    17 | 2,024 | 12.1% |
-| `attention-items`                 |    14 | 1,699 | 10.1% |
-| `timers`                          |    17 | 1,147 |  6.8% |
-| `storage`                         |    14 |   877 |  5.2% |
-| `public-views`                    |    16 |   811 |  4.8% |
-| `networks`                        |    13 |   749 |  4.5% |
-| `tags`                            |    14 |   722 |  4.3% |
-| `auth`                            |    15 |   571 |  3.4% |
-| `websockets`                      |     5 |   555 |  3.3% |
-| `common`                          |    12 |   409 |  2.4% |
-| `user-profile`                    |     9 |   277 |  1.7% |
-| `user-settings`                   |     9 |   201 |  1.2% |
-| `infrastructure`                  |     3 |   121 |  0.7% |
-| root (`main.ts`, `app.module.ts`) |     2 |    80 |  0.5% |
-| `events`                          |     1 |    26 |  0.2% |
-| `health`                          |     1 |    16 |  0.1% |
-
-Plus `packages/shared/src` 2,180 LOC, `apps/migrations` 1,269 LOC, `apps/api/test`
-3,044 LOC.
-
-_(Line counts are physical lines including blanks and comments. Figures elsewhere in
-these docs use the same measure, so they sum consistently.)_
-
-Note the top five — `tasks`, the two calendar modules, `messaging`,
-`attention-items` — are **61% of the codebase**. They are also where every
-significant coupling problem lives.
+- **Controllers are clean.** None touches Drizzle or a repository; every response goes
+  through a mapper; no DTO leaks `$inferSelect`.
+- **Services never hit the DB directly.** Persistence goes through repositories.
+- **Transactions are uniform.** `TransactionHost` + re-entrant `@Transactional()`
+  everywhere. The only raw `db.transaction()` is the outbox dispatcher (by design).
+- **`kernel/` + `platform/` tiers.** `kernel/` (5 files: `id.ts`, `time/iso.ts`,
+  `errors/*`) imports no framework and nothing outside itself. `platform/` imports no
+  context. `common/`, `infrastructure/` and `packages/shared` are gone. 0 `src/…` or
+  relative imports. → [ADR 0005](adr/0005-kernel-and-platform-tiers.md)
+- **Typed domain errors.** `DomainError` + 12 per-context catalogs; HTTP status
+  decided in `platform/errors`. → [platform/errors](../platform/errors.md)
+- **Events.** Transactional outbox, durable + realtime legs, one `key_strict_fifo`
+  queue per consumer group, consumer groups owned by their context, dead letters +
+  admin replay, retention. → [platform/events](../platform/events.md)
+- **Jobs.** One typed API (`defineJob`, `@JobHandler`, `@CronJob`, `JobScheduler`),
+  caller-derived ids, no queue refs in domain tables. → [platform/jobs](../platform/jobs.md)
+- **WebSocket broadcasting is decoupled.** No service holds the gateway; it subscribes
+  to realtime events.
+- **One textbook seam:** `AttachmentAccessService.register(resolver)` — `messaging`
+  self-registers a resolver so `storage` never depends on it. The pattern to copy.
+- **Calendar sync design:** `calendar_event_links` with `origin: imported | mirrored`
+  echo-skip; `GoogleCalendarProvider` is already a proper anti-corruption layer.
+- **Message ↔ attention status sync**: bidirectional, loop-safe via three
+  idempotency guards. Move it, don't redesign it.
+- **Test harness.** Jest `unit` (`*.unit.test.ts`, no Postgres) + `integration`
+  projects. 10 unit files (jobs, events runtime, errors translator, recurrence utils,
+  task status, slug, admin guard), 9 integration files (attention, calendar events,
+  tasks↔attention, timers, storage, jobs, dead letters, retention).
 
 ---
 
-## 3. What is already right
+## 3. What is still wrong
 
-This section exists so the refactor does not undo working design.
+### 3.1 Modules have no contract, so callers reach into internals
 
-**Controllers are clean.** Across all 19 controllers: zero import Drizzle, zero
-import a repository, zero return a raw row. Every response goes through an explicit
-mapper (`to*Response`). Across 31 DTO files, zero leak `typeof table.$inferSelect`.
+**16 imports of another module's repository:**
 
-**Services do not touch the database.** No service imports `drizzle-orm` or a schema
-table. Persistence genuinely goes through repositories. `$inferSelect` types exist
-only as private module-level aliases inside repository files, never exported.
+| Edge                                        | Count | Where                                                                                       |
+| ------------------------------------------- | ----: | ------------------------------------------------------------------------------------------- |
+| `calendar-integrations` → `calendar-events` |     7 | `calendar-sync.service`, `calendar-integration.service`, `calendar-outbound-sync.service`, `sync/calendar-sync.job-handlers` |
+| `attention-items` → `tags`                  |     3 | `attention-due-date.service`, `attention-items.module`, `handlers/tag-calendar-attention.handler` |
+| `calendar-events` → `tags`                  |     2 | `calendar-events.module`, `services/calendar-events.service`                                |
+| `auth` → `public-views`                     |     1 | `guest-auth.service` (`PublicViewGuestsRepository`)                                         |
+| `messaging` → `public-views`                |     1 | `services/messaging.service` (`PublicViewsRepository`)                                      |
+| `messaging` → `storage`                     |     1 | `attachments/message-attachment.resolver`                                                   |
+| `user-profile` → `storage`                  |     1 | `services/user-profile.service`                                                             |
 
-**Transactions are uniform.** Every repository injects
-`TransactionHost<TxAdapter>` and reads `this.txHost.tx`, which resolves to the
-ambient CLS transaction or the pool. 94 `@Transactional()` annotations across 22
-files. Because it is re-entrant, nested service calls share one transaction. There is
-exactly **one** raw `db.transaction()` in the entire codebase — the outbox dispatcher,
-which needs `FOR UPDATE SKIP LOCKED` outside any request context.
+Why: modules export internals or nothing useful. `TagsModule` exports only
+`TagsService`, so **`TagRepository` is provided by 3 modules** (3 instances).
+`CalendarEventsModule`, `MessagingModule`, `PublicViewsModule` and the `@Global`
+`StorageModule` export repositories.
 
-**A real transactional outbox.** `events_outbox` + two `AFTER INSERT` triggers →
-`pg_notify`. Two delivery legs:
+Beyond repositories: 103 cross-module imports over 34 edges (46 of them are auth
+decorators/types in controllers — harmless). Heaviest: `messaging → storage` (12 incl.
+repo), `calendar-integrations → calendar-events` (15 incl. repos), `websockets →
+messaging` (5), `tasks → tags` (4, `TagsService`), `messaging → tasks` (3,
+`TaskSuggestionsService`), four modules → `NetworksService`.
+`calendar-events.controller` and `tags.controller` inject `NetworksService` to decide
+whose data the actor may read.
 
-- _durable_ — a dispatcher drains the outbox into pg-boss queues named
-  `${eventType}.${group}`;
-- _realtime_ — `LISTEN evt:<name>` carries only the row id (8 KB notify limit), and
-  the listener re-reads the payload.
+### 3.2 The database is the integration layer
 
-The publisher is `@Transactional()`, so the outbox insert joins the caller's
-transaction. This is the [transactional outbox pattern](https://microservices.io/patterns/data/transactional-outbox.html)
-implemented correctly, including the idempotency requirement it imposes on consumers.
-
-> **Since `fcd9922`** ([docs/events](../events/README.md),
-> [ADR 0006](adr/0006-group-ordered-event-delivery.md)): the machinery now lives
-> in `apps/api/src/platform/events/`. The durable leg drains into **one
-> `key_strict_fifo` queue per consumer group**, keyed per user (or message), not
-> `${eventType}.${group}`. Terminal failures are recorded in
-> `events_dead_letters` and the job completes.
-
-**WebSocket broadcasting is already a separate layer.** There are zero
-`server.emit` / `server.to` calls outside [`ws.gateway.ts`](../../apps/api/src/websockets/ws.gateway.ts).
-No domain service holds a reference to the gateway. Services only `publish()` to the
-outbox; the gateway subscribes via realtime `@EventHandler`s. Many codebases get this
-wrong; this one does not.
-
-**One textbook context seam already exists.**
-[`attachment-access.service.ts`](../../apps/api/src/storage/attachment-access.service.ts)
-exposes `register(resolver)`, and
-[`message-attachment.resolver.ts`](../../apps/api/src/messaging/attachments/message-attachment.resolver.ts)
-self-registers at `onModuleInit`. The result: `storage` never depends on `messaging`.
-**This is the pattern the rest of the refactor replicates.**
-
-**Ports already exist — just not in `apps/api`.** `packages/shared` declares
-`abstract class EventsPublisher` with `EventsPublisherImpl`, and
-`abstract class ScheduledJobService` with `PgBossScheduledJobService` (replaced
-by `JobScheduler` / `PgBossJobScheduler`, [ADR 0007](adr/0007-unified-typed-jobs.md)). The team
-knows the pattern; it simply was not applied to the 21 repositories.
-
-**Domain errors exist.** `AsksynkError` with an `ErrorType` enum plus a global
-`AllExceptionsFilter`. Usage: **107 `AsksynkError.*` calls vs 17 Nest HTTP
-exceptions** — and 11 of the 17 are in a single file.
-_Since replaced: `DomainError` + per-context catalogs, ~106 `xxxError("code")` calls;
-20 Nest exceptions, 11 still in `attachments.service.ts` ([04 §7](04-layering.md#7-errors))._
-
----
-
-## 4. What is wrong
-
-### 4.1 Modules have no contract, so callers reach into internals
-
-**16 cross-module imports of another module's repository, across 13 files, forming 7
-edges:**
-
-| Edge                                        | Count | Files                                                                                                                            |
-| ------------------------------------------- | ----: | -------------------------------------------------------------------------------------------------------------------------------- |
-| `calendar-integrations` → `calendar-events` |     7 | `calendar-sync.service.ts`, `calendar-integration.service.ts`, `calendar-outbound-sync.service.ts`, `calendar-sync.scheduler.ts`¹ |
-| `attention-items` → `tags`                  |     3 | `attention-due-date.service.ts`, `attention-items.module.ts`, `handlers/tag-calendar-attention.handler.ts`                       |
-| `calendar-events` → `tags`                  |     2 | `calendar-events.module.ts`, `services/calendar-events.service.ts`                                                               |
-| `auth` → `public-views`                     |     1 | `guest-auth.service.ts`                                                                                                          |
-| `messaging` → `public-views`                |     1 | `services/messaging.service.ts`                                                                                                  |
-| `messaging` → `storage`                     |     1 | `attachments/message-attachment.resolver.ts`                                                                                     |
-| `user-profile` → `storage`                  |     1 | `services/user-profile.service.ts`                                                                                               |
-
-¹ Now `sync/calendar-sync.job-handlers.ts` (unified jobs).
-
-Plus **19 cross-module service imports across 13 files** forming 13 edges — including
-two where a **controller** injects another module's service to make an authorization
-decision (`calendar-events.controller.ts` and `tags.controller.ts` both inject
-`NetworksService`).
-
-**Why this happens:** [`tags.module.ts`](../../apps/api/src/tags/tags.module.ts)
-exports only `TagsService`. So `TagRepository` is **provided by three modules** —
-`tags.module.ts`, `attention-items.module.ts`, `calendar-events.module.ts`. That is
-**three separate instances** (two of them duplicates) and no single write path to the
-`tags` table.
-
-This is the definition of a missing module contract. Grzybek:
-_"everything that we share outside becomes the public API of the module"_ — here
-nothing is deliberately shared, so consumers take what they need.
-
-### 4.2 The database is the real integration layer
-
-33 tables, 12 enums (now 34 / 13: `events_dead_letters`). **Ten foreign keys cross a
-module boundary:**
+**10 FKs cross a module boundary** (excluding `users`):
 
 | FK                                                       | Crosses                                 |
 | -------------------------------------------------------- | --------------------------------------- |
@@ -223,232 +114,120 @@ module boundary:**
 | `messages.suggestion_id` → `task_suggestions.id`         | messaging → tasks                       |
 | `message_attachments.attachment_id` → `attachments.id`   | messaging → storage                     |
 
-(Plus ~20 FKs to `users.id` across 15 schema files, which are a different matter — see
-[06-persistence.md](06-persistence.md).)
+Deliberately FK-less soft refs already exist and are the pattern to copy:
+`attention_item_tags.tag_id`, `attention_items.source_calendar_event_id`,
+`calendar_event_links.asksynk_event_id`.
 
-**Two modules query tables they do not own**, and one does it in raw SQL:
+**Queries on tables a module doesn't own:**
 
-- [`attention-items.repository.ts:370-411`](../../apps/api/src/attention-items/attention-items.repository.ts)
-  hardcodes `calendar_events`, `calendar_event_tags` and
-  `calendar_event_exceptions` in a `sql\`\``template, complete with a`CROSS JOIN LATERAL rrule.between(...)`extension call and a hardcoded 365-day
-window — duplicating recurrence expansion that already exists in`calendar-events/utils/recurrence.utils.ts`.
-- `public-view-guests.repository.ts` joins `messages` to compute a guest message
-  count.
-- `calendar.repository.ts` imports the `calendar_integrations` table.
+- `attention-items.repository.ts:355-423` (`findEarliestUpcomingOccurrenceForTags`) —
+  raw SQL CTE over `calendar_events`, `calendar_event_tags`,
+  `calendar_event_exceptions`, `CROSS JOIN LATERAL rrule.between(...)`, hardcoded
+  365-day window. Duplicates recurrence logic in `recurrence.utils.ts`.
+- `attention-items.repository.ts` joins `tags` 6× via the query builder.
+- `messaging.repository.ts:446-497` — raw SQL joining `users`, `public_view_guests`,
+  `public_views`, `user_network`.
+- `public-view-guests.repository.ts:111-114` — joins `messages` for a count.
+- `calendar.repository.ts:98-105` — joins `calendar_integrations`.
 
-This is Grzybek's _Shared Database Data_ integration style — the highest-coupling
-option, where _"one little change to database structure or even data itself can break
-another module without notice."_
+### 3.3 The core rule is the least-modelled code
 
-**The one place it is done right:** `calendar_event_links.asksynk_event_id` is a
-plain `uuid` with **no FK**, deliberately, so the link table can reference the other
-side without binding to it. That is the pattern the other nine should follow.
+The tag → due-date rule is `AttentionDueDateService.pickEarliestCandidate`
+(`attention-items/attention-due-date.service.ts:75-102`), a private method on a DI
+class; its other half is the raw SQL above. The "pinned due date must not move"
+invariant is a `.filter()` inside `recomputeForItems` (31-55).
 
-### 4.3 The domain model is anemic
+### 3.4 The domain model is anemic
 
-All 20 entity classes were audited for public behaviour. Here is every public method
-on every entity:
+20 entity classes; each has a bare `static create()` and only predicates/getters
+(`belongsTo`, `isDeleted`, `isPending`…). None owns a state transition. A few encode
+a small rule: `UserTimer` (`completesAt`, `remainingSeconds`, `isDue`),
+`CalendarIntegration.accessTokenExpired`, `PublicView.isLive`, `Invite.isForEmail`.
 
-| Entity                           | Public methods                                           |
-| -------------------------------- | -------------------------------------------------------- |
-| `calendar-event.entity.ts`       | `get isRecurring`, `belongsTo`                           |
-| `calendar.entity.ts`             | `belongsTo`, `get isNative`                              |
-| `task.entity.ts`                 | `get isDeleted`, `isVisibleTo`, `isAssignee`             |
-| `task-batch.entity.ts`           | `get isDeleted`, `isVisibleTo`, `isAssignee`             |
-| `task-suggestion.entity.ts`      | `isPending`, `isSuggestee`, `isSuggester`                |
-| `attention-item.entity.ts`       | `belongsTo`, `get isDeleted`                             |
-| `user-timer.entity.ts`           | `completesAt`, `remainingSeconds`, `isDue`               |
-| `public-view.entity.ts`          | `belongsTo`, `isLive`                                    |
-| `attachment.entity.ts`           | `isOwnedBy`, `isActive`                                  |
-| `tag.entity.ts`                  | `belongsTo`                                              |
-| `invite.entity.ts`               | `isForEmail`, `isPending`                                |
-| `calendar-event-link.entity.ts`  | `get isMirrored`                                         |
-| `calendar-integration.entity.ts` | `belongsTo`, `get isBidirectional`, `accessTokenExpired` |
-| `thread.entity.ts`               | `isGuestThread`                                          |
-| `message.entity.ts`              | `isReply`                                                |
-| `user-settings.entity.ts`        | _(none)_                                                 |
-| `user-timer-settings.entity.ts`  | _(none)_                                                 |
-| `public-view-guest.entity.ts`    | _(none)_                                                 |
-| `network-connection.entity.ts`   | _(none)_                                                 |
-| `user-profile.entity.ts`         | _(none)_                                                 |
+State machines live in services:
 
-**Every single one is a predicate or a getter. There is not one mutator, not one
-state transition, and not one constructor that rejects an invalid state.**
+- `timers/timers.service.ts` — five-state timer (`idle | running | paused | completed
+  | stopped`): `persistStart` 168-202, `persistResume` 204-221, `persistPause` 223-249,
+  `persistStop` 251-279, `complete` 303-328, `validateTransitionInput` 354-367. The
+  repository repeats the guards as `WHERE` clauses (a concurrency guard — keep it).
+- `tasks/services/task-suggestions.service.ts` — `requirePending()` guards.
+- `networks/services/networks.service.ts` — invite status guards.
+- `attention-items.service.ts` — status/note/tags assigned field by field.
 
-`create()` is a bare constructor alias:
+### 3.5 No ports
 
-```ts
-// apps/api/src/tasks/entities/task.entity.ts:47
-static create(props: TaskProps): Task {
-  return new Task(props);
-}
-```
+21 concrete `@Injectable()` Drizzle repositories, injected by concrete type. Ports
+exist only in `platform/` (`EventsPublisher`, `JobScheduler`, `Clock`,
+`ObjectStorage`, `EmailProvider`, `CalendarProvider`).
 
-Fields are publicly mutable and mutated from outside:
+### 3.6 No `Actor`
 
-```ts
-// apps/api/src/attention-items/attention-items.service.ts:73-75
-if (input.status !== undefined) item.status = input.status;
-if (input.note !== undefined) item.note = input.note;
-if (input.tagIds !== undefined) item.tagIds = input.tagIds;
-```
+Three identity shapes: `RequestActor` (`auth/auth.types.ts:29`, from
+`@RequestActor()`), `WsIdentity` (`websockets/services/ws-auth.service.ts:10`), and
+`AuthGuest`. `@RequestActor` is used by 2 controllers; one service method takes it
+(`NetworksService.resolveTargetUserId`). ~74 service methods take a bare
+`userId: string`. `messaging.service.ts` duplicates methods in `X` / `guestX` pairs
+(`sendAsUser`/`sendAsGuest`, `getThreadStats`/`getGuestThreadStats`, …) and imports
+`WsIdentity` from `websockets` — a cycle, since `websockets` imports `messaging`.
+Guest capability rules ("guests cannot attach files / suggest tasks / update status")
+live only in `ws.gateway.ts`, so REST and WS can disagree.
 
-Ownership and permission checks by layer: **services 49, entities 16, repositories 3,
-gateway 1**. The entity supplies the predicate; the service supplies the rule.
+### 3.7 Contracts live outside their contexts
 
-Business rules live in procedural helpers instead of aggregates:
+All 20 events are defined in one file, `platform/events/registry/events.registry.ts`
+(319 LOC). The `AttentionItemUpserted` zod schema is a hand-kept copy of
+`AttentionItemResponse`, with a stale comment blaming the old `packages/shared`.
+(Consumer groups, by contrast, already live in their contexts.)
 
-- `timers.service.ts:163-274` — transitions guarded by string comparison
-  (`"Timer not paused"`, `"Timer not running"`)
-- `tasks/task-status.util.ts` — `mapTaskStatusToAttention`, `aggregateBatchStatus`
-- `task-suggestions.service.ts:258-284` — `requirePending()`
-- `networks.service.ts:106,140` — invite status guards
+### 3.8 `attention_items` is a projection wearing an aggregate's clothes
 
-### 4.4 There are no ports
+- `type` enum names the source: `tagged_message | incoming_email | slack_message |
+  whatsapp_message | suggested_timeblock | suggested_task | task` — three values have
+  no producer.
+- Source identity lives in `metadata jsonb` (`messageId`, `taskId`, `taskBatchId`,
+  `suggestionId`), looked up with `metadata->>'key'` — no index.
+- Three bespoke handlers (`message-attention`, `task-attention`,
+  `tag-calendar-attention`) each know a different source's shape.
 
-`grep 'abstract class|interface .*Repository|implements .*Repository'` over
-`apps/api/src` returns **nothing for repositories**. 21 concrete `@Injectable()`
-Drizzle classes, injected by concrete type:
+Design for the fix: [06-attention-core.md](06-attention-core.md).
 
-```ts
-// every service, e.g. tasks.service.ts:25
-constructor(private readonly tasksRepository: TasksRepository) {}  // the Drizzle class
-```
+### 3.9 `ws.gateway.ts` does three jobs
 
-There is no seam to substitute a fake. Only 3 files in all of `apps/api` contain
-`export abstract class` — and none of them is a repository.
+Transport + auth; 5 `@SubscribeMessage` commands (`message.send` duplicates the REST
+path); 7 realtime `@EventHandler`s spanning messaging, timers, attention, tasks.
 
-### 4.5 Unit tests cannot run
+### 3.10 Inverted / cyclic module deps
 
-```ts
-// apps/api/jest.config.ts:6
-testMatch: ["**/*.integration.test.ts"],
-```
+- `auth ↔ public-views`: `auth.module` imports `PublicViewsModule`,
+  `guest-auth.service` injects `PublicViewGuestsRepository` + `hashGuestToken`; public
+  views controllers import auth decorators. The global guard depends on a feature.
+- `messaging ↔ websockets` (`WsIdentity`, above).
+- `tasks → attention-items`: `task-status.util.ts` imports `AttentionItemStatus`.
 
-> **✅ Fixed (roadmap 0.1).** `unit` + `integration` jest projects; `pnpm test:unit`
-> runs `**/*.unit.test.ts` with no Postgres. globalSetup now runs `drizzle-kit migrate`.
-> The pure logic listed below is still untested — that is roadmap 0.7.
+### 3.11 No boundary enforcement
 
-A `*.spec.ts` file would be **silently ignored**. There are currently **0 `*.spec.ts`
-files** in the repo. The 5 integration tests (3,044 LOC) all boot real Nest modules
-and require a live Postgres via `globalSetup`, which shells out to
-`drizzle-kit push --force` and truncates every table.
-
-Covered: `attention-items`, `calendar-events`, `storage`, `tasks↔attention`,
-`timers`.
-**Not covered at all:** `messaging` (the 683-line largest service),
-`calendar-integrations` (2,135 LOC), `networks`, `tags`, `public-views`,
-`user-profile`, `user-settings`, `websockets`, `auth`.
-
-Roughly **700 lines of already-pure, dependency-free logic** could be unit tested
-today with no refactor at all — the 20 entity classes, `recurrence.utils.ts`
-(229 LOC), `task-status.util.ts`, `oauth-state.util.ts`, `AsksynkError`, and the
-due-date selection algorithm. None of it is, because the config will not run the
-tests.
-
-### 4.6 The published language lives outside every context
-
-`packages/shared/src/event-registry/events.registry.ts` is **347 lines defining 21
-events for every bounded context in the system** — tags, messaging, calendar, timers,
-tasks, suggestions, attention. Every context's contract lives outside that context.
-
-> **Since `fcd9922`:** the file moved to
-> `apps/api/src/platform/events/registry/events.registry.ts` and lost its
-> `groups` fields, but it is still one central catalogue (319 lines, 20 events). Consumer groups, by
-> contrast, already live in their owning contexts (`<ctx>/<ctx>.consumer-group.ts`).
-
-It also carries a known duplication: `AttentionItemUpserted`'s zod schema is a
-hand-maintained copy of `AttentionItemResponse` in `apps/api`, because
-`packages/shared` must not depend on `apps/api`. The comment in the file acknowledges
-the drift risk. _The reason is gone (the registry now lives in `apps/api`); the copy
-and its comment remain._
-
-### 4.7 `attention_items` is a projection wearing an aggregate's clothes
-
-- The `type` enum names the **source context**, not a property of the item:
-  `tagged_message | incoming_email | slack_message | whatsapp_message |
-suggested_timeblock | suggested_task | task`.
-- Source identity hides inside an untyped `metadata jsonb`. The repository looks
-  items up with `metadata->>'messageId' = $1`, `metadata->>'taskId' = $1`,
-  `metadata->>'taskBatchId'`, `metadata->>'suggestionId'` — **four query paths with
-  no supporting index**.
-- `source_calendar_event_id` is a `uuid` with no FK.
-- `attention_item_tags.tag_id` has **no FK**, unlike the four sibling tag junction
-  tables. This is deliberate: `findByTagIds` intentionally skips the `tags` join so
-  "ghost" rows pointing at a just-deleted tag remain findable by the tag-deleted
-  handler. Every _other_ read path does `leftJoin(tags)` and silently drops them.
-- `upsertFromSource` hardcodes `type: "task"` for both tasks and batches
-  ([`attention-items.service.ts:112`](../../apps/api/src/attention-items/attention-items.service.ts)).
-
-It consumes events from four contexts and publishes back into two. It is the hub of
-the system and the least typed thing in it.
-
-### 4.8 Two inverted dependencies, and one import that should not exist
-
-- `common/decorators/param.decorators.ts` and `common/decorators/validators.ts`
-  import `isIsoDateWithOffset` / `isValidIanaTimezone` from
-  `calendar-events/utils/recurrence.utils` — **the shared kernel depends on a
-  feature**. _✅ Fixed — predicates moved to `kernel/time/iso.ts`._
-- `auth/auth.module.ts` imports `PublicViewsModule`, and `auth/guest-auth.service.ts`
-  injects `PublicViewGuestsRepository` — **the global guard depends on a feature
-  module**.
-- `auth/auth.guard.ts:16` imports `CalendarEventsRepository` **solely to name a
-  logger**: `new ContextLogger(CalendarEventsRepository.name)`. Both a copy-paste bug
-  (the logger is mislabelled) and a hard coupling from the auth boundary into
-  calendar persistence. _✅ Fixed._
-- `messaging/services/messaging.service.ts:3` imports `WsIdentity` from
-  `src/websockets/...` — a transport type inside a domain service, and the _reverse_
-  of the declared module dependency. It is also one of four files using a
-  non-aliased `src/`-rooted import, against the rule in `CLAUDE.md`. _Import now
-  aliased (0 `src/` imports remain); the transport-type coupling remains._
-
-### 4.9 Smaller defects worth fixing while nearby
-
-- ~~**`tags.name` is globally `.unique()`** rather than unique per user.~~
-  _Fixed — `uq_tags_user_name (user_id, name)`, migration `0003`. Still
-  case-sensitive._
-- ~~**`tag.created` has no publisher and no consumer.** Dead contract.~~
-  _Fixed — the event no longer exists._
-- ~~**The `email` group on `tag.created` / `tag.updated` has no handler.**~~
-  _Fixed — `groups` was dropped from `defineEvent`; groups are now discovered from
-  handlers, so an orphan group cannot exist ([docs/events](../events/02-consumer-groups.md))._
-- **Realtime-only outbox rows are never marked dispatched.** The dispatcher's
-  `WHERE` clause excludes `delivery_mode = 'realtime'`, so those rows accumulate
-  forever. There is no retention job, and no index on `dispatched_at` / `failed_at` —
-  the dispatcher's poll query will sequential-scan as the table grows. _✅ Fixed —
-  `idx_events_outbox_pending` (`0008`) and the daily `events.retention` job. Realtime
-  rows are still never marked dispatched; retention prunes them after 30 days._
-- **`ws.gateway.ts` (454 LOC; 555 is the whole `websockets/` module) does three jobs**: WebSocket transport, an inbound
-  command surface (`@SubscribeMessage("message.send")` with a 128-line handler that
-  duplicates the REST path), and an event-consumer surface with 7 realtime
-  `@EventHandler`s spanning four contexts.
-- **`messaging` handles actor polymorphism by method duplication** — 17 public
-  methods with systematic `X` / `guestX` pairs. There is no domain-level Actor
-  concept.
-- **`attachments.placement` enum (`public | message`)** encodes consumer contexts
-  inside the storage table.
-- **better-auth runs its own second `pg.Pool` and `drizzle()` instance**, separate
-  from `infrastructure/db` (now `platform/db`).
-- **No lint-enforced boundaries.** `eslint.config.js` carries only
-  `unused-imports` and `simple-import-sort`. Nothing mechanically prevents any of the
-  above.
+ESLint has only `simple-import-sort` + `unused-imports`. No dependency-cruiser, no
+`eslint-plugin-boundaries`, no `no-restricted-imports`.
 
 ---
 
-## 5. Structural inconsistency
+## 4. Known small defects
 
-Three module shapes coexist:
+| Defect                                                                                   | Where                                           |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `isValidId` calls `UUID.parse`, which throws on malformed input → 500 instead of 400; also accepts any UUID version | `kernel/id.ts`                                  |
+| Duplicate tag name → unmapped `23505` → 500. Uniqueness is case-sensitive (`uq_tags_user_name (user_id, name)`) | `tags/`, `apps/migrations/src/schema/tags.ts`   |
+| 11 Nest `HttpException`s; no `storage` error catalog (also none for `auth`, `user-settings`) | `storage/attachments/services/attachments.service.ts` |
+| `attachments.placement` enum (`public \| message`) names consumer contexts                | `attachments` table                             |
+| Comment says job `deleteAfterSeconds` default is 1h; it is 2 days                        | `calendar-integrations/sync/calendar-sync.jobs.ts:16` |
+| `AuthGuard` provided by both `auth.module` and `authGuard.module`                        | `auth/`                                         |
+| Leftovers: `packages/*` in `pnpm-workspace.yaml`; empty `src/errors/`                     | repo root, `apps/api/src`                       |
 
-- **Layered** — `calendar-events`, `tasks`, `public-views`, `networks`:
-  `entities/ models/ repositories/ services/ rest/`
-- **Partial** — `attention-items` (services at the module root),
-  `messaging`, `storage` (which nests a whole sub-context under `attachments/`)
-- **Flat** — `timers`, `user-settings`, `auth`
+Event-delivery gaps (idempotency inbox, key prefixes, guest-recipient jobs, thread-room
+duplicates) are listed in [platform/events §Known gaps](../platform/events.md#known-gaps).
 
-A new contributor cannot predict where anything lives. That is a boundary problem
-before it is a taste problem.
+## 5. Untested
 
----
-
-Next: [02-why-not-ddd.md](02-why-not-ddd.md) — why this shape resists the growth
-that is planned.
+`messaging` (only indirectly via the attention suite), `websockets`, guest sign-in /
+`GuestAuthService` / public-views services, `tags`, `networks`, `user-profile`,
+`user-settings`, `calendar-integrations`, the auth guard, the due-date rule as a unit.

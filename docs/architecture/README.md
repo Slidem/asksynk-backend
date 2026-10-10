@@ -1,141 +1,77 @@
 # asksynk backend — architecture
 
-An analysis of the current backend and a plan to restructure it around pragmatic
-Domain-Driven Design.
+How the backend is shaped today, the pragmatic-DDD shape it is moving to, and the
+order to get there. Audited against the code at `5129fc8` (2026-10-10).
 
-Written 2026-08-07 against commit `fcd9922`. All metrics and file references were
-derived mechanically from the tree at that commit. **Re-audited 2026-10-07 at
-`01de2f3`:** paths and statuses updated throughout; [01](01-current-state.md#0-status-at-01de2f3-2026-10-07)
-keeps the baseline numbers and lists what has changed.
-
-## Progress
-
-| Wave                         | Status                                                                                                                                                                     |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 — safety net, free wins    | **10 / 12 done.** Left: 0.3c lint rule, 0.7 unit tests for pure code ([details](08-roadmap.md#wave-0--safety-net-and-free-wins))            |
-| 1–8                          | not started — except pieces done alongside the events / jobs work: timers on `JobScheduler`, outbox retention, dead-letter replay (8.6)                                      |
-
-Alongside: the events refactor ([ADR 0006](adr/0006-group-ordered-event-delivery.md),
-[docs/events](../events/README.md)) and unified jobs ([ADR 0007](adr/0007-unified-typed-jobs.md),
-[docs/jobs](../jobs/README.md)) are built.
+**Status:** Wave 0 (safety net, `kernel/` + `platform/` split, typed errors, events,
+jobs) is done. **Next: [Wave 1 — extract the pure core](07-roadmap.md#wave-1--extract-the-pure-core).**
 
 ---
 
 ## The product, in one paragraph
 
-Asksynk gives a user control over their attention. **Input channels** deliver
-notifications (today: in-app messages; next: gmail, slack, whatsapp). The user puts
-**tags** on things — and a tag is not a label, it is a _policy_: it says _when_ the
-thing behind it deserves an answer, either "within N minutes" or "in the next
-timeblock I have booked for this". Tagged input becomes an **attention item** with a
-derived due date. The user's **calendar** is the surface where they decide when to
-act. Public links let outsiders see a schedule and start a conversation.
+Asksynk gives a user control over their attention. **Input channels** deliver things
+to respond to (today: in-app messages and tasks; next: gmail, slack, whatsapp). The
+user puts **tags** on them — and a tag is a _policy_, not a label: it says _when_ the
+thing deserves an answer, either "within N minutes" or "in the next timeblock booked
+for this tag". Tagged input becomes an **attention item** with a derived due date.
+The **calendar** is where the user decides when to act. Public links let outsiders see
+a schedule and start a conversation.
 
-**Tag as the barrier between input and attention** is the product. Everything else is
-supporting machinery.
-
----
-
-## Read in this order
-
-| Doc                                          | What it answers                                                                  |
-| -------------------------------------------- | -------------------------------------------------------------------------------- |
-| [01-current-state.md](01-current-state.md)   | What is actually in the repo today, with numbers                                 |
-| [02-why-not-ddd.md](02-why-not-ddd.md)       | Why the current shape is not DDD, argued against named sources                   |
-| [03-context-map.md](03-context-map.md)       | The target bounded contexts and why each boundary sits where it does             |
-| [04-layering.md](04-layering.md)             | The layer template, the `kernel/` vs `platform/` tiers, and the NestJS mechanics |
-| [05-integration.md](05-integration.md)       | How contexts talk — decision table plus a verdict for every current violation    |
-| [06-persistence.md](06-persistence.md)       | Schema-per-context, foreign key policy, repository ports, read models            |
-| [07-attention-core.md](07-attention-core.md) | The heart of the product, designed for the channels that are coming              |
-| [08-roadmap.md](08-roadmap.md)               | Eight waves, each independently shippable                                        |
-| [09-references.md](09-references.md)         | Every source, and what specifically it justifies                                 |
-| [adr/](adr/)                                 | The decisions that are expensive to reverse                                      |
+**Tag as the barrier between input and attention** is the product. The spine is
+_input → tagging → attention → scheduling_; everything else supports it.
 
 ---
 
-## TL;DR
+## Where we are going
 
-**The good news first.** This is not a rescue job. The codebase already has things
-many NestJS apps never get right:
+Ten bounded contexts ([02](02-context-map.md)), each with the same layer template
+([03](03-layering.md)), talking only through declared contracts ([04](04-integration.md)),
+each owning its own Postgres schema with no cross-context FKs ([05](05-persistence.md)).
+Rich aggregates only where a real state machine exists. Code stays in place under
+`apps/api/src/<context>/`, enforced by lint, not by packages.
 
-- Controllers are clean — none touch a repository or Drizzle, none leak
-  `$inferSelect` into a DTO.
-- No service imports Drizzle or a schema table. Persistence really does go through
-  repositories.
-- Transactions are uniform and correct: `TransactionHost` everywhere, re-entrant
-  `@Transactional()`, exactly one raw `db.transaction()` in the whole repo.
-- There is a working transactional outbox with two delivery legs.
-- WebSocket broadcasting is _already_ decoupled — no domain service can reach the
-  gateway.
-- One textbook context seam already exists (the attachment permission resolver).
+## Decisions
 
-**The problem is not layering inside a module. It is that the modules are not
-boundaries.**
+| Decision              | Choice                                                                  | Record                                                              |
+| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Persistence isolation | Postgres schema per context; no cross-schema FKs except `users`         | [ADR 0001](adr/0001-schema-per-context.md)                          |
+| Repository ports      | `abstract class` = contract + DI token; no `Symbol` tokens              | [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)        |
+| Calendar boundary     | `calendar-events` + `calendar-integrations` merge into `scheduling`     | [ADR 0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
+| Attention shape       | Aggregate with a projected slice; typed `source_*` columns              | [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md)   |
+| Shared code           | `kernel/` (pure, domain may import) + `platform/` (framework-aware)     | [ADR 0005](adr/0005-kernel-and-platform-tiers.md)                   |
+| Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table   | [ADR 0006](adr/0006-group-ordered-event-delivery.md)                |
+| Background jobs       | One typed jobs API; caller-derived ids, nothing stored                  | [ADR 0007](adr/0007-unified-typed-jobs.md)                          |
+| Domain errors         | One `DomainError` + per-context catalogs; HTTP status decided at edge  | [platform/errors](../platform/errors.md)                            |
 
-Eight findings, in descending order of how much they will cost as the app grows:
+## Deliberately not doing
 
-1. **Modules have no contract, so callers reach into internals.** 16 cross-module
-   imports of another module's _repository_, across 13 files. `TagRepository` is
-   provided by three modules because `TagsModule` exports only its service.
-2. **The database is the real integration layer.** Ten foreign keys cross module
-   boundaries. Two modules query tables they do not own — one of them in raw SQL.
-3. **The core domain is the least-modelled part of the system.** The tag → due-date
-   policy is a private method on a DI-injected class, and its calendar lookup is a
-   raw SQL CTE living in the wrong module.
-4. **The domain model is anemic.** All 20 entity classes are field bags with
-   read-only predicates. Not one enforces an invariant or owns a state transition.
-   49 ownership checks live in services; 16 in entities.
-5. **There are no ports.** 21 concrete Drizzle repositories, injected by concrete
-   type. The dependency arrow is never inverted.
-6. ~~**Unit tests cannot run.** `testMatch` only matches `*.integration.test.ts`.~~
-   _Fixed (0.1)._ Roughly 700 lines of already-pure logic is still untested (0.7).
-7. **The published language lives outside every context** — one 347-line event
-   registry (then in `packages/shared`, now `platform/events/registry/`) holding every
-   event contract — 21 then, 20 now.
-8. **`attention_items` is a projection wearing an aggregate's clothes** — source
-   identity hides in an unindexed `metadata` jsonb, probed with `metadata->>'key'`.
-
-**The plan.** Ten bounded contexts, each with the same four-layer template, talking
-only through declared contracts. One Postgres schema per context, no foreign keys
-across them. Rich aggregates only where there is a real state machine. Eight waves,
-starting with the one that makes everything else safe: turning unit tests on.
+- **Microservices.** A modular monolith is the end state.
+- **CQRS framework / event sourcing / `@nestjs/cqrs`.** The outbox is enough; read
+  models are plain queries.
+- **A value object per primitive.** Only `AnswerMode`, `RecurrenceRule`,
+  `AttentionSource`.
+- **Workspace packages per context.** Lint gives most of the benefit.
+- **A rewrite.** Every wave ships alone and leaves the app working.
 
 ---
 
-## The decisions
+## Docs
 
-These choices shape everything else. Each has an ADR.
+| Doc                                          | Answers                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| [01-current-state.md](01-current-state.md)   | What is solid, what is still wrong, with numbers                   |
+| [02-context-map.md](02-context-map.md)       | The target contexts and why each boundary sits where it does       |
+| [03-layering.md](03-layering.md)             | Layer template, `kernel/` vs `platform/`, Nest mechanics, lint     |
+| [04-integration.md](04-integration.md)       | How contexts talk; every current violation and its fix             |
+| [05-persistence.md](05-persistence.md)       | Schema per context, FK policy, repositories vs queries             |
+| [06-attention-core.md](06-attention-core.md) | The core domain, designed for the channels that are coming         |
+| [07-roadmap.md](07-roadmap.md)               | Waves 1–8, guardrails, what to leave alone                         |
+| [adr/](adr/)                                 | Decisions that are expensive to reverse                            |
+| [../platform/](../platform/)                 | As-built reference: events, jobs, errors                           |
 
-| Decision              | Choice                                                              | ADR                                                                 |
-| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Persistence isolation | Postgres schema per context; no cross-schema FKs                    | [0001](adr/0001-schema-per-context.md)                              |
-| Repository ports      | `abstract class` as both contract and DI token                      | [0002](adr/0002-repository-ports-as-abstract-classes.md)            |
-| Calendar boundary     | `calendar-events` + `calendar-integrations` merge into `scheduling` | [0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
-| Attention shape       | Aggregate whose _content_ is a projection; typed source columns     | [0004](adr/0004-attention-as-projection-with-typed-source.md)       |
-| Shared code           | Two tiers — `kernel/` (pure) and `platform/` (framework-aware)      | [0005](adr/0005-kernel-and-platform-tiers.md)                       |
-| Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table | [0006](adr/0006-group-ordered-event-delivery.md)                  |
-| Background jobs       | One typed jobs API; caller-derived ids, no stored pg-boss refs      | [0007](adr/0007-unified-typed-jobs.md)                              |
-| Domain errors         | One `DomainError` + per-context catalogs; HTTP status at the edge   | — ([04 §7](04-layering.md#7-errors))                                |
-
-Code structure stays **in place** — `apps/api/src/<context>/` with layered
-subfolders — enforced by `eslint-plugin-boundaries` and `dependency-cruiser` rather
-than by extracting packages. Domain models get rich **only where a state machine
-exists**; everything else stays a typed record. Both choices follow the `YAGNI` rule
-in `CLAUDE.md`.
-
----
-
-## What this plan deliberately does _not_ do
-
-Worth stating, so nobody re-opens them later:
-
-- **No microservices.** A modular monolith is the target and the end state. The
-  boundaries exist to keep the code understandable, not to prepare a split.
-- **No CQRS framework, no event sourcing.** The outbox already gives what is needed.
-  Read models are plain queries in the application layer.
-- **No Value Object for every primitive.** Only where a rule attaches
-  (`AnswerMode`, `RecurrenceRule`, `AttentionSource`).
-- **No rewrite.** Every wave in [08-roadmap.md](08-roadmap.md) ships on its own and
-  leaves the app working.
-- **`messaging → tasks` stays a direct call.** It is a genuine same-transaction
-  command. See [05-integration.md](05-integration.md).
+Key references: Grzybek, [Modular Monolith: A Primer](https://www.kamilgrzybek.com/blog/posts/modular-monolith-primer)
+and [Integration Styles](https://www.kamilgrzybek.com/blog/posts/modular-monolith-integration-styles);
+Vernon, [Effective Aggregate Design II](https://www.dddcommunity.org/wp-content/uploads/files/pdf_articles/Vernon_2011_2.pdf);
+Fowler, [Anemic Domain Model](https://martinfowler.com/bliki/AnemicDomainModel.html);
+[Sairyss/domain-driven-hexagon](https://github.com/Sairyss/domain-driven-hexagon) (TS/Nest code reference).

@@ -83,15 +83,15 @@ becomes `common/` again.
 Applying it to the kernel files. No `domain/` folder exists yet, so question 2 is
 answered against the planned domain code:
 
-| File                            | Q2 — who in `domain/` uses it                                    | Verdict                                       |
-| ------------------------------- | ---------------------------------------------------------------- | --------------------------------------------- |
-| `actor.ts`                      | domain signatures (`message.changeManagedStatus(actor, …)`)      | passes — **not built yet** (Wave 1.1)         |
-| `id.ts`                         | aggregate factories call `generateId`                            | passes                                        |
-| `errors/domain-errors.ts`       | aggregates throw `DomainError`                                   | passes                                        |
-| `errors/error-catalog.ts`       | each context's `*.errors.ts` catalog, which aggregates throw from | passes                                        |
-| `errors/kernel.errors.ts`       | `invalidValueError` — `RecurrenceRule`'s constructor              | passes (weakly: one generic code)             |
-| `time/iso.ts`                   | `isValidIanaTimezone` — `RecurrenceRule`'s constructor            | passes                                        |
-| `errors/error-registry.ts`      | nobody — only the composition root builds a registry             | **failed** → folded into `platform/errors/errors.translator.ts` (0.3e ✅) |
+| File                       | Q2 — who in `domain/` uses it                                     | Verdict                                                                   |
+| -------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `actor.ts`                 | domain signatures (`message.changeManagedStatus(actor, …)`)       | passes — **not built yet** (Wave 1.1)                                     |
+| `id.ts`                    | aggregate factories call `generateId`                             | passes                                                                    |
+| `errors/domain-errors.ts`  | aggregates throw `DomainError`                                    | passes                                                                    |
+| `errors/error-catalog.ts`  | each context's `*.errors.ts` catalog, which aggregates throw from | passes                                                                    |
+| `errors/kernel.errors.ts`  | `invalidValueError` — `RecurrenceRule`'s constructor              | passes (weakly: one generic code)                                         |
+| `time/iso.ts`              | `isValidIanaTimezone` — `RecurrenceRule`'s constructor            | passes                                                                    |
+| `errors/error-registry.ts` | nobody — only the composition root builds a registry              | **failed** → folded into `platform/errors/errors.translator.ts` (0.3e ✅) |
 
 ### Ports: the abstract/impl split does **not** run along the kernel/platform seam
 
@@ -130,11 +130,11 @@ it — the application layer schedules), `RealtimeBroadcaster`, and `ObjectStora
 The abstract/impl split is real and valuable — it is [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md).
 It just runs **port vs adapter**, not **kernel vs platform**:
 
-| Port                                                                     | Abstract lives in     | Adapter lives in                       |
-| ------------------------------------------------------------------------ | --------------------- | -------------------------------------- |
-| `TagRepository`, `AttentionItemsRepository`, …                           | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/`    |
-| `TagCatalogPort`, `CalendarOccurrencePort`, …                            | `<ctx>/contract/`     | the owning context's `infrastructure/` |
-| `EventsPublisher`, `JobScheduler`, `RealtimeBroadcaster`, `Clock`        | `platform/<area>/`    | `platform/<area>/`                     |
+| Port                                                              | Abstract lives in     | Adapter lives in                       |
+| ----------------------------------------------------------------- | --------------------- | -------------------------------------- |
+| `TagRepository`, `AttentionItemsRepository`, …                    | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/`    |
+| `TagCatalogPort`, `CalendarOccurrencePort`, …                     | `<ctx>/contract/`     | the owning context's `infrastructure/` |
+| `EventsPublisher`, `JobScheduler`, `RealtimeBroadcaster`, `Clock` | `platform/<area>/`    | `platform/<area>/`                     |
 
 Repository ports **do** split by layer — but _within a context_, `domain/ports/` →
 `infrastructure/`. That is the split the instinct is reaching for; it just does not
@@ -207,21 +207,21 @@ apps/api/src/                       # composition root files, NOT a shared tier 
 
 ### Where each file went (✅ done)
 
-| Was                                              | Planned                                                                        | Why                                                                                    |
-| ------------------------------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| `kernel/time/iso.ts`                             | **stays**                                                                      | pure predicates, zero imports                                                          |
-| `common/decorators/*`                            | `platform/validation/decorators.ts` → **built as** `platform/decorators/*`     | Nest + class-validator; 27/27 consumers are `rest/`                                    |
-| `common/clock/clock.ts` → `abstract Clock`       | `platform/clock/clock.ts`                                                      | pure, but no domain signature takes a `Clock` — time reaches domain as `now: Date`     |
-| `common/clock/clock.ts` → `SystemClock`          | `platform/clock/system-clock.ts`                                               | `@Injectable`                                                                          |
-| `common/clock/clock.module.ts`                   | `platform/clock/`                                                              | Nest module                                                                            |
-| `common/errors/errors.model.ts`                  | **replaced** — `DomainError` + catalogs in `kernel/errors/`, status map in `platform/errors/errors.translator.ts` | `AsksynkError.statusCode` is an HTTP concern — see §7                             |
-| `common/errors/errors.filter.ts`                 | `platform/errors/`                                                             | Nest exception filter                                                                  |
-| `common/errors/api-error-responses.decorator.ts` | `platform/errors/`                                                             | Swagger                                                                                |
-| `common/config/{cors,swagger}.config.ts`         | `platform/config/`                                                             | bootstrap wiring                                                                       |
-| `common/utils/inputs.ts`                         | **built as** `platform/mappers/string.utils.ts` (unused parsers deleted)      | every function takes `string \| undefined` — query-string parsing                      |
-| `common/utils/token.ts`                          | `platform/http/bearer-token.ts`                                                | reads HTTP headers                                                                     |
-| `common/logger/logger.config.ts`                 | **delete**                                                                     | a one-line re-export of `@/shared/logger.config` — a barrel, which `CLAUDE.md` forbids |
-| `infrastructure/db/*`                            | `platform/db/*`                                                                | same tier; no reason for a third folder                                                |
+| Was                                              | Planned                                                                                                           | Why                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `kernel/time/iso.ts`                             | **stays**                                                                                                         | pure predicates, zero imports                                                          |
+| `common/decorators/*`                            | `platform/validation/decorators.ts` → **built as** `platform/decorators/*`                                        | Nest + class-validator; 27/27 consumers are `rest/`                                    |
+| `common/clock/clock.ts` → `abstract Clock`       | `platform/clock/clock.ts`                                                                                         | pure, but no domain signature takes a `Clock` — time reaches domain as `now: Date`     |
+| `common/clock/clock.ts` → `SystemClock`          | `platform/clock/system-clock.ts`                                                                                  | `@Injectable`                                                                          |
+| `common/clock/clock.module.ts`                   | `platform/clock/`                                                                                                 | Nest module                                                                            |
+| `common/errors/errors.model.ts`                  | **replaced** — `DomainError` + catalogs in `kernel/errors/`, status map in `platform/errors/errors.translator.ts` | `AsksynkError.statusCode` is an HTTP concern — see §7                                  |
+| `common/errors/errors.filter.ts`                 | `platform/errors/`                                                                                                | Nest exception filter                                                                  |
+| `common/errors/api-error-responses.decorator.ts` | `platform/errors/`                                                                                                | Swagger                                                                                |
+| `common/config/{cors,swagger}.config.ts`         | `platform/config/`                                                                                                | bootstrap wiring                                                                       |
+| `common/utils/inputs.ts`                         | **built as** `platform/mappers/string.utils.ts` (unused parsers deleted)                                          | every function takes `string \| undefined` — query-string parsing                      |
+| `common/utils/token.ts`                          | `platform/http/bearer-token.ts`                                                                                   | reads HTTP headers                                                                     |
+| `common/logger/logger.config.ts`                 | **delete**                                                                                                        | a one-line re-export of `@/shared/logger.config` — a barrel, which `CLAUDE.md` forbids |
+| `infrastructure/db/*`                            | `platform/db/*`                                                                                                   | same tier; no reason for a third folder                                                |
 
 ---
 
@@ -248,19 +248,19 @@ configuration and buys nothing. It becomes `platform/` — and one file becomes 
 
 ### Where each piece lands
 
-| `packages/shared/src/…`                                     | LOC | Goes to                                                   |
-| ----------------------------------------------------------- | --: | --------------------------------------------------------- |
-| `id.ts`                                                     |  10 | **`kernel/id.ts`** — see below                            |
-| `event-consumer/`                                           | 508 | `platform/events/consumer/`                               |
-| `event-dispatcher/`                                         | 285 | `platform/events/dispatcher/`                             |
-| `event-publisher/`                                          |  63 | `platform/events/publisher/`                              |
-| `event-registry/events.registration.ts` + `events.types.ts` | 134 | `platform/events/registry/`                               |
-| `event-registry/events.registry.ts`                         | 348 | **splits per context** → `<ctx>/contract/<ctx>.events.ts` |
-| `message-bus/`                                              | 278 | `platform/jobs/message-bus/`                              |
+| `packages/shared/src/…`                                     | LOC | Goes to                                                                                        |
+| ----------------------------------------------------------- | --: | ---------------------------------------------------------------------------------------------- |
+| `id.ts`                                                     |  10 | **`kernel/id.ts`** — see below                                                                 |
+| `event-consumer/`                                           | 508 | `platform/events/consumer/`                                                                    |
+| `event-dispatcher/`                                         | 285 | `platform/events/dispatcher/`                                                                  |
+| `event-publisher/`                                          |  63 | `platform/events/publisher/`                                                                   |
+| `event-registry/events.registration.ts` + `events.types.ts` | 134 | `platform/events/registry/`                                                                    |
+| `event-registry/events.registry.ts`                         | 348 | **splits per context** → `<ctx>/contract/<ctx>.events.ts`                                      |
+| `message-bus/`                                              | 278 | `platform/jobs/message-bus/`                                                                   |
 | `scheduled-job/`                                            | 154 | `platform/jobs/` — replaced by the typed jobs API ([ADR 0007](adr/0007-unified-typed-jobs.md)) |
-| `email/`                                                    | 340 | `platform/email/` — kept whole, see below                 |
-| `logger.config.ts`                                          |  44 | `platform/logger/`                                        |
-| `pg-error-codes.ts`                                         |  16 | `platform/db/`                                            |
+| `email/`                                                    | 340 | `platform/email/` — kept whole, see below                                                      |
+| `logger.config.ts`                                          |  44 | `platform/logger/`                                                                             |
+| `pg-error-codes.ts`                                         |  16 | `platform/db/`                                                                                 |
 
 **`id.ts` is the one file that must be `kernel/`, not `platform/`.** Domain aggregates
 generate their own ids in `static open()` / `static schedule()`, so `generateId` has to
@@ -756,15 +756,15 @@ on smaller projects; that applies here.
 "domain" error type HTTP-aware by construction. It is gone (0 references). What
 replaced it:
 
-| Piece                                  | Where                                     | What                                                                                                                  |
-| -------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `DomainError`, `DomainErrorCategory`   | `kernel/errors/domain-errors.ts`          | one concrete class `(code, message?, options?)`. Categories: `NOT_FOUND`, `INVALID_VALUE`, `FORBIDDEN`, `CONFLICT`, `RULE_VIOLATION`, `INTERNAL` |
-| `defineCatalog(namespace, defs)`       | `kernel/errors/error-catalog.ts`          | each def is `{ category, message, exposable }`; returns `{ catalog, createError }`. Code is `namespace.key`; `{ param }` interpolation |
-| `<ctx>.errors.ts`                      | each context (12 catalogs)                | `throw tagsError("tag_not_found", { tagId })`. No catalog yet: `storage`, `auth`, `user-settings`                     |
-| `ERROR_CATALOGUES`                     | `src/error-catalogs.root.ts`              | composition root — the one file that imports every catalog (`ErrorCatalog[]`, plain data)                             |
-| `ErrorsModule.forRoot(catalogs)`       | `platform/errors/errors.module.ts`        | `@Global`; provides `DomainErrorsTranslator` (`useValue`) and registers `AllExceptionsFilter` as `APP_FILTER`. `app.module.ts` passes `ERROR_CATALOGUES` |
-| `DomainErrorsTranslator`               | `platform/errors/errors.translator.ts`    | builds `Map<ErrorCode, definition>`, throws on duplicate namespace / code (at boot). `translate()`: category → status (400/403/404/409/422/500). **Fails closed**: unknown code → 500, generic message; message sent only if `exposable` |
-| `AllExceptionsFilter`                  | `platform/errors/errors.filter.ts`        | `DomainError` → translator; `HttpException` → passthrough; anything else → 500. `ws.gateway.ts` injects the same translator |
+| Piece                                | Where                                  | What                                                                                                                                                                                                                                     |
+| ------------------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DomainError`, `DomainErrorCategory` | `kernel/errors/domain-errors.ts`       | one concrete class `(code, message?, options?)`. Categories: `NOT_FOUND`, `INVALID_VALUE`, `FORBIDDEN`, `CONFLICT`, `RULE_VIOLATION`, `INTERNAL`                                                                                         |
+| `defineCatalog(namespace, defs)`     | `kernel/errors/error-catalog.ts`       | each def is `{ category, message, exposable }`; returns `{ catalog, createError }`. Code is `namespace.key`; `{ param }` interpolation                                                                                                   |
+| `<ctx>.errors.ts`                    | each context (12 catalogs)             | `throw tagsError("tag_not_found", { tagId })`. No catalog yet: `storage`, `auth`, `user-settings`                                                                                                                                        |
+| `ERROR_CATALOGUES`                   | `src/error-catalogs.root.ts`           | composition root — the one file that imports every catalog (`ErrorCatalog[]`, plain data)                                                                                                                                                |
+| `ErrorsModule.forRoot(catalogs)`     | `platform/errors/errors.module.ts`     | `@Global`; provides `DomainErrorsTranslator` (`useValue`) and registers `AllExceptionsFilter` as `APP_FILTER`. `app.module.ts` passes `ERROR_CATALOGUES`                                                                                 |
+| `DomainErrorsTranslator`             | `platform/errors/errors.translator.ts` | builds `Map<ErrorCode, definition>`, throws on duplicate namespace / code (at boot). `translate()`: category → status (400/403/404/409/422/500). **Fails closed**: unknown code → 500, generic message; message sent only if `exposable` |
+| `AllExceptionsFilter`                | `platform/errors/errors.filter.ts`     | `DomainError` → translator; `HttpException` → passthrough; anything else → 500. `ws.gateway.ts` injects the same translator                                                                                                              |
 
 **Why catalogs instead of subclasses** (`TimerNotRunning extends RuleViolation`, the
 first draft): the category lives in data, so the registry can list every code the API

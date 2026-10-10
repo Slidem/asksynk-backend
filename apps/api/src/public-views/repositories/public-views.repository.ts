@@ -29,7 +29,7 @@ export class PublicViewsRepository {
     slug: string;
     name: string | null;
     expiresAt: Date;
-  }): Promise<PublicView> {
+  }): Promise<PublicView | null> {
     const [row] = await this.txHost.tx
       .insert(publicViews)
       .values({
@@ -39,8 +39,9 @@ export class PublicViewsRepository {
         name: input.name,
         expiresAt: input.expiresAt,
       })
+      .onConflictDoNothing({ target: publicViews.slug })
       .returning();
-    return this.map(row);
+    return row ? this.map(row) : null;
   }
 
   async getById(id: string): Promise<PublicView | null> {

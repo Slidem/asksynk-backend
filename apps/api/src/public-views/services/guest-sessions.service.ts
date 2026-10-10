@@ -11,7 +11,10 @@ import {
   PublicViewMetadata,
   PublicViewsRepository,
 } from "@/api/public-views/repositories/public-views.repository";
-import { generateGuestToken } from "@/api/public-views/utils/slug.util";
+import {
+  generateGuestToken,
+  hashGuestToken,
+} from "@/api/public-views/utils/slug.util";
 
 @Injectable()
 export class GuestSessionsService {
@@ -32,7 +35,7 @@ export class GuestSessionsService {
   async signIn(input: {
     slug: string;
     displayName: string;
-  }): Promise<{ guest: PublicViewGuest; view: PublicView }> {
+  }): Promise<{ guest: PublicViewGuest; view: PublicView; token: string }> {
     const view = await this.publicViewsRepository.getBySlug(input.slug);
 
     if (!view || !view.isLive()) {
@@ -47,14 +50,16 @@ export class GuestSessionsService {
       Math.min(view.expiresAt.getTime(), now.getTime() + GUEST_SESSION_TTL_MS),
     );
 
+    const token = generateGuestToken();
+
     const guest = await this.guestsRepository.insert({
       id: generateId(),
       publicViewId: view.id,
       displayName: input.displayName.trim(),
-      token: generateGuestToken(),
+      tokenHash: hashGuestToken(token),
       expiresAt: guestExpiresAt,
     });
 
-    return { guest, view };
+    return { guest, view, token };
   }
 }

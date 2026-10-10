@@ -33,7 +33,7 @@ export const publicViewGuests = pgTable(
       .notNull()
       .references(() => publicViews.id, { onDelete: "cascade" }),
     displayName: text("display_name").notNull(),
-    token: text("token").notNull().unique(),
+    tokenHash: text("token_hash").notNull().unique(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
       .notNull()

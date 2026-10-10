@@ -7,6 +7,7 @@ export const ATTENTION_ITEM_TYPES = [
   "suggested_task",
   "task",
 ] as const;
+
 export type AttentionItemType = (typeof ATTENTION_ITEM_TYPES)[number];
 
 export const ATTENTION_ITEM_STATUSES = [
@@ -14,6 +15,7 @@ export const ATTENTION_ITEM_STATUSES = [
   "in_progress",
   "resolved",
 ] as const;
+
 export type AttentionItemStatus = (typeof ATTENTION_ITEM_STATUSES)[number];
 
 export type TaggedMessageMetadata = {

@@ -4,7 +4,6 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { generateId } from "@/api/kernel/id";
-import { PgError, PgErrorCode } from "@/api/platform/db/pg-error-codes";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import {
   PUBLIC_VIEW_DEFAULT_TTL_MS,
@@ -57,22 +56,15 @@ export class PublicViewsService {
     }
 
     for (let attempt = 0; attempt < SLUG_INSERT_MAX_RETRIES; attempt++) {
-      const slug = generateSlug(SLUG_LENGTH);
-      try {
-        const view = await this.publicViewsRepository.insert({
-          id: generateId(),
-          ownerUserId,
-          slug,
-          name: input.name ?? null,
-          expiresAt,
-        });
-        return { view, url: this.buildUrl(view.slug) };
-      } catch (err) {
-        if (!this.isUniqueViolation(err)) {
-          throw err;
-        }
-        this.logger.warn("Slug collision, retrying", { attempt });
-      }
+      const view = await this.publicViewsRepository.insert({
+        id: generateId(),
+        ownerUserId,
+        slug: generateSlug(SLUG_LENGTH),
+        name: input.name ?? null,
+        expiresAt,
+      });
+      if (view) return { view, url: this.buildUrl(view.slug) };
+      this.logger.warn("Slug collision, retrying", { attempt });
     }
 
     throw publicViewsError("slug_allocation_failed", {
@@ -112,9 +104,5 @@ export class PublicViewsService {
   buildUrl(slug: string): string {
     const base = this.configService.getOrThrow<string>("APP_BASE_URL");
     return `${base}/public/${slug}`;
-  }
-
-  private isUniqueViolation(err: unknown): boolean {
-    return (err as PgError)?.code === PgErrorCode.UNIQUE_VIOLATION;
   }
 }

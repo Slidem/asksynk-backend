@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 
 import { AuthGuest } from "@/api/auth/auth.types";
 import { PublicViewGuestsRepository } from "@/api/public-views/repositories/public-view-guests.repository";
+import { hashGuestToken } from "@/api/public-views/utils/slug.util";
 
 const LAST_SEEN_THROTTLE_INTERVAL = "2 minutes";
 
@@ -14,8 +15,8 @@ export class GuestAuthService {
   async validateToken(token: string): Promise<AuthGuest> {
     const now = new Date();
 
-    const row = await this.publicViewGuestsRepository.findActiveByToken(
-      token,
+    const row = await this.publicViewGuestsRepository.findActiveByTokenHash(
+      hashGuestToken(token),
       now,
     );
 

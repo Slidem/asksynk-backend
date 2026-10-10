@@ -169,7 +169,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       id: guestId,
       publicViewId,
       displayName: "Guest",
-      token: `token-${guestId}`,
+      tokenHash: `token-${guestId}`,
       expiresAt: farFuture,
     });
 

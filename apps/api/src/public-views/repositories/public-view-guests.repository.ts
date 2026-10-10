@@ -32,7 +32,7 @@ export class PublicViewGuestsRepository {
     id: string;
     publicViewId: string;
     displayName: string;
-    token: string;
+    tokenHash: string;
     expiresAt: Date;
   }): Promise<PublicViewGuest> {
     const [row] = await this.txHost.tx
@@ -41,15 +41,15 @@ export class PublicViewGuestsRepository {
         id: input.id,
         publicViewId: input.publicViewId,
         displayName: input.displayName,
-        token: input.token,
+        tokenHash: input.tokenHash,
         expiresAt: input.expiresAt,
       })
       .returning();
     return this.map(row);
   }
 
-  async findActiveByToken(
-    token: string,
+  async findActiveByTokenHash(
+    tokenHash: string,
     now: Date,
   ): Promise<ActiveGuestSession | null> {
     const [row] = await this.txHost.tx
@@ -66,7 +66,7 @@ export class PublicViewGuestsRepository {
       .innerJoin(publicViews, eq(publicViewGuests.publicViewId, publicViews.id))
       .where(
         and(
-          eq(publicViewGuests.token, token),
+          eq(publicViewGuests.tokenHash, tokenHash),
           gt(publicViewGuests.expiresAt, now),
           gt(publicViews.expiresAt, now),
           isNull(publicViews.revokedAt),
@@ -127,7 +127,6 @@ export class PublicViewGuestsRepository {
       id: row.id,
       publicViewId: row.publicViewId,
       displayName: row.displayName,
-      token: row.token,
       expiresAt: row.expiresAt,
       lastSeenAt: row.lastSeenAt,
       createdAt: row.createdAt,

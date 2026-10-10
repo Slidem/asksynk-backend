@@ -1,4 +1,5 @@
 import { Injectable, OnApplicationBootstrap } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { DiscoveryService, MetadataScanner } from "@nestjs/core";
 import { ContextLogger } from "nestjs-context-logger";
 import { JobWithMetadata } from "pg-boss";
@@ -25,6 +26,7 @@ export class JobHandlersRegistry implements OnApplicationBootstrap {
     private readonly discovery: DiscoveryService,
     private readonly metadataScanner: MetadataScanner,
     private readonly bus: MessageBusService,
+    private readonly config: ConfigService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -45,7 +47,9 @@ export class JobHandlersRegistry implements OnApplicationBootstrap {
       );
     }
 
-    await this.reconcileCrons();
+    if (this.config.get<string>("JOBS_RECONCILE_CRONS") !== "false") {
+      await this.reconcileCrons();
+    }
   }
 
   /** Unschedules pg-boss schedules that have no cron def in code. Public for the integration test. */

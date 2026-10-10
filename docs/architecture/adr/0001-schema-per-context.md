@@ -1,153 +1,53 @@
 # ADR 0001 — One Postgres schema per bounded context
 
-**Status:** Accepted
-**Date:** 2026-08-07
-**Deciders:** Mihai Alexandru
-
----
+**Status:** Accepted (2026-08-07) · executed in Wave 7
 
 ## Context
 
-All 34 tables live in `public`. Ten foreign keys cross module boundaries, and two
-modules issue queries against tables they do not own — one of them raw SQL naming
-three foreign tables plus a Postgres extension function.
+All tables live in `public`. Ten FKs cross module boundaries, and modules query
+tables they don't own — the worst in raw SQL (`attention-items.repository.ts`
+reading three calendar tables through `rrule.between`). That is Grzybek's _Shared
+Database Data_ style: _"one little change to database structure … can break another
+module without notice."_
 
-That is Grzybek's _Shared Database Data_ integration style, the highest-coupling
-option available. Its stated cost: _"one little change to database structure or even
-data itself can break another module without notice."_
+## Options
 
-The question is whether to enforce the boundary in the database, in the code, or both.
-
-## Options considered
-
-### A. Keep one schema; enforce boundaries only in TypeScript
-
-Add `dependency-cruiser` rules, reorganise `apps/migrations/src/schema/` into
-per-context folders (zero DDL), and forbid a context's infrastructure from importing
-another context's tables.
-
-**For:** zero migration risk. No `search_path` friction. Keeps every
-`ON DELETE CASCADE`. Roughly two hours of config.
-
-**Against:** the enforcement is advisory. A raw `sql\`\`` template — and there are 19
-of them — sidesteps the linter entirely, because table names in a template string are
-just text. The two worst existing violations are exactly of this kind.
-
-### B. One Postgres schema per context _(chosen)_
-
-`tagging.tags`, `scheduling.calendar_events`, `attention.attention_items`, and so on.
-No cross-schema foreign keys, no cross-schema queries.
-
-**For:** the boundary becomes physical. A cross-context query does not lint-fail — it
-_errors_, including from inside a raw SQL string. Table ownership becomes visible at a
-glance in `psql`. It also makes the eventual "could this context move out?" question
-answerable rather than theoretical.
-
-**Against:** see Consequences. This is not free.
-
-### C. Table name prefixes (`attn_`, `cal_`)
-
-**Against:** renames every table, breaks every hand-written SQL string and every
-existing migration, and buys strictly less than schemas — a prefix is still just a
-naming convention. Rejected quickly.
-
----
+- **A. One schema, boundaries enforced in TypeScript only.** Zero migration risk,
+  keeps every cascade, ~2h of dependency-cruiser config. But lint can't see table
+  names inside raw `sql` strings — exactly where the real violations live.
+- **B. One schema per context _(chosen)_.** `tagging.tags`, `scheduling.calendar_events`, …
+  No cross-schema FKs or queries; a cross-context query _errors_, even from raw SQL.
+- **C. Table prefixes.** Renames everything, buys less than schemas. Rejected.
 
 ## Decision
 
-**Option B.** One schema per context, with a single sanctioned exception for foreign
-keys to `identity.users(id)`.
+**B**, with one exception: FKs to `identity.users(id)` stay (it's the tenant key;
+dropping it turns account deletion into a ten-context saga).
 
-### The counter-argument, stated fairly
+The counter-argument for A is fair (`search_path` friction, pg-boss / better-auth /
+`rrule` already add schemas, YAGNI). B wins because raw SQL is where violations live,
+the cost is one-time and sequenced last, and boundaries are cheapest before the new
+channels land.
 
-An independent design review of this codebase recommended **Option A**, and its
-reasoning deserves recording rather than burying:
-
-> drizzle-kit supports `pgSchema()`, but you inherit `search_path` friction in every
-> raw `sql\`\``(you have several), plus pg-boss, better-auth and the`rrule`
-> extension already add schemas. The one benefit — a physical, greppable boundary — is
-> fully achievable in TypeScript for ~2h of dependency-cruiser config. YAGNI.
-
-That is a good argument and it may turn out to be right. Three things tip the decision
-to B anyway:
-
-1. **The linter cannot see into raw SQL, and raw SQL is where both real violations
-   live.** `attention-items.repository.ts:355-423` is not an accident of import
-   hygiene; it is a string. Option A would not have prevented it and would not detect
-   the next one.
-2. **The cost is front-loaded and bounded.** It is one migration and one audit of 19
-   SQL templates, sequenced last, after the code boundaries are already clean. It does
-   not recur.
-3. **`YAGNI` cuts both ways here.** The project is explicitly planning four new
-   integration surfaces. The moment where boundaries are cheapest to establish is
-   before those exist.
-
-**If Wave 7.1's SQL audit reveals materially more friction than expected, stopping
-after the FK removal (7.2) captures most of the benefit at a fraction of the cost.**
-That is a legitimate exit, not a failure.
-
----
+**Exit:** if Wave 7.1's SQL audit shows more friction than expected, stop after
+dropping the cross-context FKs (7.2) — most of the benefit, fraction of the cost.
 
 ## Consequences
 
-### Positive
-
-- Cross-schema queries fail loudly, including from raw SQL.
-- `attention`'s recurrence CTE is _forced_ into `scheduling`, where it belongs and
-  where its test coverage already is.
-- Table ownership is self-documenting.
-- `\dn` in `psql` prints the context map.
-
-### Negative
-
-- **19 raw `sql\`\`` templates must be audited** for unqualified table names —
-  concentrated in `attention-items.repository.ts` (8),
-  `calendar-events.repository.ts` (7), `messaging.repository.ts` (4). This is the
-  main risk and the reason the step is sequenced last.
-- **Nine foreign keys are dropped** (of the ten; `calendars.integration_id` stays inside `scheduling`), so the database no longer prevents orphaned
-  `message_tags` or a `messages.suggestion_id` pointing at a deleted suggestion.
-  Mitigated by: existing event-driven cleanup (`tag.deleted` already fans out), the
-  proven precedent of `attention_item_tags` living without an FK by design, and a new
-  periodic orphan-count job.
-- One more thing to remember when adding a table.
-- `drizzle.config.ts` needs a `schemaFilter` so drizzle-kit does not try to manage
-  `pgboss` or the extension schemas.
-
-### Neutral
-
-- Still one database, one connection pool, one migration history, one `drizzle-kit`
-  invocation. Transactions still span contexts freely — that is a code-level rule, not
-  a database-level one.
-- pg-boss and better-auth already coexist with extra schemas, so multi-schema is not
-  new territory for this deployment.
-
----
-
-## The `identity.users` exception
-
-`user_id` appears on 17 tables with `ON DELETE CASCADE`. Those foreign keys **stay**.
-
-It is not really a cross-context reference — it is the tenant key. No context
-_queries_ another's data through `users`; they merely share an identifier. Dropping
-the FKs would turn "delete my account" into a ten-context saga that must be written,
-tested and kept correct forever, in exchange for autonomy that will not be spent.
-
-This is a deliberate, documented, bounded exception. It is recorded here so that a
-future reader recognises it as a decision rather than an oversight.
-
----
+- **+** Cross-schema queries fail loudly; the rrule CTE is forced into `scheduling`;
+  `\dn` prints the context map.
+- **−** Every raw `sql` template (33 in context repositories) must be audited for
+  unqualified table names.
+- **−** Nine FKs dropped (`calendars.integration_id` stays — both sides in
+  `scheduling`). Mitigated by `tag.deleted` handlers per tagged context, the proven
+  FK-less `attention_item_tags`, and an orphan-count cron.
+- **−** `drizzle.config.ts` needs `schemaFilter`.
+- **=** Still one DB, one pool, one migration history. Transactions may still span
+  contexts — that's a code rule, not a DB one.
 
 ## Verification
 
-1. `drizzle-kit push` against a fresh database, then the full integration suite.
-2. The same against a restored copy of production data.
-3. `grep -rn 'sql\`' apps/api/src` — every hit reviewed for unqualified table names.
-4. The orphan-consistency job runs clean for a week before the FK drop is considered
-   settled.
+`drizzle-kit push` on a fresh DB + full integration suite; same on a copy of real
+data; every `sql\`` hit reviewed; orphan job clean for a week.
 
-## References
-
-- Grzybek, [Modular Monolith: Integration Styles](https://www.kamilgrzybek.com/blog/posts/modular-monolith-integration-styles)
-- [Sharing data between modules in a modular monolith](https://dev.to/lukaszreszke/sharing-data-between-modules-in-modular-monolith-50on)
-- [Drizzle — SQL schema declaration](https://orm.drizzle.team/docs/sql-schema-declaration),
-  [drizzle.config.ts](https://orm.drizzle.team/docs/drizzle-config-file)
+Detail: [05-persistence.md](../05-persistence.md).

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { Injectable, Type } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { DiscoveryModule } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 
@@ -68,6 +69,7 @@ class CronHandler {
 
 describe("JobHandlersRegistry", () => {
   let schedules: { name: string }[];
+  let env: Record<string, string>;
   let bus: {
     ensureQueue: jest.Mock;
     scheduleCron: jest.Mock;
@@ -78,6 +80,7 @@ describe("JobHandlersRegistry", () => {
 
   beforeEach(() => {
     schedules = [];
+    env = {};
     bus = {
       ensureQueue: jest.fn(),
       scheduleCron: jest.fn(),
@@ -94,6 +97,10 @@ describe("JobHandlersRegistry", () => {
         JobHandlersRegistry,
         ...providers,
         { provide: MessageBusService, useValue: bus },
+        {
+          provide: ConfigService,
+          useValue: { get: (key: string) => env[key] },
+        },
       ],
     }).compile();
     await module.init();
@@ -160,6 +167,16 @@ describe("JobHandlersRegistry", () => {
 
     expect(bus.unscheduleCron).toHaveBeenCalledTimes(1);
     expect(bus.unscheduleCron).toHaveBeenCalledWith("stale.cron");
+  });
+
+  it("skips reconcile on bootstrap when JOBS_RECONCILE_CRONS=false", async () => {
+    env.JOBS_RECONCILE_CRONS = "false";
+    schedules = [{ name: "stale.cron" }];
+
+    await init([CronHandler]);
+
+    expect(bus.getSchedules).not.toHaveBeenCalled();
+    expect(bus.unscheduleCron).not.toHaveBeenCalled();
   });
 
   describe("assertRegistered", () => {

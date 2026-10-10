@@ -71,6 +71,13 @@
       "when": 1791259081414,
       "tag": "0009_harsh_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791603697947,
+      "tag": "0010_hash_guest_tokens",
+      "breakpoints": true
     }
   ]
 }

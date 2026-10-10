@@ -39,13 +39,13 @@ export class PublicVisitorsController {
     @Param("slug") slug: string,
     @Body() dto: GuestSignInRequestDto,
   ): Promise<GuestSignInResponseDto> {
-    const { guest } = await this.guestSessionsService.signIn({
+    const { guest, token } = await this.guestSessionsService.signIn({
       slug,
       displayName: dto.displayName,
     });
     return {
       guestId: guest.id,
-      token: guest.token,
+      token,
       expiresAt: guest.expiresAt.toISOString(),
       publicViewId: guest.publicViewId,
     };
