@@ -2,14 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 import { Socket } from "socket.io";
 
+import { guestActor, userActor } from "@/api/auth/actor.mapper";
 import { AuthService } from "@/api/auth/auth.service";
-import { AuthGuest, AuthUser } from "@/api/auth/auth.types";
 import { GuestAuthService } from "@/api/auth/guest-auth.service";
+import { Actor } from "@/api/kernel/actor/actor";
 import { extractBearerToken } from "@/api/platform/http/bearer-token";
-
-export type WsIdentity =
-  | { kind: "user"; user: AuthUser }
-  | { kind: "guest"; guest: AuthGuest };
 
 @Injectable()
 export class WsAuthService {
@@ -20,12 +17,12 @@ export class WsAuthService {
     private readonly guestAuthService: GuestAuthService,
   ) {}
 
-  async authenticateSocket(socket: Socket): Promise<WsIdentity | null> {
+  async authenticateSocket(socket: Socket): Promise<Actor | null> {
     const headers = this.buildHeaderBag(socket);
 
     try {
       const session = await this.authService.validateRequest(headers);
-      return { kind: "user", user: session.user };
+      return userActor(session.user);
     } catch (userErr) {
       const token = extractBearerToken(headers);
       if (!token) {
@@ -34,7 +31,7 @@ export class WsAuthService {
       }
       try {
         const guest = await this.guestAuthService.validateToken(token);
-        return { kind: "guest", guest };
+        return guestActor(guest);
       } catch (guestErr) {
         this.logger.debug("ws auth failed for both user and guest", {
           userErr,

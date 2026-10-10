@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
 import { AuthGuest } from "@/api/auth/auth.types";
+import { Actor } from "@/api/kernel/actor/actor";
 import { generateId } from "@/api/kernel/id";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
 import {
@@ -30,7 +31,6 @@ import { PublicViewsRepository } from "@/api/public-views/repositories/public-vi
 import { TagsService } from "@/api/tags/services/tags.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
-import { WsIdentity } from "@/api/websockets/services/ws-auth.service";
 
 const MAX_MESSAGE_LIMIT = 100;
 
@@ -160,18 +160,18 @@ export class MessagingService {
   }
 
   async canAccessThread(
-    identity: WsIdentity,
+    actor: Actor,
     threadId: string,
   ): Promise<boolean> {
-    if (identity.kind === "user") {
+    if (actor.kind === "user") {
       return this.messagingRepository.isUserParticipant(
         threadId,
-        identity.user.id,
+        actor.userId,
       );
     }
 
     const guestThread = await this.messagingRepository.findGuestThread(
-      identity.guest.id,
+      actor.guestId,
     );
     return guestThread?.id === threadId;
   }

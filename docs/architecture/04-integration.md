@@ -95,7 +95,6 @@ recurrence gets one owner. Same treatment for `messaging.repository.ts:446-497`
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `auth` → `PublicViewGuestsRepository`, `hashGuestToken`, `PublicViewsModule` | `identity` declares `GuestIdentityProvider`; `sharing` registers at bootstrap                 |
 | `messaging.service` → `PublicViewsRepository`                                | `sharing/contract/public-link.port.ts` → `isLive(publicViewId): Promise<boolean>`             |
-| `messaging.service` → `WsIdentity` (cycle with `websockets`)                 | `Actor` in `kernel/` (§3)                                                                     |
 | `tasks/task-status.util` → `AttentionItemStatus`                             | batch status derived in tasks' own terms (1.3); translation becomes tasks' outbound ACL (6.2) |
 
 ```ts
@@ -137,7 +136,8 @@ feature code. Design: [03 §6](03-layering.md#6-wsgatewayts-split-wave-4).
 
 ## 3. `Actor`
 
-Replaces `RequestActor`, `WsIdentity` and ad-hoc `AuthGuest` handling.
+One identity shape for HTTP and WS (`@RequestActor()`, `WsAuthService`); still to
+replace the ad-hoc `AuthGuest` handling in messaging.
 
 ```ts
 // kernel/actor/actor.ts
@@ -157,8 +157,7 @@ export const ownerUserIdOf = (a: Actor): string =>
   a.kind === "guest" ? a.ownerUserId : a.userId;
 ```
 
-It collapses messaging's `X` / `guestX` pairs, removes the `messaging → websockets`
-import, moves guest capability rules from the gateway into the application layer
+It collapses messaging's `X` / `guestX` pairs (4.3), moves guest capability rules from the gateway into the application layer
 (so REST gets them too), and is the seam for AI agents.
 
 **Rule:** new and touched application methods take `Actor`, not `userId: string`.

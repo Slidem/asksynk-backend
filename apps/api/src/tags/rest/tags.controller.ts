@@ -12,12 +12,10 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { pick } from "lodash";
 
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
-import {
-  AuthUser as AuthUserType,
-  RequestActor as RequestActorType,
-} from "@/api/auth/auth.types";
+import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { RequestActor } from "@/api/auth/requestActor.decorator";
+import { Actor } from "@/api/kernel/actor/actor";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
@@ -58,7 +56,7 @@ export class TagsController {
   @AllowGuest()
   async listTags(
     @Query() query: ListTagsQueryDto,
-    @RequestActor() actor: RequestActorType,
+    @RequestActor() actor: Actor,
   ): Promise<TagResponseDto[]> {
     const targetUserId = await this.networksService.resolveTargetUserId(
       actor,

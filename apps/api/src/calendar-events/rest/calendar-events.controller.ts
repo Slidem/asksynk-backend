@@ -11,10 +11,7 @@ import {
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AllowGuest } from "@/api/auth/allowGuest.decorator";
-import {
-  AuthUser as AuthUserType,
-  RequestActor as RequestActorType,
-} from "@/api/auth/auth.types";
+import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { RequestActor } from "@/api/auth/requestActor.decorator";
 import { toCalendarResponseDto } from "@/api/calendar-events/rest/calendar.mapper";
@@ -28,6 +25,7 @@ import { CalendarResponseDto } from "@/api/calendar-events/rest/responses/calend
 import { CalendarEventInstanceResponse } from "@/api/calendar-events/rest/responses/calendar-event-instance.response";
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
 import { parseIsoWallClockInTimezone } from "@/api/calendar-events/utils/recurrence.utils";
+import { Actor } from "@/api/kernel/actor/actor";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import {
   IsoDateWithOffsetParam,
@@ -90,7 +88,7 @@ export class CalendarEventsController {
   @Get("calendar-events")
   async listCalendarEvents(
     @Query() query: ListCalendarEventsQueryDto,
-    @RequestActor() actor: RequestActorType,
+    @RequestActor() actor: Actor,
   ): Promise<CalendarEventInstanceResponse[]> {
     const targetUserId = await this.networksService.resolveTargetUserId(
       actor,

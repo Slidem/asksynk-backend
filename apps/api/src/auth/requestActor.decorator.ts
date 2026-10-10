@@ -4,13 +4,12 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 
-import {
-  RequestActor as RequestActorType,
-  RequestWithAuth,
-} from "@/api/auth/auth.types";
+import { guestActor, userActor } from "@/api/auth/actor.mapper";
+import { RequestWithAuth } from "@/api/auth/auth.types";
+import { Actor } from "@/api/kernel/actor/actor";
 
 export const RequestActor = createParamDecorator(
-  (_: unknown, context: ExecutionContext): RequestActorType => {
+  (_: unknown, context: ExecutionContext): Actor => {
     const request = context.switchToHttp().getRequest<RequestWithAuth>();
     if (request.user && request.guest) {
       throw new UnauthorizedException(
@@ -18,10 +17,10 @@ export const RequestActor = createParamDecorator(
       );
     }
     if (request.guest) {
-      return { guest: request.guest, isGuest: true };
+      return guestActor(request.guest);
     }
     if (request.user) {
-      return { user: request.user, isGuest: false };
+      return userActor(request.user);
     }
     throw new UnauthorizedException("No authenticated principal");
   },

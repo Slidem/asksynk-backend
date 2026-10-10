@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { RequestActor } from "@/api/auth/auth.types";
+import { Actor } from "@/api/kernel/actor/actor";
 import { generateId } from "@/api/kernel/id";
 import { Invite } from "@/api/networks/entities/invite.entity";
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
@@ -180,18 +180,18 @@ export class NetworksService {
   }
 
   async resolveTargetUserId(
-    actor: RequestActor,
+    actor: Actor,
     requestedUserId?: string,
   ): Promise<string> {
-    if (actor.isGuest) {
-      return actor.guest.ownerUserId;
+    if (actor.kind === "guest") {
+      return actor.ownerUserId;
     }
 
-    if (!requestedUserId || requestedUserId === actor.user.id) {
-      return actor.user.id;
+    if (!requestedUserId || requestedUserId === actor.userId) {
+      return actor.userId;
     }
 
-    await this.validateIsActiveConnection(actor.user.id, requestedUserId);
+    await this.validateIsActiveConnection(actor.userId, requestedUserId);
 
     return requestedUserId;
   }

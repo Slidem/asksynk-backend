@@ -22,41 +22,10 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 
 | #   | Step                                     | Effort | Risk       | Safety net                                                  |
 | --- | ---------------------------------------- | ------ | ---------- | ----------------------------------------------------------- |
-| 1.1 | `Actor` in `kernel/`                     | 3h     | low        | integration suites (attention ↔ messaging)                  |
 | 1.2 | Due-date policy as a pure function       | 2h     | none       | `attention-items.events-handler`, `tasks-attention`         |
 | 1.3 | Batch status derived in tasks' own terms | 1h     | none       | `task-status.util.unit`, `tasks-attention`                  |
 | 1.4 | Timer state machine as a domain object   | 4h     | **medium** | `timers.integration.test.ts` (14 cases)                     |
 | 1.5 | `RecurrenceRule` value object            | 2h     | low        | `recurrence.utils.unit` (26), `calendar-events.integration` |
-
-### 1.1 `Actor`
-
-```ts
-// kernel/actor/actor.ts   (the empty kernel/actor/ folder is already there)
-export type Actor =
-  | { kind: "user"; userId: string; email: string }
-  | {
-      kind: "guest";
-      guestId: string;
-      publicViewId: string;
-      ownerUserId: string;
-      displayName: string;
-      expiresAt: Date;
-    };
-
-export const ownerUserIdOf = (a: Actor): string =>
-  a.kind === "guest" ? a.ownerUserId : a.userId;
-```
-
-- `@RequestActor()` (`auth/requestActor.decorator.ts`) returns `Actor`; delete
-  `RequestActor` (`auth/auth.types.ts:29`). Callers: `calendar-events.controller.ts:93`,
-  `tags.controller.ts:61`, `NetworksService.resolveTargetUserId` (`networks.service.ts:182`).
-- `WsAuthService.authenticateSocket` returns `Actor`; delete `WsIdentity`. Update
-  `ws.gateway.ts` (95, 150, 263, 311) and `messaging.service.ts` (33, 163) — this
-  removes the `messaging → websockets` cycle.
-- Don't convert the ~74 `userId: string` methods now. Rule from here on: new or
-  touched application methods take `Actor`. Collapsing messaging's `X`/`guestX` pairs
-  is 4.3.
-- Test: `test/kernel/actor.unit.test.ts` — `ownerUserIdOf` for both kinds.
 
 ### 1.2 Due-date policy
 
@@ -113,8 +82,7 @@ timezone, start)` wraps `validateAndNormalizeRrule` (rejects `COUNT=`, defaults
 - Callers that validate rrules construct a `RecurrenceRule` instead.
 - Test: existing `recurrence.utils.unit.test.ts` (26) keeps passing; add VO cases.
 
-**Done when:** `pnpm test:unit` covers policy, batch status, timer, recurrence rule,
-actor; `pnpm test:integration` unchanged and green.
+**Done when:** `pnpm test:unit` covers policy, batch status, timer, recurrence rule; `pnpm test:integration` unchanged and green.
 
 ---
 

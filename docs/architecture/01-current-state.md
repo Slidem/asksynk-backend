@@ -160,15 +160,15 @@ State machines live in services:
 exist only in `platform/` (`EventsPublisher`, `JobScheduler`, `Clock`,
 `ObjectStorage`, `EmailProvider`, `CalendarProvider`).
 
-### 3.6 No `Actor`
+### 3.6 `Actor` barely used
 
-Three identity shapes: `RequestActor` (`auth/auth.types.ts:29`, from
-`@RequestActor()`), `WsIdentity` (`websockets/services/ws-auth.service.ts:10`), and
-`AuthGuest`. `@RequestActor` is used by 2 controllers; one service method takes it
-(`NetworksService.resolveTargetUserId`). ~74 service methods take a bare
+`Actor` (`kernel/actor/actor.ts`) is returned by `@RequestActor()` and
+`WsAuthService.authenticateSocket`; built from `AuthUser` / `AuthGuest` in
+`auth/actor.mapper.ts`. Takers: `NetworksService.resolveTargetUserId`,
+`MessagingService.canAccessThread`. ~74 service methods still take a bare
 `userId: string`. `messaging.service.ts` duplicates methods in `X` / `guestX` pairs
-(`sendAsUser`/`sendAsGuest`, `getThreadStats`/`getGuestThreadStats`, …) and imports
-`WsIdentity` from `websockets` — a cycle, since `websockets` imports `messaging`.
+(`sendAsUser`/`sendAsGuest`, `getThreadStats`/`getGuestThreadStats`, …) taking
+`AuthGuest`; the gateway bridges via `toAuthGuest`.
 Guest capability rules ("guests cannot attach files / suggest tasks / update status")
 live only in `ws.gateway.ts`, so REST and WS can disagree.
 
@@ -201,7 +201,6 @@ path); 7 realtime `@EventHandler`s spanning messaging, timers, attention, tasks.
 - `auth ↔ public-views`: `auth.module` imports `PublicViewsModule`,
   `guest-auth.service` injects `PublicViewGuestsRepository` + `hashGuestToken`; public
   views controllers import auth decorators. The global guard depends on a feature.
-- `messaging ↔ websockets` (`WsIdentity`, above).
 - `tasks → attention-items`: `task-status.util.ts` imports `AttentionItemStatus`.
 
 ### 3.11 No boundary enforcement

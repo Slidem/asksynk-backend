@@ -11,6 +11,8 @@ import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
 
+import { toAuthGuest } from "@/api/auth/actor.mapper";
+import { Actor } from "@/api/kernel/actor/actor";
 import { DomainError } from "@/api/kernel/errors/domain-errors";
 import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/api/messaging/attachments/message-attachment.constants";
 import {
@@ -34,10 +36,7 @@ import { EventOf } from "@/api/platform/events/registry/events.types";
 import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
 import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
-import {
-  WsAuthService,
-  WsIdentity,
-} from "@/api/websockets/services/ws-auth.service";
+import { WsAuthService } from "@/api/websockets/services/ws-auth.service";
 import { guestRoom, threadRoom, userRoom } from "@/api/websockets/ws.rooms";
 import { Ack, SendAck } from "@/api/websockets/ws.types";
 
@@ -72,9 +71,9 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     socket.data.identity = identity;
 
     if (identity.kind === "user") {
-      await socket.join(userRoom(identity.user.id));
+      await socket.join(userRoom(identity.userId));
     } else {
-      await socket.join(guestRoom(identity.guest.id));
+      await socket.join(guestRoom(identity.guestId));
     }
   }
 
@@ -92,7 +91,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: { threadId?: string },
   ): Promise<Ack> {
-    const identity = socket.data.identity as WsIdentity | undefined;
+    const identity = socket.data.identity as Actor | undefined;
 
     if (!identity) {
       return { ok: false, error: "unauthorized" };
@@ -147,7 +146,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } | null;
     },
   ): Promise<SendAck> {
-    const identity = socket.data.identity as WsIdentity | undefined;
+    const identity = socket.data.identity as Actor | undefined;
 
     if (!identity) {
       return { ok: false, error: "unauthorized" };
@@ -216,7 +215,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           return { ok: false, error: "threadId required" };
         }
         const message = await this.messagingService.sendAsUser(
-          identity.user.id,
+          identity.userId,
           body.threadId,
           text,
           tagIds,
@@ -240,7 +239,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const message = await this.messagingService.sendAsGuest(
-        identity.guest,
+        toAuthGuest(identity),
         text,
         tagIds,
         parentMessageId,
@@ -248,7 +247,10 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: true, messageId: message.id };
     } catch (error) {
       if (error instanceof DomainError) {
-        return { ok: false, error: this.errorTranslator.translate(error).message };
+        return {
+          ok: false,
+          error: this.errorTranslator.translate(error).message,
+        };
       }
       this.logger.error("message.send failed", { error });
       return { ok: false, error: "internal_error" };
@@ -260,7 +262,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: { messageId?: string; tagIds?: string[] },
   ): Promise<Ack> {
-    const identity = socket.data.identity as WsIdentity | undefined;
+    const identity = socket.data.identity as Actor | undefined;
 
     if (!identity) {
       return { ok: false, error: "unauthorized" };
@@ -282,13 +284,13 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       if (identity.kind === "user") {
         await this.messagingService.tagMessage(
-          identity.user.id,
+          identity.userId,
           body.messageId,
           tagIds,
         );
       } else {
         await this.messagingService.tagMessageAsGuest(
-          identity.guest,
+          toAuthGuest(identity),
           body.messageId,
           tagIds,
         );
@@ -296,7 +298,10 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { ok: true };
     } catch (error) {
       if (error instanceof DomainError) {
-        return { ok: false, error: this.errorTranslator.translate(error).message };
+        return {
+          ok: false,
+          error: this.errorTranslator.translate(error).message,
+        };
       }
       this.logger.error("message.tag failed", { error });
       return { ok: false, error: "internal_error" };
@@ -308,7 +313,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: { messageId?: string; status?: string },
   ): Promise<Ack> {
-    const identity = socket.data.identity as WsIdentity | undefined;
+    const identity = socket.data.identity as Actor | undefined;
 
     if (!identity) {
       return { ok: false, error: "unauthorized" };
@@ -336,14 +341,17 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       await this.messagingService.updateManagedStatus(
-        identity.user.id,
+        identity.userId,
         body.messageId,
         status as ManagedMessageStatus,
       );
       return { ok: true };
     } catch (error) {
       if (error instanceof DomainError) {
-        return { ok: false, error: this.errorTranslator.translate(error).message };
+        return {
+          ok: false,
+          error: this.errorTranslator.translate(error).message,
+        };
       }
       this.logger.error("message.updateStatus failed", { error });
       return { ok: false, error: "internal_error" };
