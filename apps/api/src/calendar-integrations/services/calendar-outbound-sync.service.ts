@@ -2,10 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
+import { utcToIso } from "@/api/calendar-events/domain/recurrence";
 import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
 import { CalendarRepository } from "@/api/calendar-events/repositories/calendar.repository";
 import { CalendarEventsRepository } from "@/api/calendar-events/repositories/calendar-events.repository";
-import { utcToIso } from "@/api/calendar-events/utils/recurrence.utils";
 import { CalendarEventLink } from "@/api/calendar-integrations/entities/calendar-event-link.entity";
 import { CalendarIntegration } from "@/api/calendar-integrations/entities/calendar-integration.entity";
 import { CalendarProviderRegistry } from "@/api/calendar-integrations/providers/calendar-provider.registry";

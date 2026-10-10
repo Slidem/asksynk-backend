@@ -19,6 +19,7 @@
     "test:integration:reset": "bash localdev/test-reset.sh",
     "test:unit": "pnpm --filter @asksynk/api test:unit",
     "test:integration": "pnpm --filter @asksynk/api test:integration",
+    "test:all": "pnpm --filter @asksynk/api test:all",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint --fix",

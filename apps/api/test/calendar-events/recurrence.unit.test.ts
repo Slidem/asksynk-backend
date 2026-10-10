@@ -3,7 +3,7 @@ import {
   replaceRruleUntil,
   utcToIso,
   validateAndNormalizeRrule,
-} from "@/api/calendar-events/utils/recurrence.utils";
+} from "@/api/calendar-events/domain/recurrence";
 import { DomainError } from "@/api/kernel/errors/domain-errors";
 
 // Europe/Bucharest 2026: EET (+02) → EEST (+03) on Mar 29 at 01:00Z,

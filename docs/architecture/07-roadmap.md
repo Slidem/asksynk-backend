@@ -16,7 +16,7 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 
 ---
 
-## Wave 1 — Extract the pure core
+## Wave 1 — Extract the pure core ✅
 
 **~1–2 days. No schema change. Every step is a move plus a unit test.**
 
@@ -25,8 +25,8 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 | 1.1 | `Actor` in `kernel/` ✅                     | 3h     | low        | integration suites (attention ↔ messaging)                  |
 | 1.2 | Due-date policy as a pure function ✅       | 2h     | none       | `attention-items.events-handler`, `tasks-attention`         |
 | 1.3 | Batch status derived in tasks' own terms ✅ | 1h     | none       | `task-status.util.unit`, `tasks-attention`                  |
-| 1.4 | Timer state machine as a domain object     | 4h     | **medium** | `timers.integration.test.ts` (14 cases)                     |
-| 1.5 | `RecurrenceRule` value object              | 2h     | low        | `recurrence.utils.unit` (26), `calendar-events.integration` |
+| 1.4 | Timer state machine as a domain object ✅   | 4h     | **medium** | `timers.integration.test.ts` (14 cases)                     |
+| 1.5 | `RecurrenceRule` value object ✅            | 2h     | low        | `recurrence.utils.unit` (26), `calendar-events.integration` |
 
 ### 1.1 `Actor` ✅
 
@@ -83,7 +83,7 @@ export const ownerUserIdOf = (a: Actor): string =>
 - Test: split the existing `test/tasks/task-status.util.unit.test.ts`; batch cases
   move to `task-batch-status.unit.test.ts` with `TaskStatus` expectations.
 
-### 1.4 Timer state machine
+### 1.4 Timer state machine ✅
 
 - New `timers/domain/timer.ts`: a `Timer` built from the `UserTimer` props with
   `start(session, now)`, `pause(now)`, `resume(now)`, `stop(now)`, `complete(now)`.
@@ -100,8 +100,11 @@ export const ownerUserIdOf = (a: Actor): string =>
   `transitionedAt` staleness check in `handleScheduledCompletion`.
 - Test: `test/timers/timer.unit.test.ts`, ~12 cases — every legal transition, every
   illegal one, pause-after-due completes, `remainingSeconds` clamps at 0.
+- As built: `Timer` replaced the `UserTimer` entity (repository returns it);
+  `now` only on `pause`/`stop` (the others don't need it); `validateTransitionInput`
+  became `assertValidTransitionInput` in the same file.
 
-### 1.5 `RecurrenceRule`
+### 1.5 `RecurrenceRule` ✅
 
 - New `calendar-events/domain/recurrence-rule.vo.ts`: `RecurrenceRule.create(rrule,
 timezone, start)` wraps `validateAndNormalizeRrule` (rejects `COUNT=`, defaults
@@ -112,6 +115,8 @@ timezone, start)` wraps `validateAndNormalizeRrule` (rejects `COUNT=`, defaults
   `calendar-sync.service`, `calendar-outbound-sync.service`) and the unit test import.
 - Callers that validate rrules construct a `RecurrenceRule` instead.
 - Test: existing `recurrence.utils.unit.test.ts` (26) keeps passing; add VO cases.
+- As built: test renamed `recurrence.unit.test.ts`; `RecurrenceRule.restore(value)`
+  rehydrates a stored rrule for `withUntil`. `CalendarEvent.rrule` stays a string.
 
 **Done when:** `pnpm test:unit` covers policy, batch status, timer, recurrence rule,
 actor; `pnpm test:integration` unchanged and green.

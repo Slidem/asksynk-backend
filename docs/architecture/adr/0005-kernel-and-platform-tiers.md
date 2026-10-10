@@ -39,8 +39,8 @@ template without editing `platform/`.
 
 ## As built
 
-- `kernel/`: `id.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts`;
-  `actor/` comes in Wave 1.1.
+- `kernel/`: `id.ts`, `actor/actor.ts`, `time/iso.ts`,
+  `errors/{domain-errors,error-catalog,kernel.errors}.ts`.
 - `platform/`: clock, config, db, decorators, email, errors, events, http, jobs,
   logger, mappers. `common/`, `infrastructure/`, `packages/shared` are gone.
 - The error catalog list lives in the composition root `src/error-catalogs.root.ts`

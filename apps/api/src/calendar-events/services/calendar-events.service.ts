@@ -3,6 +3,8 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { pick, pickBy } from "lodash";
 
 import { calendarEventError } from "@/api/calendar-events/calendar-events.errors";
+import { parseIsoWallClockInTimezone } from "@/api/calendar-events/domain/recurrence";
+import { RecurrenceRule } from "@/api/calendar-events/domain/recurrence-rule.vo";
 import { Calendar } from "@/api/calendar-events/entities/calendar.entity";
 import { CalendarEvent } from "@/api/calendar-events/entities/calendar-event.entity";
 import { toCalendarEventInstance } from "@/api/calendar-events/mappers/calendar-event-instance.mapper";
@@ -14,11 +16,6 @@ import { SplitCalendarEventSeriesInput } from "@/api/calendar-events/models/spli
 import { UpdateCalendarEventInput } from "@/api/calendar-events/models/update-calendar-event.model";
 import { CalendarRepository } from "@/api/calendar-events/repositories/calendar.repository";
 import { CalendarEventsRepository } from "@/api/calendar-events/repositories/calendar-events.repository";
-import {
-  parseIsoWallClockInTimezone,
-  replaceRruleUntil,
-  validateAndNormalizeRrule,
-} from "@/api/calendar-events/utils/recurrence.utils";
 import { generateId } from "@/api/kernel/id";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import {
@@ -66,7 +63,7 @@ export class CalendarEventsService {
     const calendar = await this.ensureCalendar(userId);
 
     const rrule = input.rrule
-      ? validateAndNormalizeRrule(input.rrule, input.timezone, input.start)
+      ? RecurrenceRule.create(input.rrule, input.timezone, input.start).value
       : null;
 
     await this.validateTagIds(input.tagIds ?? [], userId);
@@ -193,7 +190,7 @@ export class CalendarEventsService {
 
     if (input.rrule !== undefined) {
       event.rrule = input.rrule
-        ? validateAndNormalizeRrule(input.rrule, event.timezone, event.start)
+        ? RecurrenceRule.create(input.rrule, event.timezone, event.start).value
         : null;
     }
 
@@ -334,11 +331,11 @@ export class CalendarEventsService {
       event.color = mergeNullable(input.color, event.color);
 
       if (input.rrule) {
-        event.rrule = validateAndNormalizeRrule(
+        event.rrule = RecurrenceRule.create(
           input.rrule,
           timezone,
           event.start,
-        );
+        ).value;
       }
 
       if (input.tagIds !== undefined) {
@@ -353,14 +350,16 @@ export class CalendarEventsService {
 
     // UNTIL = splitDate - 1 day + 1 second (just after previous occurrence)
     const newUntil = new Date(splitDate.getTime() - 86400000 + 1000);
-    const truncatedRrule = replaceRruleUntil(event.rrule!, newUntil);
+    const truncatedRrule = RecurrenceRule.restore(event.rrule!).withUntil(
+      newUntil,
+    ).value;
 
     const newRruleBase = input.rrule ?? event.rrule!;
-    const newRrule = validateAndNormalizeRrule(
+    const newRrule = RecurrenceRule.create(
       newRruleBase,
       timezone,
       splitDate,
-    );
+    ).value;
 
     await this.validateTagIds(input.tagIds ?? [], userId);
 

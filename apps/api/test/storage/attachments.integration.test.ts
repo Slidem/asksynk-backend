@@ -48,6 +48,7 @@ describe("Attachments (integration, real Garage)", () => {
   let app: INestApplication;
   let db: ReturnType<typeof import("drizzle-orm/node-postgres").drizzle>;
   const createdUserIds: string[] = [];
+  const createdThreadIds: string[] = [];
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -79,6 +80,12 @@ describe("Attachments (integration, real Garage)", () => {
   });
 
   afterAll(async () => {
+    // Threads first: messages.sender_user_id SET NULL would violate chk_messages_sender_one_of.
+    if (createdThreadIds.length) {
+      await db
+        .delete(messageThreads)
+        .where(inArray(messageThreads.id, createdThreadIds));
+    }
     if (createdUserIds.length) {
       await db.delete(users).where(inArray(users.id, createdUserIds));
     }
@@ -249,6 +256,7 @@ describe("Attachments (integration, real Garage)", () => {
 
     // Thread (owner + participant) with a message linking the attachment.
     const threadId = uuidv7();
+    createdThreadIds.push(threadId);
     const messageId = uuidv7();
     await db
       .insert(messageThreads)

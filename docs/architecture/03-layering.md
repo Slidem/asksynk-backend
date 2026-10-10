@@ -36,8 +36,8 @@ touch repositories (already true).
 | ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Contains          | pure domain vocabulary                                                          | framework-aware shared infra                                                      |
 | Imported by       | everything, **including `domain/`**                                             | `application/`, `infrastructure/`, `presentation/` — never `domain/`              |
-| Today             | `id.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http, jobs, logger, mappers |
-| Planned additions | `actor/` (Wave 1.1)                                                             | `realtime/realtime-broadcaster.ts` (Wave 4.1)                                     |
+| Today             | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http, jobs, logger, mappers |
+| Planned additions | —                                                                               | `realtime/realtime-broadcaster.ts` (Wave 4.1)                                     |
 
 **Placement test for `kernel/` — both must be yes:** (1) it is pure, transitively;
 (2) `domain/` code actually references it. Q2 keeps `kernel/` from becoming the old
@@ -178,7 +178,7 @@ Rich only where an invariant would otherwise be enforced in several places:
 
 | Aggregate             | Methods                                                                                | Replaces                      |
 | --------------------- | -------------------------------------------------------------------------------------- | ----------------------------- |
-| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | `timers.service.ts` guards    |
+| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | done (1.4): `timers/domain/timer.ts` |
 | `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
 | `Invite`              | `accept`, `reject`                                                                     | `networks.service.ts` guards  |
 | `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |

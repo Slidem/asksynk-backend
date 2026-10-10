@@ -5,7 +5,11 @@ import { Clock } from "@/api/platform/clock/clock";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import { TimerLifecycle } from "@/api/platform/events/registry/events.registry";
 import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
-import { UserTimer } from "@/api/timers/entities/user-timer.entity";
+import {
+  assertValidTransitionInput,
+  Timer,
+  TimerSession,
+} from "@/api/timers/domain/timer";
 import { UserTimerSettings } from "@/api/timers/entities/user-timer-settings.entity";
 import {
   BreakSuggestion,
@@ -24,7 +28,7 @@ import { timersError } from "@/api/timers/timers.errors";
 import { TimersRepository } from "@/api/timers/timers.repository";
 
 interface PersistResult {
-  entity: UserTimer;
+  entity: Timer;
   jobToCancel: string | null;
 }
 
@@ -40,7 +44,7 @@ export class TimersService {
 
   /** Current timer; lazily creates the idle row and completes an overdue running one. */
   @Transactional()
-  async getCurrent(userId: string): Promise<UserTimer> {
+  async getCurrent(userId: string): Promise<Timer> {
     const now = this.clock.now();
     const timer = await this.timersRepo.ensure(userId);
 
@@ -63,13 +67,16 @@ export class TimersService {
   async applyTransition(
     userId: string,
     input: TransitionTimerInput,
-  ): Promise<UserTimer> {
-    this.validateTransitionInput(input);
+  ): Promise<Timer> {
+    assertValidTransitionInput(input);
 
     switch (input.status) {
       case "running":
         return input.sessionType != null && input.durationSeconds != null
-          ? this.startSession(userId, input.sessionType, input.durationSeconds)
+          ? this.startSession(userId, {
+              sessionType: input.sessionType,
+              durationSeconds: input.durationSeconds,
+            })
           : this.resumeSession(userId);
       case "paused":
         return this.pauseSession(userId);
@@ -126,14 +133,9 @@ export class TimersService {
   // --- transition orchestrators (persist + cancel + schedule all join applyTransition's tx) ---
   private async startSession(
     userId: string,
-    sessionType: TimerSessionType,
-    durationSeconds: number,
-  ): Promise<UserTimer> {
-    const { entity, jobToCancel } = await this.persistStart(
-      userId,
-      sessionType,
-      durationSeconds,
-    );
+    session: TimerSession,
+  ): Promise<Timer> {
+    const { entity, jobToCancel } = await this.persistStart(userId, session);
 
     if (jobToCancel) {
       await this.jobs.cancel(TimerCompletionJob, jobToCancel);
@@ -143,13 +145,13 @@ export class TimersService {
     return entity;
   }
 
-  private async resumeSession(userId: string): Promise<UserTimer> {
+  private async resumeSession(userId: string): Promise<Timer> {
     const timer = await this.persistResume(userId);
     await this.scheduleCompletion(timer);
     return timer;
   }
 
-  private async pauseSession(userId: string): Promise<UserTimer> {
+  private async pauseSession(userId: string): Promise<Timer> {
     const { entity, jobToCancel } = await this.persistPause(userId);
     if (jobToCancel) {
       await this.jobs.cancel(TimerCompletionJob, jobToCancel);
@@ -157,7 +159,7 @@ export class TimersService {
     return entity;
   }
 
-  private async stopSession(userId: string): Promise<UserTimer> {
+  private async stopSession(userId: string): Promise<Timer> {
     const { entity, jobToCancel } = await this.persistStop(userId);
     if (jobToCancel) {
       await this.jobs.cancel(TimerCompletionJob, jobToCancel);
@@ -167,46 +169,43 @@ export class TimersService {
 
   private async persistStart(
     userId: string,
-    sessionType: TimerSessionType,
-    durationSeconds: number,
+    session: TimerSession,
   ): Promise<PersistResult> {
     const now = this.clock.now();
     const current = await this.timersRepo.ensure(userId);
+    const transition = current.start(session);
 
-    // Direct switch from a running session: complete the current one first
-    // (counts toward the long-break cadence + fires the completion notification),
-    // then start the new session and cancel the old completion job.
+    // Completing the running session counts toward the long-break cadence and
+    // fires the completion notification; its completion job gets cancelled.
     const jobToCancel = this.pendingCompletionJobId(current);
 
-    if (current.status === "running") {
+    if (transition.completesCurrent) {
       await this.complete(current, now);
     }
 
     const updated = await this.timersRepo.start(userId, {
-      sessionType,
-      durationSeconds,
+      sessionType: session.sessionType,
+      durationSeconds: session.durationSeconds,
       transitionedAt: now,
-      resetFocusCounter: sessionType === "long_break",
+      resetFocusCounter: transition.resetFocusCounter,
     });
 
     await this.publishLifecycle({
       userId,
       eventType: "started",
-      sessionType,
-      sessionDurationSeconds: durationSeconds,
-      remainingSeconds: durationSeconds,
+      sessionType: session.sessionType,
+      sessionDurationSeconds: session.durationSeconds,
+      remainingSeconds: session.durationSeconds,
       occurredAt: now,
     });
 
     return { entity: updated, jobToCancel };
   }
 
-  private async persistResume(userId: string): Promise<UserTimer> {
+  private async persistResume(userId: string): Promise<Timer> {
     const now = this.clock.now();
     const current = await this.timersRepo.ensure(userId);
-    if (current.status !== "paused") {
-      throw timersError("timer_not_paused");
-    }
+    current.resume();
     const updated = await this.timersRepo.resume(userId, now);
     if (!updated) throw timersError("timer_not_paused");
     await this.publishLifecycle({
@@ -223,26 +222,23 @@ export class TimersService {
   private async persistPause(userId: string): Promise<PersistResult> {
     const now = this.clock.now();
     const current = await this.timersRepo.ensure(userId);
-    if (current.status !== "running") {
-      throw timersError("timer_not_running");
-    }
+    const transition = current.pause(now);
     const jobToCancel = this.pendingCompletionJobId(current);
-    const remaining = current.remainingSeconds(now) ?? 0;
 
-    // Past due → complete instead of leaving a "paused at 0" zombie.
-    if (remaining <= 0) {
+    if (transition.type === "completed") {
       const completed = await this.complete(current, now);
       return { entity: completed ?? current, jobToCancel };
     }
 
-    const updated = await this.timersRepo.pause(userId, remaining, now);
+    const { remainingSeconds } = transition;
+    const updated = await this.timersRepo.pause(userId, remainingSeconds, now);
     if (!updated) throw timersError("timer_not_running");
     await this.publishLifecycle({
       userId,
       eventType: "paused",
       sessionType: updated.sessionType!,
       sessionDurationSeconds: updated.sessionDurationSeconds!,
-      remainingSeconds: remaining,
+      remainingSeconds,
       occurredAt: now,
     });
     return { entity: updated, jobToCancel };
@@ -251,14 +247,11 @@ export class TimersService {
   private async persistStop(userId: string): Promise<PersistResult> {
     const now = this.clock.now();
     const current = await this.timersRepo.ensure(userId);
-
-    if (current.status !== "running" && current.status !== "paused") {
-      throw timersError("no_active_timer");
-    }
+    const transition = current.stop(now);
 
     const jobToCancel = this.pendingCompletionJobId(current);
-    const remaining = current.remainingSeconds(now) ?? 0;
-    const updated = await this.timersRepo.stop(userId, remaining, now);
+    const { remainingSeconds } = transition;
+    const updated = await this.timersRepo.stop(userId, remainingSeconds, now);
 
     if (!updated) {
       throw timersError("no_active_timer");
@@ -269,7 +262,7 @@ export class TimersService {
       eventType: "stopped",
       sessionType: updated.sessionType!,
       sessionDurationSeconds: updated.sessionDurationSeconds!,
-      remainingSeconds: remaining,
+      remainingSeconds,
       occurredAt: now,
     });
     return { entity: updated, jobToCancel };
@@ -300,15 +293,12 @@ export class TimersService {
    * Idempotent completion shared by the job, lazy-GET, and pause-when-due. Returns the completed timer, or
    * null if nothing was completed (lost the race / stale).
    */
-  private async complete(
-    timer: UserTimer,
-    now: Date,
-  ): Promise<UserTimer | null> {
-    if (timer.transitionedAt === null) return null;
+  private async complete(timer: Timer, now: Date): Promise<Timer | null> {
+    const { transitionedAt } = timer.complete();
 
     const completed = await this.timersRepo.completeIfRunning(
       timer.userId,
-      timer.transitionedAt,
+      transitionedAt,
       now,
     );
 
@@ -331,7 +321,7 @@ export class TimersService {
    * has no transitionedAt, does nothing. Caller should ensure the timer is still running at the scheduled time to avoid
    * zombies.
    */
-  private async scheduleCompletion(timer: UserTimer): Promise<void> {
+  private async scheduleCompletion(timer: Timer): Promise<void> {
     const runAt = timer.completesAt();
     if (!runAt || timer.transitionedAt === null) return;
     await this.jobs.schedule(
@@ -345,24 +335,9 @@ export class TimersService {
   }
 
   /** Id of the completion job pending for `timer`, if any. Only a running timer has one. */
-  private pendingCompletionJobId(timer: UserTimer): string | null {
+  private pendingCompletionJobId(timer: Timer): string | null {
     return timer.status === "running" && timer.transitionedAt
       ? timerCompletionJobId(timer.userId, timer.transitionedAt)
       : null;
-  }
-
-  private validateTransitionInput(input: TransitionTimerInput): void {
-    const hasSessionType = input.sessionType != null;
-    const hasDuration = input.durationSeconds != null;
-    if (hasSessionType !== hasDuration) {
-      throw timersError("invalid_session_input", {
-        reason: "sessionType and durationSeconds must be provided together",
-      });
-    }
-    if (hasSessionType && input.status !== "running") {
-      throw timersError("invalid_session_input", {
-        reason: "session fields are only valid when starting (status=running)",
-      });
-    }
   }
 }

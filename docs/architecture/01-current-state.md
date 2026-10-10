@@ -123,7 +123,7 @@ Deliberately FK-less soft refs already exist and are the pattern to copy:
 - `attention-items.repository.ts:355-423` (`findEarliestUpcomingOccurrenceForTags`) —
   raw SQL CTE over `calendar_events`, `calendar_event_tags`,
   `calendar_event_exceptions`, `CROSS JOIN LATERAL rrule.between(...)`, hardcoded
-  365-day window. Duplicates recurrence logic in `recurrence.utils.ts`.
+  365-day window. Duplicates recurrence logic in `calendar-events/domain/recurrence.ts`.
 - `attention-items.repository.ts` joins `tags` 6× via the query builder.
 - `messaging.repository.ts:446-497` — raw SQL joining `users`, `public_view_guests`,
   `public_views`, `user_network`.
@@ -140,16 +140,12 @@ must not move" invariant is still a `.filter()` inside `recomputeForItems`.
 ### 3.4 The domain model is anemic
 
 20 entity classes; each has a bare `static create()` and only predicates/getters
-(`belongsTo`, `isDeleted`, `isPending`…). None owns a state transition. A few encode
-a small rule: `UserTimer` (`completesAt`, `remainingSeconds`, `isDue`),
-`CalendarIntegration.accessTokenExpired`, `PublicView.isLive`, `Invite.isForEmail`.
+(`belongsTo`, `isDeleted`, `isPending`…). Only `Timer` (`timers/domain/timer.ts`)
+owns its state transitions; `RecurrenceRule` (`calendar-events/domain/`) is the one
+value object. A few encode a small rule: `CalendarIntegration.accessTokenExpired`, `PublicView.isLive`, `Invite.isForEmail`.
 
 State machines live in services:
 
-- `timers/timers.service.ts` — five-state timer (`idle | running | paused | completed
-| stopped`): `persistStart` 168-202, `persistResume` 204-221, `persistPause` 223-249,
-  `persistStop` 251-279, `complete` 303-328, `validateTransitionInput` 354-367. The
-  repository repeats the guards as `WHERE` clauses (a concurrency guard — keep it).
 - `tasks/services/task-suggestions.service.ts` — `requirePending()` guards.
 - `networks/services/networks.service.ts` — invite status guards.
 - `attention-items.service.ts` — status/note/tags assigned field by field.

@@ -4,7 +4,8 @@ How the backend is shaped today, the pragmatic-DDD shape it is moving to, and th
 order to get there. Audited against the code at `5129fc8` (2026-10-10).
 
 **Status:** Wave 0 (safety net, `kernel/` + `platform/` split, typed errors, events,
-jobs) is done. **Next: [Wave 1 — extract the pure core](07-roadmap.md#wave-1--extract-the-pure-core).**
+jobs) and Wave 1 (pure core: `Actor`, due-date policy, batch status, `Timer`,
+`RecurrenceRule`) are done. **Next: [Wave 2 — ports and contracts](07-roadmap.md#wave-2--ports-and-contracts-one-context-at-a-time).**
 
 ---
 

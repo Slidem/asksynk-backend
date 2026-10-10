@@ -14,6 +14,7 @@ import { AllowGuest } from "@/api/auth/allowGuest.decorator";
 import { AuthUser as AuthUserType } from "@/api/auth/auth.types";
 import { AuthUser } from "@/api/auth/authUser.decorator";
 import { RequestActor } from "@/api/auth/requestActor.decorator";
+import { parseIsoWallClockInTimezone } from "@/api/calendar-events/domain/recurrence";
 import { toCalendarResponseDto } from "@/api/calendar-events/rest/calendar.mapper";
 import { AddCalendarEventExceptionRequestDto } from "@/api/calendar-events/rest/dto/add-calendar-event-exception.dto";
 import { CreateCalendarEventRequestDto } from "@/api/calendar-events/rest/dto/create-calendar-event.dto";
@@ -24,7 +25,6 @@ import { UpdateCalendarEventInstanceRequestDto } from "@/api/calendar-events/res
 import { CalendarResponseDto } from "@/api/calendar-events/rest/responses/calendar.response";
 import { CalendarEventInstanceResponse } from "@/api/calendar-events/rest/responses/calendar-event-instance.response";
 import { CalendarEventsService } from "@/api/calendar-events/services/calendar-events.service";
-import { parseIsoWallClockInTimezone } from "@/api/calendar-events/utils/recurrence.utils";
 import { Actor } from "@/api/kernel/actor/actor";
 import { NetworksService } from "@/api/networks/services/networks.service";
 import {

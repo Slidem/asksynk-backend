@@ -3,7 +3,7 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { TxAdapter } from "@/api/platform/db/tx.module";
-import { UserTimer } from "@/api/timers/entities/user-timer.entity";
+import { Timer } from "@/api/timers/domain/timer";
 import {
   TimerEventType,
   TimerSessionType,
@@ -12,7 +12,7 @@ import {
 import { userTimerEvents } from "@/migrations/schema/userTimerEvents";
 import { userTimers } from "@/migrations/schema/userTimers";
 
-type UserTimerRow = typeof userTimers.$inferSelect;
+type TimerRow = typeof userTimers.$inferSelect;
 
 interface StartInput {
   sessionType: TimerSessionType;
@@ -35,7 +35,7 @@ export class TimersRepository {
   constructor(private readonly txHost: TransactionHost<TxAdapter>) {}
 
   /** Lazily create the user's idle timer row if missing, then return it. */
-  async ensure(userId: string): Promise<UserTimer> {
+  async ensure(userId: string): Promise<Timer> {
     await this.txHost.tx
       .insert(userTimers)
       .values({ userId })
@@ -46,7 +46,7 @@ export class TimersRepository {
     return timer!;
   }
 
-  async getByUserId(userId: string): Promise<UserTimer | null> {
+  async getByUserId(userId: string): Promise<Timer | null> {
     const [row] = await this.txHost.tx
       .select()
       .from(userTimers)
@@ -58,7 +58,7 @@ export class TimersRepository {
    * Start a fresh session. Unconditional — overrides whatever state the timer
    * is in (the caller completes a running session first when switching).
    */
-  async start(userId: string, input: StartInput): Promise<UserTimer> {
+  async start(userId: string, input: StartInput): Promise<Timer> {
     const [row] = await this.txHost.tx
       .update(userTimers)
       .set({
@@ -80,7 +80,7 @@ export class TimersRepository {
     userId: string,
     remainingAtTransition: number,
     transitionedAt: Date,
-  ): Promise<UserTimer | null> {
+  ): Promise<Timer | null> {
     const [row] = await this.txHost.tx
       .update(userTimers)
       .set({
@@ -100,7 +100,7 @@ export class TimersRepository {
   async resume(
     userId: string,
     transitionedAt: Date,
-  ): Promise<UserTimer | null> {
+  ): Promise<Timer | null> {
     const [row] = await this.txHost.tx
       .update(userTimers)
       .set({
@@ -120,7 +120,7 @@ export class TimersRepository {
     userId: string,
     remainingAtTransition: number,
     transitionedAt: Date,
-  ): Promise<UserTimer | null> {
+  ): Promise<Timer | null> {
     const [row] = await this.txHost.tx
       .update(userTimers)
       .set({
@@ -149,7 +149,7 @@ export class TimersRepository {
     userId: string,
     transitionedAtGuard: Date,
     now: Date,
-  ): Promise<UserTimer | null> {
+  ): Promise<Timer | null> {
     const [row] = await this.txHost.tx
       .update(userTimers)
       .set({
@@ -180,8 +180,8 @@ export class TimersRepository {
     });
   }
 
-  private mapRow(row: UserTimerRow): UserTimer {
-    return UserTimer.create({
+  private mapRow(row: TimerRow): Timer {
+    return Timer.create({
       id: row.id,
       userId: row.userId,
       status: row.status as TimerStatus,

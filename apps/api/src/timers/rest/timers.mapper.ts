@@ -1,11 +1,11 @@
-import { UserTimer } from "@/api/timers/entities/user-timer.entity";
+import { Timer } from "@/api/timers/domain/timer";
 import { UserTimerSettings } from "@/api/timers/entities/user-timer-settings.entity";
 import { BreakSuggestion } from "@/api/timers/models/timer.model";
 import { BreakSuggestionResponse } from "@/api/timers/rest/responses/break-suggestion.response";
 import { TimerResponse } from "@/api/timers/rest/responses/timer.response";
 import { TimerSettingsResponse } from "@/api/timers/rest/responses/timer-settings.response";
 
-export function toTimerResponse(timer: UserTimer, now: Date): TimerResponse {
+export function toTimerResponse(timer: Timer, now: Date): TimerResponse {
   const completesAt = timer.completesAt();
   return {
     id: timer.id,
