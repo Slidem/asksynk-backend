@@ -8,14 +8,14 @@ The product. Design target for Waves 1.2 (policy), 5 (aggregate) and 6 (typed so
 _A thing that arrived, carrying tags, that the user has to decide about — and the tags
 decide when._
 
-| Data                                     | Owner                 | Written by                       |
-| ---------------------------------------- | --------------------- | -------------------------------- |
-| source identity                          | source context        | ingestion, once                  |
-| preview (title, body, sender)            | source context        | ingestion, every update          |
-| `tagIds`                                 | source context        | ingestion, every update          |
-| `status`                                 | contested — §5        | the user _and_ the source        |
-| `dueDate`, `dueDatePinned`               | **attention**         | the due-date policy, or the user |
-| `note`                                   | **attention**         | the user                         |
+| Data                          | Owner          | Written by                       |
+| ----------------------------- | -------------- | -------------------------------- |
+| source identity               | source context | ingestion, once                  |
+| preview (title, body, sender) | source context | ingestion, every update          |
+| `tagIds`                      | source context | ingestion, every update          |
+| `status`                      | contested — §5 | the user _and_ the source        |
+| `dueDate`, `dueDatePinned`    | **attention**  | the due-date policy, or the user |
+| `note`                        | **attention**  | the user                         |
 
 An aggregate with a projected slice. `dueDate`, `dueDatePinned` and user-set `status`
 are decisions no source can make — that is the product.
@@ -32,25 +32,40 @@ unindexed probe.
 ## 3. Typed source identity (Wave 6)
 
 ```ts
-export const attentionItems = attention.table("attention_items", {
-  id: uuid("id").primaryKey().default(sql`uuidv7()`),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+export const attentionItems = attention.table(
+  "attention_items",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuidv7()`),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
 
-  sourceContext: text("source_context").notNull(), // 'conversations' | 'tasks' | 'channels.gmail' | …
-  sourceKind: text("source_kind").notNull(),       // 'message' | 'task' | 'task_batch' | 'task_suggestion'
-  sourceId: text("source_id").notNull(),           // opaque to attention
-  preview: jsonb("preview").$type<AttentionPreview>().notNull(), // display only
+    sourceContext: text("source_context").notNull(), // 'conversations' | 'tasks' | 'channels.gmail' | …
+    sourceKind: text("source_kind").notNull(), // 'message' | 'task' | 'task_batch' | 'task_suggestion'
+    sourceId: text("source_id").notNull(), // opaque to attention
+    preview: jsonb("preview").$type<AttentionPreview>().notNull(), // display only
 
-  status: attentionItemStatus("status").notNull().default("created"),
-  dueDate: timestamp("due_date", { withTimezone: true }),
-  dueDatePinned: boolean("due_date_pinned").notNull().default(false),
-  dueSourceEventId: uuid("due_source_event_id"),   // soft ref into scheduling
-  note: text("note"),
-  deletedAt, createdAt, updatedAt,
-}, (t) => [
-  uniqueIndex("uq_attention_items_source").on(t.userId, t.sourceContext, t.sourceKind, t.sourceId),
-  // + existing user/status, user/due_date, due_source_event partial indexes
-]);
+    status: attentionItemStatus("status").notNull().default("created"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    dueDatePinned: boolean("due_date_pinned").notNull().default(false),
+    dueSourceEventId: uuid("due_source_event_id"), // soft ref into scheduling
+    note: text("note"),
+    deletedAt,
+    createdAt,
+    updatedAt,
+  },
+  (t) => [
+    uniqueIndex("uq_attention_items_source").on(
+      t.userId,
+      t.sourceContext,
+      t.sourceKind,
+      t.sourceId,
+    ),
+    // + existing user/status, user/due_date, due_source_event partial indexes
+  ],
+);
 ```
 
 - **Three-part source:** `tasks` alone produces three kinds; one enum would recreate
@@ -74,7 +89,11 @@ export const AttentionSourceUpserted = defineEvent({
   schema: z.object({
     userId: z.string(),
     source: z.object({ context: z.string(), kind: z.string(), id: z.string() }),
-    preview: z.object({ title: z.string(), body: z.string().nullable(), actorLabel: z.string().nullable() }),
+    preview: z.object({
+      title: z.string(),
+      body: z.string().nullable(),
+      actorLabel: z.string().nullable(),
+    }),
     tagIds: z.array(z.string()),
     status: z.enum(["created", "in_progress", "resolved"]),
     dueDate: z.string().nullable(), // non-null = explicit, pins the item
@@ -84,7 +103,10 @@ export const AttentionSourceUpserted = defineEvent({
 });
 export const AttentionSourceRemoved = defineEvent({
   name: "attention.source.removed",
-  schema: z.object({ userId: z.string(), source: z.object({ context: z.string(), kind: z.string(), id: z.string() }) }),
+  schema: z.object({
+    userId: z.string(),
+    source: z.object({ context: z.string(), kind: z.string(), id: z.string() }),
+  }),
   delivery: DeliveryMode.Durable,
 });
 ```
@@ -122,7 +144,7 @@ making it carry tasks' own `TaskStatus` so translation happens exactly once.
 
 ```ts
 export class AttentionItem {
-  static open(input: OpenAttentionItem): AttentionItem;    // source triple + userId non-empty
+  static open(input: OpenAttentionItem): AttentionItem; // source triple + userId non-empty
   static rehydrate(props: AttentionItemProps): AttentionItem;
 
   // owned by attention
@@ -158,7 +180,10 @@ Today: `AttentionDueDateService.pickEarliestCandidate`
 ```ts
 // domain/due-date.policy.ts
 export type TimeblockOccurrence = { startAt: Date; eventId: string };
-export type DueDateDecision = { dueDate: Date | null; dueSourceEventId: string | null };
+export type DueDateDecision = {
+  dueDate: Date | null;
+  dueSourceEventId: string | null;
+};
 
 /** Earliest wins. immediately → base + responseTimeMillis; timeblock → next occurrence
  *  of an event carrying that tag. Ties keep the first candidate. */
@@ -171,11 +196,19 @@ export function decideDueDate(input: {
   let dueSourceEventId: string | null = null;
   for (const mode of input.answerModes) {
     if (mode.type === "immediately") {
-      const candidate = new Date(input.base.getTime() + mode.responseTimeMillis);
-      if (!dueDate || candidate < dueDate) { dueDate = candidate; dueSourceEventId = null; }
+      const candidate = new Date(
+        input.base.getTime() + mode.responseTimeMillis,
+      );
+      if (!dueDate || candidate < dueDate) {
+        dueDate = candidate;
+        dueSourceEventId = null;
+      }
     } else {
       const occ = input.occurrences.get(mode.tagId);
-      if (occ && (!dueDate || occ.startAt < dueDate)) { dueDate = occ.startAt; dueSourceEventId = occ.eventId; }
+      if (occ && (!dueDate || occ.startAt < dueDate)) {
+        dueDate = occ.startAt;
+        dueSourceEventId = occ.eventId;
+      }
     }
   }
   return { dueDate, dueSourceEventId };
@@ -207,12 +240,12 @@ fetch modes + occurrences once, `decideDueDate` per item, save + publish when
 
 ## 7. Designed-in growth
 
-| Feature                  | Cost after this design                                       | Do now                                                                       |
-| ------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Gmail / Slack / WhatsApp | `channels/<provider>/` publishing `AttentionSourceUpserted`   | Nothing beyond Wave 6. Don't create `channels/` speculatively                |
-| Gamification             | `momentum/` consuming `attention.item.resolved`               | Publish `attention.item.resolved { userId, itemId, resolvedAt, dueDate, wasOverdue }` (6.5) so history exists |
-| Analytics                | `insights` projections from events                            | Nothing. Don't use the outbox as an event log (retention prunes it at 30 days) |
-| AI agents                | Another `Actor` through the same application layer            | `Actor` everywhere (Wave 1.1 onward)                                         |
+| Feature                  | Cost after this design                                      | Do now                                                                                                        |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Gmail / Slack / WhatsApp | `channels/<provider>/` publishing `AttentionSourceUpserted` | Nothing beyond Wave 6. Don't create `channels/` speculatively                                                 |
+| Gamification             | `momentum/` consuming `attention.item.resolved`             | Publish `attention.item.resolved { userId, itemId, resolvedAt, dueDate, wasOverdue }` (6.5) so history exists |
+| Analytics                | `insights` projections from events                          | Nothing. Don't use the outbox as an event log (retention prunes it at 30 days)                                |
+| AI agents                | Another `Actor` through the same application layer          | `Actor` everywhere (Wave 1.1 onward)                                                                          |
 
 ## 8. Migration
 

@@ -138,15 +138,15 @@ export class CalendarEventsService {
     const calendars = await this.calendarRepository.listByUserId(userId);
     if (calendars.length === 0) return [];
 
-    let calendarIds = calendars.map((c) => c.id);
-    if (input.calendarId) {
-      if (!calendarIds.includes(input.calendarId)) {
-        throw calendarEventError("calendar_not_found", {
-          id: input.calendarId,
-        });
-      }
-      calendarIds = [input.calendarId];
+    const allCalendarIds = calendars.map((c) => c.id);
+
+    if (input.calendarId && !allCalendarIds.includes(input.calendarId)) {
+      throw calendarEventError("calendar_not_found", {
+        id: input.calendarId,
+      });
     }
+
+    const calendarIds = input.calendarId ? [input.calendarId] : allCalendarIds;
 
     return this.calendarEventsRepository.listInWindow(
       calendarIds,

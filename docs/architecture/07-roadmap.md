@@ -20,13 +20,13 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 
 **~1–2 days. No schema change. Every step is a move plus a unit test.**
 
-| #   | Step                                         | Effort | Risk       | Safety net                                   |
-| --- | -------------------------------------------- | ------ | ---------- | -------------------------------------------- |
-| 1.1 | `Actor` in `kernel/`                         | 3h     | low        | integration suites (attention ↔ messaging)   |
-| 1.2 | Due-date policy as a pure function           | 2h     | none       | `attention-items.events-handler`, `tasks-attention` |
-| 1.3 | Batch status derived in tasks' own terms     | 1h     | none       | `task-status.util.unit`, `tasks-attention`   |
-| 1.4 | Timer state machine as a domain object       | 4h     | **medium** | `timers.integration.test.ts` (14 cases)      |
-| 1.5 | `RecurrenceRule` value object                | 2h     | low        | `recurrence.utils.unit` (26), `calendar-events.integration` |
+| #   | Step                                     | Effort | Risk       | Safety net                                                  |
+| --- | ---------------------------------------- | ------ | ---------- | ----------------------------------------------------------- |
+| 1.1 | `Actor` in `kernel/`                     | 3h     | low        | integration suites (attention ↔ messaging)                  |
+| 1.2 | Due-date policy as a pure function       | 2h     | none       | `attention-items.events-handler`, `tasks-attention`         |
+| 1.3 | Batch status derived in tasks' own terms | 1h     | none       | `task-status.util.unit`, `tasks-attention`                  |
+| 1.4 | Timer state machine as a domain object   | 4h     | **medium** | `timers.integration.test.ts` (14 cases)                     |
+| 1.5 | `RecurrenceRule` value object            | 2h     | low        | `recurrence.utils.unit` (26), `calendar-events.integration` |
 
 ### 1.1 `Actor`
 
@@ -34,8 +34,14 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 // kernel/actor/actor.ts   (the empty kernel/actor/ folder is already there)
 export type Actor =
   | { kind: "user"; userId: string; email: string }
-  | { kind: "guest"; guestId: string; publicViewId: string; ownerUserId: string;
-      displayName: string; expiresAt: Date };
+  | {
+      kind: "guest";
+      guestId: string;
+      publicViewId: string;
+      ownerUserId: string;
+      displayName: string;
+      expiresAt: Date;
+    };
 
 export const ownerUserIdOf = (a: Actor): string =>
   a.kind === "guest" ? a.ownerUserId : a.userId;
@@ -98,7 +104,7 @@ export const ownerUserIdOf = (a: Actor): string =>
 ### 1.5 `RecurrenceRule`
 
 - New `calendar-events/domain/recurrence-rule.vo.ts`: `RecurrenceRule.create(rrule,
-  timezone, start)` wraps `validateAndNormalizeRrule` (rejects `COUNT=`, defaults
+timezone, start)` wraps `validateAndNormalizeRrule` (rejects `COUNT=`, defaults
   `UNTIL` to start + 1y, caps `UNTIL` at 12 months, embeds `TZID=`); exposes
   `.value` and `.withUntil(date)` (`replaceRruleUntil`).
 - Move `recurrence.utils.ts` (233 LOC) to `calendar-events/domain/recurrence.ts`;
@@ -116,16 +122,16 @@ actor; `pnpm test:integration` unchanged and green.
 
 **3–5 days.** Smallest first to validate the template.
 
-| #   | Step                                                                                                                         | Effort | Risk                |
-| --- | ---------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------- |
-| 2.1 | **`tags` → `tagging` pilot.** `domain/ports/tag.repository.ts` + Drizzle adapter; `contract/tag-catalog.port.ts` (`assertOwnedBy`, `getAnswerModes`). Module exports only the contract. Kills the 3× `TagRepository` | 4h | low |
-| 2.2 | **Merge into `scheduling`.** `calendar-events` + `calendar-integrations`, pure file moves, no behaviour change                 | 1 day  | **medium**          |
-| 2.3 | `scheduling/contract/occurrence.port.ts`; move `attention-items.repository.ts:355-423` verbatim                              | 4h     | low                 |
-| 2.4 | `storage` contract: `AttachmentCatalogPort` (`getSummaries`, `assertUsable`, `resolveMany`); drop `@Global` + repo export    | 2h     | low                 |
-| 2.5 | `networks` contract: `ConnectionPolicyPort`; `resolveTargetUserId` out of the two controllers into application code, using `Actor` | 3h | low          |
-| 2.6 | Invert `auth → public-views`: `GuestIdentityProvider`, registered by sharing at bootstrap                                    | 4h     | **medium** — auth   |
-| 2.7 | `sharing` contract: public-link liveness for messaging; ports for the cross-table reads in `messaging.repository.ts:446-497` and `public-view-guests.repository.ts` | 3h | low |
-| 2.8 | Repository ports for the rest: `timers`, `tasks`, `networks`, `public-views`, `messaging`, `attention-items`                 | 1 day  | low, mechanical     |
+| #   | Step                                                                                                                                                                                                                 | Effort | Risk              |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------- |
+| 2.1 | **`tags` → `tagging` pilot.** `domain/ports/tag.repository.ts` + Drizzle adapter; `contract/tag-catalog.port.ts` (`assertOwnedBy`, `getAnswerModes`). Module exports only the contract. Kills the 3× `TagRepository` | 4h     | low               |
+| 2.2 | **Merge into `scheduling`.** `calendar-events` + `calendar-integrations`, pure file moves, no behaviour change                                                                                                       | 1 day  | **medium**        |
+| 2.3 | `scheduling/contract/occurrence.port.ts`; move `attention-items.repository.ts:355-423` verbatim                                                                                                                      | 4h     | low               |
+| 2.4 | `storage` contract: `AttachmentCatalogPort` (`getSummaries`, `assertUsable`, `resolveMany`); drop `@Global` + repo export                                                                                            | 2h     | low               |
+| 2.5 | `networks` contract: `ConnectionPolicyPort`; `resolveTargetUserId` out of the two controllers into application code, using `Actor`                                                                                   | 3h     | low               |
+| 2.6 | Invert `auth → public-views`: `GuestIdentityProvider`, registered by sharing at bootstrap                                                                                                                            | 4h     | **medium** — auth |
+| 2.7 | `sharing` contract: public-link liveness for messaging; ports for the cross-table reads in `messaging.repository.ts:446-497` and `public-view-guests.repository.ts`                                                  | 3h     | low               |
+| 2.8 | Repository ports for the rest: `timers`, `tasks`, `networks`, `public-views`, `messaging`, `attention-items`                                                                                                         | 1 day  | low, mechanical   |
 
 - After 2.1: `grep -rn "TagRepository" apps/api/src | grep -v "^apps/api/src/tagging/"` → empty.
 - After 2.2: both calendar integration suites green; `grep -rc "@/api/calendar-integrations"` → 0.
@@ -135,11 +141,11 @@ actor; `pnpm test:integration` unchanged and green.
 
 **2–3 days, one context per commit.**
 
-| #   | Step                                                                                                | Effort |
-| --- | --------------------------------------------------------------------------------------------------- | ------ |
-| 3.1 | Add `dependency-cruiser`, `eslint-plugin-boundaries` and `no-restricted-imports` (see Guardrails), as **warnings** | 2h |
-| 3.2 | Move each context into `contract / domain / application / infrastructure / presentation`; rename to target names | 2 days |
-| 3.3 | Promote rules to `error` per context as it goes clean; `pnpm lint:boundaries` in CI                 | 1h     |
+| #   | Step                                                                                                               | Effort |
+| --- | ------------------------------------------------------------------------------------------------------------------ | ------ |
+| 3.1 | Add `dependency-cruiser`, `eslint-plugin-boundaries` and `no-restricted-imports` (see Guardrails), as **warnings** | 2h     |
+| 3.2 | Move each context into `contract / domain / application / infrastructure / presentation`; rename to target names   | 2 days |
+| 3.3 | Promote rules to `error` per context as it goes clean; `pnpm lint:boundaries` in CI                                | 1h     |
 
 Smallest first (`storage`→files, `timers`→focus, `networks`→network) before the
 2,000-line ones.
@@ -148,12 +154,12 @@ Smallest first (`storage`→files, `timers`→focus, `networks`→network) befor
 
 **~2 days.** Untangles `ws.gateway.ts`.
 
-| #   | Step                                                                                  | Effort | Risk            |
-| --- | ------------------------------------------------------------------------------------- | ------ | --------------- |
-| 4.1 | `platform/realtime/realtime-broadcaster.ts`; the gateway implements it                | 2h     | low             |
-| 4.2 | Move the 7 realtime `@EventHandler`s into per-context broadcasters                    | 4h     | low             |
-| 4.3 | **Collapse messaging's `X`/`guestX` pairs using `Actor`**; guest capability rules move from the gateway into the application layer | 1 day | **medium-high** |
-| 4.4 | Move the 5 `@SubscribeMessage` commands into the owning contexts, reusing REST DTOs and use cases | 3h | low |
+| #   | Step                                                                                                                               | Effort | Risk            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------- |
+| 4.1 | `platform/realtime/realtime-broadcaster.ts`; the gateway implements it                                                             | 2h     | low             |
+| 4.2 | Move the 7 realtime `@EventHandler`s into per-context broadcasters                                                                 | 4h     | low             |
+| 4.3 | **Collapse messaging's `X`/`guestX` pairs using `Actor`**; guest capability rules move from the gateway into the application layer | 1 day  | **medium-high** |
+| 4.4 | Move the 5 `@SubscribeMessage` commands into the owning contexts, reusing REST DTOs and use cases                                  | 3h     | low             |
 
 4.3 is the riskiest step in the plan: messaging has no direct tests. Write them first.
 Verify with a fake `RealtimeBroadcaster`, and that WS and REST reject the same invalid
@@ -170,13 +176,13 @@ procedural guard. Methods per [03 §7](03-layering.md#7-rich-vs-not).
 
 **2–3 days plus a real migration.** Design: [06](06-attention-core.md).
 
-| #   | Step                                                                                            | Risk     |
-| --- | ----------------------------------------------------------------------------------------------- | -------- |
-| 6.1 | Add `source_*` + `preview` nullable; backfill from `metadata`; verify counts; add unique index  | **high** |
-| 6.2 | `AttentionSourceUpserted/Removed`; port `tasks` (outbound translator, `TaskUpserted` carries `TaskStatus`); dual-publish | low |
-| 6.3 | Port `messaging` and the tag/calendar recompute handlers; delete the 3 bespoke handlers         | medium   |
-| 6.4 | Reads via `findBySource` (check `EXPLAIN`); **separate commit:** drop `metadata`, `type`, enum   | medium   |
-| 6.5 | Publish `attention.item.resolved`                                                               | none     |
+| #   | Step                                                                                                                     | Risk     |
+| --- | ------------------------------------------------------------------------------------------------------------------------ | -------- |
+| 6.1 | Add `source_*` + `preview` nullable; backfill from `metadata`; verify counts; add unique index                           | **high** |
+| 6.2 | `AttentionSourceUpserted/Removed`; port `tasks` (outbound translator, `TaskUpserted` carries `TaskStatus`); dual-publish | low      |
+| 6.3 | Port `messaging` and the tag/calendar recompute handlers; delete the 3 bespoke handlers                                  | medium   |
+| 6.4 | Reads via `findBySource` (check `EXPLAIN`); **separate commit:** drop `metadata`, `type`, enum                           | medium   |
+| 6.5 | Publish `attention.item.resolved`                                                                                        | none     |
 
 Verify: counts per old `type` = counts per `(source_context, source_kind)`; zero nulls;
 `attention-items.events-handler.integration.test.ts` green.
@@ -186,21 +192,21 @@ Verify: counts per old `type` = counts per `(source_context, source_kind)`; zero
 **1–2 days.** Last on purpose: by now it is a rename, not a redesign.
 → [05](05-persistence.md), [ADR 0001](adr/0001-schema-per-context.md)
 
-| #   | Step                                                                                         | Risk              |
-| --- | -------------------------------------------------------------------------------------------- | ----------------- |
-| 7.1 | Audit every raw `sql` template (33) for unqualified table names                               | **the main risk** |
-| 7.2 | `tag.deleted` handlers in each tagged context; then drop the 9 cross-context FKs              | low               |
-| 7.3 | `pgTable` → `<schema>.table`; `apps/migrations/src/schema/<context>/`; `schemaFilter`        | medium            |
-| 7.4 | One migration; verify on a fresh DB and on a copy of real data                                | **medium-high**   |
-| 7.5 | Orphan-count `@CronJob` replacing what the FKs guaranteed                                     | low               |
+| #   | Step                                                                                  | Risk              |
+| --- | ------------------------------------------------------------------------------------- | ----------------- |
+| 7.1 | Audit every raw `sql` template (33) for unqualified table names                       | **the main risk** |
+| 7.2 | `tag.deleted` handlers in each tagged context; then drop the 9 cross-context FKs      | low               |
+| 7.3 | `pgTable` → `<schema>.table`; `apps/migrations/src/schema/<context>/`; `schemaFilter` | medium            |
+| 7.4 | One migration; verify on a fresh DB and on a copy of real data                        | **medium-high**   |
+| 7.5 | Orphan-count `@CronJob` replacing what the FKs guaranteed                             | low               |
 
 7.2 can be pulled earlier; it is cheap and independently reversible. If 7.1 turns up
 more friction than expected, stopping after 7.2 keeps most of the benefit.
 
 ## Wave 8 — Cleanup
 
-| #   | Step                                                                                                       |
-| --- | ---------------------------------------------------------------------------------------------------------- |
+| #   | Step                                                                                                        |
+| --- | ----------------------------------------------------------------------------------------------------------- |
 | 8.1 | Split `events.registry.ts` into `<ctx>/contract/<ctx>.events.ts`; drop the `AttentionItemUpserted` zod copy |
 | 8.2 | `attachments.placement` → `visibility` + `owner_context`                                                    |
 | 8.3 | Merge `auth` + `user-profile` + `user-settings` → `identity`                                                |
@@ -240,28 +246,64 @@ module.exports = {
     exclude: { path: "\\.(unit|integration)\\.test\\.ts$" },
   },
   forbidden: [
-    { name: "cross-context-via-contract-only", severity: "error",
+    {
+      name: "cross-context-via-contract-only",
+      severity: "error",
       // root files (app.module.ts, error-catalogs.root.ts) don't match `from`
       from: { path: "^apps/api/src/([^/]+)/" },
-      to: { path: "^apps/api/src/(?!kernel/|platform/)([^/]+)/(?!contract/)", pathNot: "^apps/api/src/$1/" } },
-    { name: "no-foreign-repository", severity: "error",
+      to: {
+        path: "^apps/api/src/(?!kernel/|platform/)([^/]+)/(?!contract/)",
+        pathNot: "^apps/api/src/$1/",
+      },
+    },
+    {
+      name: "no-foreign-repository",
+      severity: "error",
       from: { path: "^apps/api/src/([^/]+)/" },
-      to: { path: "^apps/api/src/(?!$1/)[^/]+/.*\\.repository\\.ts$" } },
-    { name: "only-module-imports-infrastructure", severity: "error",
+      to: { path: "^apps/api/src/(?!$1/)[^/]+/.*\\.repository\\.ts$" },
+    },
+    {
+      name: "only-module-imports-infrastructure",
+      severity: "error",
       from: { path: "^apps/api/src/[^/]+/(application|presentation)/" },
-      to: { path: "^apps/api/src/[^/]+/infrastructure/" } },
-    { name: "schema-ownership", severity: "error",
+      to: { path: "^apps/api/src/[^/]+/infrastructure/" },
+    },
+    {
+      name: "schema-ownership",
+      severity: "error",
       from: { path: "^apps/api/src/([^/]+)/infrastructure/" },
-      to: { path: "^apps/migrations/src/schema/(?!$1/|identity/)" } },
-    { name: "kernel-is-a-leaf", severity: "error",
-      from: { path: "^apps/api/src/kernel/" }, to: { path: "^apps/api/src/(?!kernel/)" } },
-    { name: "platform-imports-no-context", severity: "error",
-      from: { path: "^apps/api/src/platform/" }, to: { path: "^apps/api/src/(?!kernel/|platform/)" } },
-    { name: "domain-never-imports-platform", severity: "error",
-      from: { path: "^apps/api/src/[^/]+/domain/" }, to: { path: "^apps/api/src/platform/" } },
-    { name: "no-barrels", severity: "error",
-      from: {}, to: { path: "^apps/api/src/.*/index\\.ts$" } },
-    { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
+      to: { path: "^apps/migrations/src/schema/(?!$1/|identity/)" },
+    },
+    {
+      name: "kernel-is-a-leaf",
+      severity: "error",
+      from: { path: "^apps/api/src/kernel/" },
+      to: { path: "^apps/api/src/(?!kernel/)" },
+    },
+    {
+      name: "platform-imports-no-context",
+      severity: "error",
+      from: { path: "^apps/api/src/platform/" },
+      to: { path: "^apps/api/src/(?!kernel/|platform/)" },
+    },
+    {
+      name: "domain-never-imports-platform",
+      severity: "error",
+      from: { path: "^apps/api/src/[^/]+/domain/" },
+      to: { path: "^apps/api/src/platform/" },
+    },
+    {
+      name: "no-barrels",
+      severity: "error",
+      from: {},
+      to: { path: "^apps/api/src/.*/index\\.ts$" },
+    },
+    {
+      name: "no-circular",
+      severity: "error",
+      from: {},
+      to: { circular: true },
+    },
   ],
 };
 ```
@@ -318,16 +360,16 @@ module.exports = {
 
 ## Leave alone
 
-| Thing                                                     | Why                                                                     |
-| --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Controllers, DTOs, mappers                                | Already the target shape                                                |
-| Outbox / dispatcher / consumer machinery                  | Strongest code in the repo; only the registry file moves (8.1)          |
-| The raw `db.transaction()` in the dispatcher              | Must run outside request transactions                                   |
-| `@Transactional()` usage                                  | Correct and re-entrant                                                  |
-| `AttachmentAccessService.register()`                      | The pattern to copy                                                     |
-| Message ↔ attention status loop-breaking                  | Three idempotency guards that work. Move it, don't redesign it          |
-| `calendar_event_links` origin-based echo skip             | Good design                                                             |
-| `attention_item_tags.tag_id` without FK                   | Deliberate (ghost rows for the tag-deleted handler). Add a comment      |
-| better-auth's own `pg.Pool`                               | Library boundary; nothing relies on joining its writes to our tx        |
-| `platform/email` templates in one switch                  | Inverting saves nothing until a context needs its own template          |
-| Typed-record entities (`UserSettings`, `UserProfile`, …)  | Enriching them is the classic over-DDD mistake                          |
+| Thing                                                    | Why                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------ |
+| Controllers, DTOs, mappers                               | Already the target shape                                           |
+| Outbox / dispatcher / consumer machinery                 | Strongest code in the repo; only the registry file moves (8.1)     |
+| The raw `db.transaction()` in the dispatcher             | Must run outside request transactions                              |
+| `@Transactional()` usage                                 | Correct and re-entrant                                             |
+| `AttachmentAccessService.register()`                     | The pattern to copy                                                |
+| Message ↔ attention status loop-breaking                 | Three idempotency guards that work. Move it, don't redesign it     |
+| `calendar_event_links` origin-based echo skip            | Good design                                                        |
+| `attention_item_tags.tag_id` without FK                  | Deliberate (ghost rows for the tag-deleted handler). Add a comment |
+| better-auth's own `pg.Pool`                              | Library boundary; nothing relies on joining its writes to our tx   |
+| `platform/email` templates in one switch                 | Inverting saves nothing until a context needs its own template     |
+| Typed-record entities (`UserSettings`, `UserProfile`, …) | Enriching them is the classic over-DDD mistake                     |

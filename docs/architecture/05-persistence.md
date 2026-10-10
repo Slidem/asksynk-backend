@@ -29,7 +29,9 @@ Untouched: `pgboss` (pg-boss), `drizzle` (migration journal), the `rrule` extens
 export const scheduling = pgSchema("scheduling");
 
 // apps/migrations/src/schema/scheduling/calendarEvents.ts
-export const calendarEvents = scheduling.table("calendar_events", { /* ... */ });
+export const calendarEvents = scheduling.table("calendar_events", {
+  /* ... */
+});
 ```
 
 Layout `apps/migrations/src/schema/<context>/`. `drizzle.config.ts` already globs
@@ -72,10 +74,10 @@ Heaviest: `attention-items.repository.ts`, `calendar-events.repository.ts`,
 
 ## 5. Repositories vs queries
 
-| Port           | Returns                                    | Declared in                                                     | Implemented in                                |
-| -------------- | ------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------- |
-| **Repository** | the aggregate root, never rows or partials | `<ctx>/domain/ports/<x>.repository.ts`                          | `<ctx>/infrastructure/persistence/drizzle-<x>.repository.ts` |
-| **Query**      | flat view types; any SQL within the context | `<ctx>/domain/ports/<x>.query.ts` or `<ctx>/contract/<x>.port.ts` | `<ctx>/infrastructure/persistence/<x>.query.ts` |
+| Port           | Returns                                     | Declared in                                                       | Implemented in                                               |
+| -------------- | ------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Repository** | the aggregate root, never rows or partials  | `<ctx>/domain/ports/<x>.repository.ts`                            | `<ctx>/infrastructure/persistence/drizzle-<x>.repository.ts` |
+| **Query**      | flat view types; any SQL within the context | `<ctx>/domain/ports/<x>.query.ts` or `<ctx>/contract/<x>.port.ts` | `<ctx>/infrastructure/persistence/<x>.query.ts`              |
 
 View types live in `application/read/`. `messaging.repository.ts` is the clearest
 fusion of both today (`ThreadListItem`, `ThreadStats`, … next to aggregate loads).
@@ -89,10 +91,10 @@ join with a nicer name and invisible to lint.
 
 ## 7. Schema changes queued
 
-| Change                                                                       | Wave | Risk                                     |
-| ---------------------------------------------------------------------------- | ---- | ---------------------------------------- |
-| `attention_items`: `source_context` / `source_kind` / `source_id` + unique index; drop `metadata`, `type` | 6 | **High** — data migration ([06 §8](06-attention-core.md#8-migration)) |
-| Drop the 9 cross-context FKs                                                 | 7.2  | Low (needs the `tag.deleted` handlers first) |
-| `pgSchema` per context                                                       | 7.3  | Medium-high                              |
-| `attachments.placement` → `visibility` + `owner_context`                     | 8.2  | Low                                      |
-| `tags`: unique on `(user_id, lower(name))`                                   | backlog | Medium — dedupe case variants first   |
+| Change                                                                                                    | Wave    | Risk                                                                  |
+| --------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
+| `attention_items`: `source_context` / `source_kind` / `source_id` + unique index; drop `metadata`, `type` | 6       | **High** — data migration ([06 §8](06-attention-core.md#8-migration)) |
+| Drop the 9 cross-context FKs                                                                              | 7.2     | Low (needs the `tag.deleted` handlers first)                          |
+| `pgSchema` per context                                                                                    | 7.3     | Medium-high                                                           |
+| `attachments.placement` → `visibility` + `owner_context`                                                  | 8.2     | Low                                                                   |
+| `tags`: unique on `(user_id, lower(name))`                                                                | backlog | Medium — dedupe case variants first                                   |

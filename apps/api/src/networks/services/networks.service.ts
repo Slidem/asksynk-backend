@@ -186,10 +186,13 @@ export class NetworksService {
     if (actor.isGuest) {
       return actor.guest.ownerUserId;
     }
+
     if (!requestedUserId || requestedUserId === actor.user.id) {
       return actor.user.id;
     }
+
     await this.validateIsActiveConnection(actor.user.id, requestedUserId);
+
     return requestedUserId;
   }
 

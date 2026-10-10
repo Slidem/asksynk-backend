@@ -4,12 +4,12 @@ Four ways for one context to reach another. Pick deliberately.
 
 ## 1. Mechanisms
 
-|         | Mechanism                                 | Use when                                                                                         | Consistency                                                      |
-| ------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **(a)** | Sync call to `<other>/contract/*.port.ts` | You need an authoritative fact **now** to make _your_ decision (ownership, existence, liveness)  | Strong — joins the caller's tx via re-entrant `@Transactional()` |
+|         | Mechanism                                 | Use when                                                                                        | Consistency                                                            |
+| ------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **(a)** | Sync call to `<other>/contract/*.port.ts` | You need an authoritative fact **now** to make _your_ decision (ownership, existence, liveness) | Strong — joins the caller's tx via re-entrant `@Transactional()`       |
 | **(b)** | Domain event via the outbox               | **You** decided something others care about. Mandatory for any write to a table you don't own   | Eventual, ordered per key within a consumer group; handlers idempotent |
-| **(c)** | A projection you own                      | You repeatedly need another context's data for _your_ queries. Built by (b)                      | Eventual                                                         |
-| **(d)** | ACL translator                            | The other side speaks a different language or is external (Google, Gmail, Slack)                 | n/a                                                              |
+| **(c)** | A projection you own                      | You repeatedly need another context's data for _your_ queries. Built by (b)                     | Eventual                                                               |
+| **(d)** | ACL translator                            | The other side speaks a different language or is external (Google, Gmail, Slack)                | n/a                                                                    |
 
 When (a) and (b) both fit, prefer (b) — it keeps the write side independent.
 
@@ -42,13 +42,13 @@ becomes `event.applyProviderFields(fields)` (Wave 5).
 
 ### B — `tagging` publishes a contract (Wave 2.1)
 
-| Today                                                                                 | Becomes            |
-| ------------------------------------------------------------------------------------- | ------------------ |
-| `attention-due-date.service`, `tag-calendar-attention.handler` → `TagRepository`, `Tag` | `getAnswerModes`   |
-| `attention-items.module`, `calendar-events.module` provide `TagRepository`             | deleted            |
-| `calendar-events.service` → `TagRepository`                                            | `assertOwnedBy`    |
-| `tasks.service`, `task-batches.service`, `task-suggestions.service`, `messaging` → `TagsService` | `assertOwnedBy` |
-| `attention-items.repository` joins `tags` (6×)                                         | answer modes via port, or tag ids only |
+| Today                                                                                            | Becomes                                |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| `attention-due-date.service`, `tag-calendar-attention.handler` → `TagRepository`, `Tag`          | `getAnswerModes`                       |
+| `attention-items.module`, `calendar-events.module` provide `TagRepository`                       | deleted                                |
+| `calendar-events.service` → `TagRepository`                                                      | `assertOwnedBy`                        |
+| `tasks.service`, `task-batches.service`, `task-suggestions.service`, `messaging` → `TagsService` | `assertOwnedBy`                        |
+| `attention-items.repository` joins `tags` (6×)                                                   | answer modes via port, or tag ids only |
 
 ```ts
 // tagging/contract/tag-catalog.port.ts
@@ -77,7 +77,10 @@ grep -rn "TagRepository" apps/api/src | grep -v "^apps/api/src/tagging/"   # mus
 // scheduling/contract/occurrence.port.ts
 export type NextOccurrence = { startAt: Date; eventId: string };
 export abstract class CalendarOccurrencePort {
-  abstract findNextOccurrenceByTag(tagIds: string[], after: Date): Promise<Map<string, NextOccurrence>>;
+  abstract findNextOccurrenceByTag(
+    tagIds: string[],
+    after: Date,
+  ): Promise<Map<string, NextOccurrence>>;
 }
 ```
 
@@ -88,12 +91,12 @@ recurrence gets one owner. Same treatment for `messaging.repository.ts:446-497`
 
 ### D — inverted dependencies (Waves 1.1, 2.6)
 
-| Violation                                                                 | Fix                                                                         |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `auth` → `PublicViewGuestsRepository`, `hashGuestToken`, `PublicViewsModule` | `identity` declares `GuestIdentityProvider`; `sharing` registers at bootstrap |
-| `messaging.service` → `PublicViewsRepository`                             | `sharing/contract/public-link.port.ts` → `isLive(publicViewId): Promise<boolean>` |
-| `messaging.service` → `WsIdentity` (cycle with `websockets`)              | `Actor` in `kernel/` (§3)                                                   |
-| `tasks/task-status.util` → `AttentionItemStatus`                          | batch status derived in tasks' own terms (1.3); translation becomes tasks' outbound ACL (6.2) |
+| Violation                                                                    | Fix                                                                                           |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `auth` → `PublicViewGuestsRepository`, `hashGuestToken`, `PublicViewsModule` | `identity` declares `GuestIdentityProvider`; `sharing` registers at bootstrap                 |
+| `messaging.service` → `PublicViewsRepository`                                | `sharing/contract/public-link.port.ts` → `isLive(publicViewId): Promise<boolean>`             |
+| `messaging.service` → `WsIdentity` (cycle with `websockets`)                 | `Actor` in `kernel/` (§3)                                                                     |
+| `tasks/task-status.util` → `AttentionItemStatus`                             | batch status derived in tasks' own terms (1.3); translation becomes tasks' outbound ACL (6.2) |
 
 ```ts
 // identity/contract/guest-identity.provider.ts
@@ -104,13 +107,13 @@ export abstract class GuestIdentityProvider {
 
 ### E — `files` and `network` publish contracts (Waves 2.4, 2.5)
 
-| Today                                                                                   | Becomes                                         |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `message-attachment.resolver` → `AttachmentsRepository`, `AttachmentAccessService`, `Attachment` | `AttachmentCatalogPort.getSummaries(ids)`  |
-| `user-profile.service` → `AttachmentsRepository`, `AttachmentsService`, `Attachment`     | `AttachmentCatalogPort.assertUsable(id, …)` — the files rule moves back to files |
-| `threads.controller`, `guest-messaging.controller`, `message-attachments.helper`, `ws.gateway` → `AttachmentsService` | `AttachmentCatalogPort.resolveMany(ids)` |
-| `messaging`, `tasks`, `tags`, `calendar-events` → `NetworksService`                     | `ConnectionPolicyPort`                          |
-| `calendar-events.controller`, `tags.controller` call `resolveTargetUserId`              | application layer, using `Actor`                |
+| Today                                                                                                                 | Becomes                                                                          |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `message-attachment.resolver` → `AttachmentsRepository`, `AttachmentAccessService`, `Attachment`                      | `AttachmentCatalogPort.getSummaries(ids)`                                        |
+| `user-profile.service` → `AttachmentsRepository`, `AttachmentsService`, `Attachment`                                  | `AttachmentCatalogPort.assertUsable(id, …)` — the files rule moves back to files |
+| `threads.controller`, `guest-messaging.controller`, `message-attachments.helper`, `ws.gateway` → `AttachmentsService` | `AttachmentCatalogPort.resolveMany(ids)`                                         |
+| `messaging`, `tasks`, `tags`, `calendar-events` → `NetworksService`                                                   | `ConnectionPolicyPort`                                                           |
+| `calendar-events.controller`, `tags.controller` call `resolveTargetUserId`                                            | application layer, using `Actor`                                                 |
 
 `StorageModule` stops being `@Global` and exporting its repository.
 
@@ -123,12 +126,12 @@ feature code. Design: [03 §6](03-layering.md#6-wsgatewayts-split-wave-4).
 
 ### G — stays, deliberately
 
-| Edge                                    | Why                                                                                                              |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `messaging → TaskSuggestionsService`    | Same-transaction command: a message can embed a suggestion; both commit together. Publish it as `tasks/contract/task-suggestion.port.ts` |
-| `attention_item_tags.tag_id` has no FK  | Ghost rows must survive tag deletion so the tag-deleted handler finds them                                       |
-| `AttachmentAccessService.register()`    | The pattern to copy                                                                                              |
-| Auth decorators used by controllers     | `@Public`, `@AllowGuest`, `@RequestActor` are transport helpers; they stay importable                            |
+| Edge                                   | Why                                                                                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `messaging → TaskSuggestionsService`   | Same-transaction command: a message can embed a suggestion; both commit together. Publish it as `tasks/contract/task-suggestion.port.ts` |
+| `attention_item_tags.tag_id` has no FK | Ghost rows must survive tag deletion so the tag-deleted handler finds them                                                               |
+| `AttachmentAccessService.register()`   | The pattern to copy                                                                                                                      |
+| Auth decorators used by controllers    | `@Public`, `@AllowGuest`, `@RequestActor` are transport helpers; they stay importable                                                    |
 
 ---
 
@@ -140,8 +143,14 @@ Replaces `RequestActor`, `WsIdentity` and ad-hoc `AuthGuest` handling.
 // kernel/actor/actor.ts
 export type Actor =
   | { kind: "user"; userId: string; email: string }
-  | { kind: "guest"; guestId: string; publicViewId: string; ownerUserId: string;
-      displayName: string; expiresAt: Date };
+  | {
+      kind: "guest";
+      guestId: string;
+      publicViewId: string;
+      ownerUserId: string;
+      displayName: string;
+      expiresAt: Date;
+    };
 // later: | { kind: "agent"; agentId: string; onBehalfOfUserId: string }
 
 export const ownerUserIdOf = (a: Actor): string =>

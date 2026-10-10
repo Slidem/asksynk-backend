@@ -15,15 +15,15 @@ Every context gets the same layers and dependency rule, over two shared tiers
   infrastructure/ drizzle · acl · clients       outbound adapters
 ```
 
-| Layer             | May import                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| `domain/`         | own `domain/`, `kernel/`                                                                   |
-| `contract/`       | `kernel/`, other `contract/`, `platform/events/registry` (`defineEvent`) + zod             |
-| `application/`    | own `domain/` + `application/`, `kernel/`, `platform/`, **other contexts' `contract/`**   |
-| `infrastructure/` | own `domain/` + `application/`, `kernel/`, `platform/`, Drizzle, SDKs                      |
-| `presentation/`   | own `application/` + `domain/` (types), `kernel/`, `platform/`                             |
-| `kernel/`         | nothing outside itself; plain libraries only (`uuidv7`, `lodash`), no framework            |
-| `platform/`       | `kernel/`, frameworks — never a context                                                    |
+| Layer             | May import                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| `domain/`         | own `domain/`, `kernel/`                                                                |
+| `contract/`       | `kernel/`, other `contract/`, `platform/events/registry` (`defineEvent`) + zod          |
+| `application/`    | own `domain/` + `application/`, `kernel/`, `platform/`, **other contexts' `contract/`** |
+| `infrastructure/` | own `domain/` + `application/`, `kernel/`, `platform/`, Drizzle, SDKs                   |
+| `presentation/`   | own `application/` + `domain/` (types), `kernel/`, `platform/`                          |
+| `kernel/`         | nothing outside itself; plain libraries only (`uuidv7`, `lodash`), no framework         |
+| `platform/`       | `kernel/`, frameworks — never a context                                                 |
 
 **No context imports another context's `domain/`, `application/`, `infrastructure/`
 or `presentation/` — only `contract/`.** `domain/` imports no `@nestjs/*`,
@@ -32,12 +32,12 @@ touch repositories (already true).
 
 ## 2. `kernel/` vs `platform/`
 
-|                   | `kernel/`                                         | `platform/`                                                          |
-| ----------------- | ------------------------------------------------- | -------------------------------------------------------------------- |
-| Contains          | pure domain vocabulary                            | framework-aware shared infra                                         |
-| Imported by       | everything, **including `domain/`**               | `application/`, `infrastructure/`, `presentation/` — never `domain/` |
+|                   | `kernel/`                                                                       | `platform/`                                                                       |
+| ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Contains          | pure domain vocabulary                                                          | framework-aware shared infra                                                      |
+| Imported by       | everything, **including `domain/`**                                             | `application/`, `infrastructure/`, `presentation/` — never `domain/`              |
 | Today             | `id.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http, jobs, logger, mappers |
-| Planned additions | `actor/` (Wave 1.1)                               | `realtime/realtime-broadcaster.ts` (Wave 4.1)                        |
+| Planned additions | `actor/` (Wave 1.1)                                                             | `realtime/realtime-broadcaster.ts` (Wave 4.1)                                     |
 
 **Placement test for `kernel/` — both must be yes:** (1) it is pure, transitively;
 (2) `domain/` code actually references it. Q2 keeps `kernel/` from becoming the old
@@ -46,11 +46,11 @@ touch repositories (already true).
 **Ports don't split along this seam.** A port lives with the layer that declares the
 need, both halves together:
 
-| Port                                                        | Abstract              | Adapter                                |
-| ----------------------------------------------------------- | --------------------- | -------------------------------------- |
-| `TagRepository`, `AttentionItemsRepository`, …              | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/`    |
-| published ports (`CalendarOccurrencePort`, …)               | `<ctx>/contract/`     | owning context's `infrastructure/`     |
-| `EventsPublisher`, `JobScheduler`, `Clock`, `RealtimeBroadcaster` | `platform/<area>/` | `platform/<area>/`                    |
+| Port                                                              | Abstract              | Adapter                             |
+| ----------------------------------------------------------------- | --------------------- | ----------------------------------- |
+| `TagRepository`, `AttentionItemsRepository`, …                    | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/` |
+| published ports (`CalendarOccurrencePort`, …)                     | `<ctx>/contract/`     | owning context's `infrastructure/`  |
+| `EventsPublisher`, `JobScheduler`, `Clock`, `RealtimeBroadcaster` | `platform/<area>/`    | `platform/<area>/`                  |
 
 `EventsPublisher` / `JobScheduler` signatures depend on zod/platform types, and only
 the application layer calls them — aggregates _return_ what happened, the application
@@ -111,11 +111,18 @@ export abstract class AttentionItemsRepository {
 // infrastructure/persistence/drizzle-attention-items.repository.ts
 @Injectable()
 export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
-  constructor(private readonly txHost: TransactionHost<TxAdapter>) { super(); }
+  constructor(private readonly txHost: TransactionHost<TxAdapter>) {
+    super();
+  }
 }
 
 // attention.module.ts
-providers: [{ provide: AttentionItemsRepository, useClass: DrizzleAttentionItemsRepository }]
+providers: [
+  {
+    provide: AttentionItemsRepository,
+    useClass: DrizzleAttentionItemsRepository,
+  },
+];
 ```
 
 Injection sites name the abstract type; no `@Inject()`, no `Symbol`.
@@ -169,15 +176,15 @@ URLs expire) — via the files contract.
 
 Rich only where an invariant would otherwise be enforced in several places:
 
-| Aggregate             | Methods                                                         | Replaces                                       |
-| --------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
-| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                  | `timers.service.ts` guards                     |
-| `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                    | `requirePending()`                             |
-| `Invite`              | `accept`, `reject`                                              | `networks.service.ts` guards                   |
-| `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror` | field assignment in service                |
-| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                 | `task-status.util.ts`                          |
+| Aggregate             | Methods                                                                                | Replaces                      |
+| --------------------- | -------------------------------------------------------------------------------------- | ----------------------------- |
+| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | `timers.service.ts` guards    |
+| `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
+| `Invite`              | `accept`, `reject`                                                                     | `networks.service.ts` guards  |
+| `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |
+| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `task-status.util.ts`         |
 | `CalendarEvent`       | `reschedule`, `addException`, `splitSeriesAt`, `detachInstance`, `applyProviderFields` | service logic + `applyFields` |
-| `CalendarIntegration` | `markError`, `revoke`, `withRefreshedCredentials`               | status mutated externally                      |
+| `CalendarIntegration` | `markError`, `revoke`, `withRefreshedCredentials`                                      | status mutated externally     |
 
 Stay typed records: `UserSettings`, `UserProfile`, `Attachment`, `Calendar`,
 `PublicView`, `Thread`, `NetworkConnection`, `CalendarEventLink`, `PublicViewGuest`.

@@ -32,19 +32,19 @@ Subdomain type decides how much modelling a context earns (Khononov): **core** g
 rich aggregates, pure policies, careful contracts; **supporting** is rich only where a
 state machine exists (`Timer`, `TaskSuggestion`, `Invite`); **generic** stays thin.
 
-| Context           | Today (module)                                  | Type       | Owns                                                                                                                                |
-| ----------------- | ----------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **tagging**       | `tags`                                          | Core       | `tags`                                                                                                                              |
-| **attention**     | `attention-items`                               | Core       | `attention_items`, `attention_item_tags`                                                                                            |
-| **scheduling**    | `calendar-events` + `calendar-integrations`     | Core       | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
-| **conversations** | `messaging`                                     | Supporting | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
-| **tasks**         | `tasks`                                         | Supporting | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
-| **network**       | `networks`                                      | Supporting | `user_invites`, `user_network`                                                                                                      |
-| **sharing**       | `public-views`                                  | Supporting | `public_views`, `public_view_guests`                                                                                                |
-| **focus**         | `timers`                                        | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
-| **files**         | `storage`                                       | Generic    | `attachments`                                                                                                                       |
-| **identity**      | `auth` + `user-profile` + `user-settings`       | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
-| _(platform)_      | `platform/`                                     | —          | `events_outbox`, `events_dead_letters`                                                                                              |
+| Context           | Today (module)                              | Type       | Owns                                                                                                                                |
+| ----------------- | ------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **tagging**       | `tags`                                      | Core       | `tags`                                                                                                                              |
+| **attention**     | `attention-items`                           | Core       | `attention_items`, `attention_item_tags`                                                                                            |
+| **scheduling**    | `calendar-events` + `calendar-integrations` | Core       | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
+| **conversations** | `messaging`                                 | Supporting | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
+| **tasks**         | `tasks`                                     | Supporting | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
+| **network**       | `networks`                                  | Supporting | `user_invites`, `user_network`                                                                                                      |
+| **sharing**       | `public-views`                              | Supporting | `public_views`, `public_view_guests`                                                                                                |
+| **focus**         | `timers`                                    | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
+| **files**         | `storage`                                   | Generic    | `attachments`                                                                                                                       |
+| **identity**      | `auth` + `user-profile` + `user-settings`   | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
+| _(platform)_      | `platform/`                                 | —          | `events_outbox`, `events_dead_letters`                                                                                              |
 
 Tag junction tables belong to the **tagged** context: "this message carries tag X" is
 a fact about the message.
@@ -139,28 +139,28 @@ rich aggregate. Already behind `JobScheduler`; no job ref stored.
 
 ## 4. Relationships
 
-| Upstream             | Downstream                                | Relationship                  | Mechanism                                     |
-| -------------------- | ----------------------------------------- | ----------------------------- | --------------------------------------------- |
-| tagging              | attention                                 | Published Language            | tag policy via port                           |
-| tagging              | conversations, tasks, scheduling          | Open Host Service             | tag ownership port                            |
-| scheduling           | attention                                 | Open Host Service             | `CalendarOccurrencePort`                      |
-| conversations, tasks | attention                                 | Event Publisher (Conformist)  | `attention.source.*` events (Wave 6)          |
-| attention            | conversations                             | Event Publisher               | `attention.message.synced`                    |
-| Google Calendar      | scheduling                                | Anti-Corruption Layer         | `GoogleCalendarProvider`                      |
-| network              | tasks, conversations, scheduling, tagging | Open Host Service             | `ConnectionPolicyPort`                        |
-| sharing              | identity                                  | inverted registration         | `GuestIdentityProvider`                       |
-| sharing              | conversations                             | Open Host Service             | public-link liveness port                     |
-| files                | conversations, identity                   | Open Host Service + registry  | attachment catalog port + resolver registry   |
-| identity             | everyone                                  | Shared Kernel (`userId` only) | the one sanctioned universal                  |
+| Upstream             | Downstream                                | Relationship                  | Mechanism                                   |
+| -------------------- | ----------------------------------------- | ----------------------------- | ------------------------------------------- |
+| tagging              | attention                                 | Published Language            | tag policy via port                         |
+| tagging              | conversations, tasks, scheduling          | Open Host Service             | tag ownership port                          |
+| scheduling           | attention                                 | Open Host Service             | `CalendarOccurrencePort`                    |
+| conversations, tasks | attention                                 | Event Publisher (Conformist)  | `attention.source.*` events (Wave 6)        |
+| attention            | conversations                             | Event Publisher               | `attention.message.synced`                  |
+| Google Calendar      | scheduling                                | Anti-Corruption Layer         | `GoogleCalendarProvider`                    |
+| network              | tasks, conversations, scheduling, tagging | Open Host Service             | `ConnectionPolicyPort`                      |
+| sharing              | identity                                  | inverted registration         | `GuestIdentityProvider`                     |
+| sharing              | conversations                             | Open Host Service             | public-link liveness port                   |
+| files                | conversations, identity                   | Open Host Service + registry  | attachment catalog port + resolver registry |
+| identity             | everyone                                  | Shared Kernel (`userId` only) | the one sanctioned universal                |
 
 ## 5. Where growth plugs in
 
-| Planned                       | Home                                                                                   | Cost                                      |
-| ----------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Gmail / Slack / WhatsApp      | `channels/<provider>/` publishing `AttentionSourceUpserted`                            | Attention: zero lines (after Wave 6)      |
-| Calendar analytics            | `insights` context, read-only projections from events                                  | Own schema; no writes into core           |
-| Gamification                  | `momentum` context consuming `attention.item.resolved`                                 | One new event from attention (6.5)        |
-| AI planning agents            | Not a context — another `Actor` kind calling the same application layer               | A new inbound adapter                     |
+| Planned                  | Home                                                                    | Cost                                 |
+| ------------------------ | ----------------------------------------------------------------------- | ------------------------------------ |
+| Gmail / Slack / WhatsApp | `channels/<provider>/` publishing `AttentionSourceUpserted`             | Attention: zero lines (after Wave 6) |
+| Calendar analytics       | `insights` context, read-only projections from events                   | Own schema; no writes into core      |
+| Gamification             | `momentum` context consuming `attention.item.resolved`                  | One new event from attention (6.5)   |
+| AI planning agents       | Not a context — another `Actor` kind calling the same application layer | A new inbound adapter                |
 
 If the application layer is the only way in, agents inherit every invariant and
 authorization rule for free. That is why `Actor` lands in Wave 1.

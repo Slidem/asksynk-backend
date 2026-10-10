@@ -9,25 +9,25 @@ jobs), `apps/migrations` (Drizzle schema + SQL), `scripts`. One process; no work
 
 `apps/api/src`: ~20.7k LOC. `apps/api/test`: ~5k LOC.
 
-| Module                  |   LOC | Notes                                         |
-| ----------------------- | ----: | --------------------------------------------- |
+| Module                  |   LOC | Notes                                              |
+| ----------------------- | ----: | -------------------------------------------------- |
 | `platform/`             | 3,833 | shared framework-aware infra (tier, not a context) |
-| `tasks`                 | 2,301 |                                               |
-| `calendar-integrations` | 2,153 | merges into `scheduling` (ADR 0003)           |
-| `messaging`             | 2,106 | no direct tests                               |
-| `calendar-events`       | 2,094 | merges into `scheduling`                      |
-| `attention-items`       | 1,758 | the core domain                               |
-| `timers`                | 1,142 |                                               |
-| `storage`               |   867 |                                               |
-| `public-views`          |   827 |                                               |
-| `networks`              |   779 |                                               |
-| `tags`                  |   726 |                                               |
-| `auth`                  |   619 |                                               |
-| `websockets`            |   554 | `ws.gateway.ts` 459 LOC                       |
-| `user-profile`          |   285 |                                               |
-| `events`                |   262 | dead-letter admin REST only                   |
-| `user-settings`         |   192 |                                               |
-| `kernel/`               |   115 | pure shared tier                              |
+| `tasks`                 | 2,301 |                                                    |
+| `calendar-integrations` | 2,153 | merges into `scheduling` (ADR 0003)                |
+| `messaging`             | 2,106 | no direct tests                                    |
+| `calendar-events`       | 2,094 | merges into `scheduling`                           |
+| `attention-items`       | 1,758 | the core domain                                    |
+| `timers`                | 1,142 |                                                    |
+| `storage`               |   867 |                                                    |
+| `public-views`          |   827 |                                                    |
+| `networks`              |   779 |                                                    |
+| `tags`                  |   726 |                                                    |
+| `auth`                  |   619 |                                                    |
+| `websockets`            |   554 | `ws.gateway.ts` 459 LOC                            |
+| `user-profile`          |   285 |                                                    |
+| `events`                |   262 | dead-letter admin REST only                        |
+| `user-settings`         |   192 |                                                    |
+| `kernel/`               |   115 | pure shared tier                                   |
 
 Module folder shapes are inconsistent (`entities/ models/ repositories/ services/ rest/`
 in some, services at the root in `attention-items`, flat in `timers`). Nothing is
@@ -74,15 +74,15 @@ layered as `domain / application / infrastructure` yet.
 
 **16 imports of another module's repository:**
 
-| Edge                                        | Count | Where                                                                                       |
-| ------------------------------------------- | ----: | ------------------------------------------------------------------------------------------- |
+| Edge                                        | Count | Where                                                                                                                        |
+| ------------------------------------------- | ----: | ---------------------------------------------------------------------------------------------------------------------------- |
 | `calendar-integrations` → `calendar-events` |     7 | `calendar-sync.service`, `calendar-integration.service`, `calendar-outbound-sync.service`, `sync/calendar-sync.job-handlers` |
-| `attention-items` → `tags`                  |     3 | `attention-due-date.service`, `attention-items.module`, `handlers/tag-calendar-attention.handler` |
-| `calendar-events` → `tags`                  |     2 | `calendar-events.module`, `services/calendar-events.service`                                |
-| `auth` → `public-views`                     |     1 | `guest-auth.service` (`PublicViewGuestsRepository`)                                         |
-| `messaging` → `public-views`                |     1 | `services/messaging.service` (`PublicViewsRepository`)                                      |
-| `messaging` → `storage`                     |     1 | `attachments/message-attachment.resolver`                                                   |
-| `user-profile` → `storage`                  |     1 | `services/user-profile.service`                                                             |
+| `attention-items` → `tags`                  |     3 | `attention-due-date.service`, `attention-items.module`, `handlers/tag-calendar-attention.handler`                            |
+| `calendar-events` → `tags`                  |     2 | `calendar-events.module`, `services/calendar-events.service`                                                                 |
+| `auth` → `public-views`                     |     1 | `guest-auth.service` (`PublicViewGuestsRepository`)                                                                          |
+| `messaging` → `public-views`                |     1 | `services/messaging.service` (`PublicViewsRepository`)                                                                       |
+| `messaging` → `storage`                     |     1 | `attachments/message-attachment.resolver`                                                                                    |
+| `user-profile` → `storage`                  |     1 | `services/user-profile.service`                                                                                              |
 
 Why: modules export internals or nothing useful. `TagsModule` exports only
 `TagsService`, so **`TagRepository` is provided by 3 modules** (3 instances).
@@ -147,7 +147,7 @@ a small rule: `UserTimer` (`completesAt`, `remainingSeconds`, `isDue`),
 State machines live in services:
 
 - `timers/timers.service.ts` — five-state timer (`idle | running | paused | completed
-  | stopped`): `persistStart` 168-202, `persistResume` 204-221, `persistPause` 223-249,
+| stopped`): `persistStart` 168-202, `persistResume` 204-221, `persistPause` 223-249,
   `persistStop` 251-279, `complete` 303-328, `validateTransitionInput` 354-367. The
   repository repeats the guards as `WHERE` clauses (a concurrency guard — keep it).
 - `tasks/services/task-suggestions.service.ts` — `requirePending()` guards.
@@ -182,7 +182,7 @@ All 20 events are defined in one file, `platform/events/registry/events.registry
 ### 3.8 `attention_items` is a projection wearing an aggregate's clothes
 
 - `type` enum names the source: `tagged_message | incoming_email | slack_message |
-  whatsapp_message | suggested_timeblock | suggested_task | task` — three values have
+whatsapp_message | suggested_timeblock | suggested_task | task` — three values have
   no producer.
 - Source identity lives in `metadata jsonb` (`messageId`, `taskId`, `taskBatchId`,
   `suggestionId`), looked up with `metadata->>'key'` — no index.
@@ -213,15 +213,15 @@ ESLint has only `simple-import-sort` + `unused-imports`. No dependency-cruiser, 
 
 ## 4. Known small defects
 
-| Defect                                                                                   | Where                                           |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `isValidId` calls `UUID.parse`, which throws on malformed input → 500 instead of 400; also accepts any UUID version | `kernel/id.ts`                                  |
-| Duplicate tag name → unmapped `23505` → 500. Uniqueness is case-sensitive (`uq_tags_user_name (user_id, name)`) | `tags/`, `apps/migrations/src/schema/tags.ts`   |
-| 11 Nest `HttpException`s; no `storage` error catalog (also none for `auth`, `user-settings`) | `storage/attachments/services/attachments.service.ts` |
-| `attachments.placement` enum (`public \| message`) names consumer contexts                | `attachments` table                             |
-| Comment says job `deleteAfterSeconds` default is 1h; it is 2 days                        | `calendar-integrations/sync/calendar-sync.jobs.ts:16` |
-| `AuthGuard` provided by both `auth.module` and `authGuard.module`                        | `auth/`                                         |
-| Leftovers: `packages/*` in `pnpm-workspace.yaml`; empty `src/errors/`                     | repo root, `apps/api/src`                       |
+| Defect                                                                                                              | Where                                                 |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `isValidId` calls `UUID.parse`, which throws on malformed input → 500 instead of 400; also accepts any UUID version | `kernel/id.ts`                                        |
+| Duplicate tag name → unmapped `23505` → 500. Uniqueness is case-sensitive (`uq_tags_user_name (user_id, name)`)     | `tags/`, `apps/migrations/src/schema/tags.ts`         |
+| 11 Nest `HttpException`s; no `storage` error catalog (also none for `auth`, `user-settings`)                        | `storage/attachments/services/attachments.service.ts` |
+| `attachments.placement` enum (`public \| message`) names consumer contexts                                          | `attachments` table                                   |
+| Comment says job `deleteAfterSeconds` default is 1h; it is 2 days                                                   | `calendar-integrations/sync/calendar-sync.jobs.ts:16` |
+| `AuthGuard` provided by both `auth.module` and `authGuard.module`                                                   | `auth/`                                               |
+| Leftovers: `packages/*` in `pnpm-workspace.yaml`; empty `src/errors/`                                               | repo root, `apps/api/src`                             |
 
 Event-delivery gaps (idempotency inbox, key prefixes, guest-recipient jobs, thread-room
 duplicates) are listed in [platform/events §Known gaps](../platform/events.md#known-gaps).
