@@ -1,6 +1,6 @@
 # 06 — The attention core
 
-The product. Design target for Waves 1.2 (policy), 5 (aggregate) and 6 (typed source).
+The product. Design target for Waves 5 (aggregate) and 6 (typed source).
 → [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md)
 
 ## 1. What an attention item is
@@ -173,9 +173,9 @@ work. Keep last-writer-wins and the outbound event; just route both writers thro
 
 ## 6. The tag → due-date policy
 
-Today: `AttentionDueDateService.pickEarliestCandidate`
-(`attention-items/attention-due-date.service.ts:75-102`). Target: a pure function
-(Wave 1.2) plus two ports (Wave 2).
+Built: the pure function (`attention-items/domain/due-date.policy.ts`), called by
+`AttentionDueDateService`. Target: two ports (Wave 2) replacing its direct
+`TagRepository` / raw-SQL reads.
 
 ```ts
 // domain/due-date.policy.ts

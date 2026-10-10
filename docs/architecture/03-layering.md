@@ -182,7 +182,7 @@ Rich only where an invariant would otherwise be enforced in several places:
 | `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
 | `Invite`              | `accept`, `reject`                                                                     | `networks.service.ts` guards  |
 | `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |
-| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `task-status.util.ts`         |
+| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `domain/task-batch-status.ts` |
 | `CalendarEvent`       | `reschedule`, `addException`, `splitSeriesAt`, `detachInstance`, `applyProviderFields` | service logic + `applyFields` |
 | `CalendarIntegration` | `markError`, `revoke`, `withRefreshedCredentials`                                      | status mutated externally     |
 

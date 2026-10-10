@@ -22,35 +22,8 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 
 | #   | Step                                     | Effort | Risk       | Safety net                                                  |
 | --- | ---------------------------------------- | ------ | ---------- | ----------------------------------------------------------- |
-| 1.2 | Due-date policy as a pure function       | 2h     | none       | `attention-items.events-handler`, `tasks-attention`         |
-| 1.3 | Batch status derived in tasks' own terms | 1h     | none       | `task-status.util.unit`, `tasks-attention`                  |
 | 1.4 | Timer state machine as a domain object   | 4h     | **medium** | `timers.integration.test.ts` (14 cases)                     |
 | 1.5 | `RecurrenceRule` value object            | 2h     | low        | `recurrence.utils.unit` (26), `calendar-events.integration` |
-
-### 1.2 Due-date policy
-
-- New `attention-items/domain/due-date.policy.ts`: `decideDueDate` +
-  `AnswerModeSpec`, `TimeblockOccurrence`, `DueDateDecision`, exactly as in
-  [06 §6](06-attention-core.md#6-the-tag--due-date-policy). Attention declares these
-  types itself (domain can't import another context's contract).
-- `AttentionDueDateService` maps `Tag` → `AnswerModeSpec` and calls `decideDueDate`;
-  delete `pickEarliestCandidate` (`attention-due-date.service.ts:75-102`).
-- Inject `Clock` instead of `new Date()` in `recomputeForItems` (line 40).
-- Leave the `dueDatePinned` filter and the raw SQL where they are — Wave 5/6 and 2.3.
-- Test: `test/attention-items/due-date.policy.unit.test.ts` — immediate wins,
-  timeblock wins, mixed tie keeps first, no tags, timeblock without occurrence.
-
-### 1.3 Batch status in tasks' terms
-
-- New `tasks/domain/task-batch-status.ts`:
-  `deriveBatchStatus(statuses: TaskStatus[]): TaskStatus` — all `completed` →
-  `completed`; empty or all `todo` → `todo`; else `in_progress`.
-- Delete `aggregateBatchStatus`; `task-batches.service.ts:133` uses
-  `mapTaskStatusToAttention(deriveBatchStatus(statuses))` (same results).
-- `mapTaskStatusToAttention` stays in `task-status.util.ts` — the one place tasks
-  speaks attention's vocabulary, until it becomes tasks' outbound translator (6.2).
-- Test: split the existing `test/tasks/task-status.util.unit.test.ts`; batch cases
-  move to `task-batch-status.unit.test.ts` with `TaskStatus` expectations.
 
 ### 1.4 Timer state machine
 
@@ -82,7 +55,7 @@ timezone, start)` wraps `validateAndNormalizeRrule` (rejects `COUNT=`, defaults
 - Callers that validate rrules construct a `RecurrenceRule` instead.
 - Test: existing `recurrence.utils.unit.test.ts` (26) keeps passing; add VO cases.
 
-**Done when:** `pnpm test:unit` covers policy, batch status, timer, recurrence rule; `pnpm test:integration` unchanged and green.
+**Done when:** `pnpm test:unit` covers timer, recurrence rule; `pnpm test:integration` unchanged and green.
 
 ---
 

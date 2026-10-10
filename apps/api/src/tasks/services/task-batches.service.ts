@@ -8,6 +8,7 @@ import {
   TaskBatchUpserted,
 } from "@/api/platform/events/registry/events.registry";
 import { TagsService } from "@/api/tags/services/tags.service";
+import { deriveBatchStatus } from "@/api/tasks/domain/task-batch-status";
 import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskBatch } from "@/api/tasks/entities/task-batch.entity";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@/api/tasks/models/task.model";
 import { TaskBatchesRepository } from "@/api/tasks/repositories/task-batches.repository";
 import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
-import { aggregateBatchStatus } from "@/api/tasks/task-status.util";
+import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
 import { tasksError } from "@/api/tasks/tasks.errors";
 
 @Injectable()
@@ -130,7 +131,7 @@ export class TaskBatchesService {
       taskBatchId: batch.id,
       assigneeUserId: batch.assigneeUserId,
       title: batch.title,
-      aggregateStatus: aggregateBatchStatus(statuses),
+      aggregateStatus: mapTaskStatusToAttention(deriveBatchStatus(statuses)),
       tagIds: batch.tagIds,
       dueDate: batch.dueDate ? batch.dueDate.toISOString() : null,
       dueDatePinned: batch.dueDate !== null,

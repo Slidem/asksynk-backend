@@ -9,13 +9,3 @@ export function mapTaskStatusToAttention(
   if (status === "in_progress") return "in_progress";
   return "created";
 }
-
-// Batch attention status: all done → resolved, all untouched → created, else in progress.
-export function aggregateBatchStatus(
-  statuses: TaskStatus[],
-): AttentionItemStatus {
-  if (statuses.length === 0) return "created";
-  if (statuses.every((s) => s === "completed")) return "resolved";
-  if (statuses.every((s) => s === "todo")) return "created";
-  return "in_progress";
-}

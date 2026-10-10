@@ -95,7 +95,7 @@ recurrence gets one owner. Same treatment for `messaging.repository.ts:446-497`
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `auth` → `PublicViewGuestsRepository`, `hashGuestToken`, `PublicViewsModule` | `identity` declares `GuestIdentityProvider`; `sharing` registers at bootstrap                 |
 | `messaging.service` → `PublicViewsRepository`                                | `sharing/contract/public-link.port.ts` → `isLive(publicViewId): Promise<boolean>`             |
-| `tasks/task-status.util` → `AttentionItemStatus`                             | batch status derived in tasks' own terms (1.3); translation becomes tasks' outbound ACL (6.2) |
+| `tasks/task-status.util` → `AttentionItemStatus`                             | translation becomes tasks' outbound ACL (6.2)                                                 |
 
 ```ts
 // identity/contract/guest-identity.provider.ts

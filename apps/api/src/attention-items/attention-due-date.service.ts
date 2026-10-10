@@ -1,18 +1,24 @@
 import { Injectable } from "@nestjs/common";
 
 import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import {
+  AnswerModeSpec,
+  decideDueDate,
+  TimeblockOccurrence,
+} from "@/api/attention-items/domain/due-date.policy";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
+import { Clock } from "@/api/platform/clock/clock";
 import { Tag } from "@/api/tags/entities/tag.entity";
 import { TagRepository } from "@/api/tags/repositories/tags.repository";
 
-// Derives attention-item due dates from a user's tags:
-// immediate tags push out `base + responseTimeMillis`; timeblock tags resolve to
-// the next upcoming tagged calendar occurrence. Shared by messages and tasks.
+// Loads tags + upcoming tagged occurrences and applies `decideDueDate`.
+// Shared by messages and tasks.
 @Injectable()
 export class AttentionDueDateService {
   constructor(
     private readonly attentionItemsRepository: AttentionItemsRepository,
     private readonly tagRepository: TagRepository,
+    private readonly clock: Clock,
   ) {}
 
   async deriveFromTags(
@@ -24,8 +30,13 @@ export class AttentionDueDateService {
     }
 
     const tags = await this.tagRepository.getByIds(tagIds);
-    const occurrenceMap = await this.fetchOccurrenceMap(tags, base);
-    return this.pickEarliestCandidate(tags, base, occurrenceMap);
+    const occurrences = await this.fetchOccurrences(tags, base);
+    const { dueDate, dueSourceEventId } = decideDueDate({
+      answerModes: tags.map(toAnswerModeSpec),
+      occurrences,
+      base,
+    });
+    return { dueDate, sourceCalendarEventId: dueSourceEventId };
   }
 
   async recomputeForItems(items: AttentionItem[]): Promise<void> {
@@ -35,29 +46,30 @@ export class AttentionDueDateService {
 
     const allTagIds = [...new Set(recomputable.flatMap((i) => i.tagIds))];
     const tags = await this.tagRepository.getByIds(allTagIds);
-    const tagMap = new Map(tags.map((t) => [t.id.toString(), t]));
+    const answerModeByTagId = new Map(
+      tags.map((t) => [t.id.toString(), toAnswerModeSpec(t)]),
+    );
 
-    const occurrenceMap = await this.fetchOccurrenceMap(tags, new Date());
+    const occurrences = await this.fetchOccurrences(tags, this.clock.now());
 
     const updates = recomputable.map((item) => {
-      const itemTags = item.tagIds
-        .map((id) => tagMap.get(id))
-        .filter((t): t is Tag => t !== undefined);
-      const { dueDate, sourceCalendarEventId } = this.pickEarliestCandidate(
-        itemTags,
-        item.createdAt,
-        occurrenceMap,
-      );
-      return { id: item.id, dueDate, sourceCalendarEventId };
+      const { dueDate, dueSourceEventId } = decideDueDate({
+        answerModes: item.tagIds
+          .map((id) => answerModeByTagId.get(id))
+          .filter((m): m is AnswerModeSpec => m !== undefined),
+        occurrences,
+        base: item.createdAt,
+      });
+      return { id: item.id, dueDate, sourceCalendarEventId: dueSourceEventId };
     });
 
     await this.attentionItemsRepository.batchUpdateDueDates(updates);
   }
 
-  private async fetchOccurrenceMap(
+  private async fetchOccurrences(
     tags: Tag[],
     after: Date,
-  ): Promise<Map<string, { date: Date; eventId: string }>> {
+  ): Promise<Map<string, TimeblockOccurrence>> {
     const timeblockTagIds = tags
       .filter((t) => t.answerMode.type === "timeblock")
       .map((t) => t.id.toString());
@@ -66,38 +78,25 @@ export class AttentionDueDateService {
       return new Map();
     }
 
-    return this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
-      timeblockTagIds,
-      after,
+    const rows =
+      await this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
+        timeblockTagIds,
+        after,
+      );
+    return new Map(
+      [...rows].map(([tagId, { date, eventId }]) => [
+        tagId,
+        { startAt: date, eventId },
+      ]),
     );
   }
-
-  private pickEarliestCandidate(
-    tags: Tag[],
-    immediateBase: Date,
-    occurrenceMap: Map<string, { date: Date; eventId: string }>,
-  ): { dueDate: Date | null; sourceCalendarEventId: string | null } {
-    let dueDate: Date | null = null;
-    let sourceCalendarEventId: string | null = null;
-
-    for (const tag of tags) {
-      if (tag.answerMode.type === "immediately") {
-        const candidate = new Date(
-          immediateBase.getTime() + tag.answerMode.responseTimeMillis,
-        );
-        if (!dueDate || candidate < dueDate) {
-          dueDate = candidate;
-          sourceCalendarEventId = null;
-        }
-      } else {
-        const candidate = occurrenceMap.get(tag.id.toString());
-        if (candidate && (!dueDate || candidate.date < dueDate)) {
-          dueDate = candidate.date;
-          sourceCalendarEventId = candidate.eventId;
-        }
-      }
-    }
-
-    return { dueDate, sourceCalendarEventId };
-  }
 }
+
+const toAnswerModeSpec = (tag: Tag): AnswerModeSpec =>
+  tag.answerMode.type === "immediately"
+    ? {
+        tagId: tag.id.toString(),
+        type: "immediately",
+        responseTimeMillis: tag.answerMode.responseTimeMillis,
+      }
+    : { tagId: tag.id.toString(), type: "timeblock" };

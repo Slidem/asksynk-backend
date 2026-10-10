@@ -130,12 +130,12 @@ Deliberately FK-less soft refs already exist and are the pattern to copy:
 - `public-view-guests.repository.ts:111-114` — joins `messages` for a count.
 - `calendar.repository.ts:98-105` — joins `calendar_integrations`.
 
-### 3.3 The core rule is the least-modelled code
+### 3.3 The core rule is only half modelled
 
-The tag → due-date rule is `AttentionDueDateService.pickEarliestCandidate`
-(`attention-items/attention-due-date.service.ts:75-102`), a private method on a DI
-class; its other half is the raw SQL above. The "pinned due date must not move"
-invariant is a `.filter()` inside `recomputeForItems` (31-55).
+The tag → due-date rule is the pure `decideDueDate`
+(`attention-items/domain/due-date.policy.ts`); `AttentionDueDateService` maps `Tag` →
+`AnswerModeSpec` and feeds it occurrences from the raw SQL above. The "pinned due date
+must not move" invariant is still a `.filter()` inside `recomputeForItems`.
 
 ### 3.4 The domain model is anemic
 
@@ -201,7 +201,7 @@ path); 7 realtime `@EventHandler`s spanning messaging, timers, attention, tasks.
 - `auth ↔ public-views`: `auth.module` imports `PublicViewsModule`,
   `guest-auth.service` injects `PublicViewGuestsRepository` + `hashGuestToken`; public
   views controllers import auth decorators. The global guard depends on a feature.
-- `tasks → attention-items`: `task-status.util.ts` imports `AttentionItemStatus`.
+- `tasks → attention-items`: `task-status.util.ts` imports `AttentionItemStatus` (`mapTaskStatusToAttention`; batch status is already derived in tasks' terms).
 
 ### 3.11 No boundary enforcement
 
