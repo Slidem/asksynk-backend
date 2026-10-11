@@ -4,19 +4,18 @@ Each wave ships on its own and leaves the app working. Order: pure core → cont
 layers + lint → transport → aggregates → attention redesign → schemas → cleanup.
 Efforts are relative-size guesses for one developer.
 
-**Waves 0–2 are done.** Wave 2 left behind (outside its scope): `websockets` → feature
-internals (Wave 4), `messaging → TaskSuggestionsService` (publish
-`tasks/contract/task-suggestion.port.ts`), `tasks → AttentionItemStatus` (6.2).
+**Waves 0–3 are done.** Left behind: `websockets` → feature internals (Wave 4, the only
+boundary-lint warnings). `tasks` still speaks attention's status vocabulary via
+`attention/contract/attention-item-status.public.ts` until its outbound translator (6.2).
 
 **Wave 0 is done** — jest unit/integration split, `kernel/` + `platform/`, typed
 errors, ordered events + dead letters + retention, typed jobs. Its leftovers moved:
 the `no-restricted-imports` rule → 3.1; case-insensitive tag names → backlog.
 
-**Placement rule until a context is restructured:** new `domain/` files go inside the
-_current_ module folder (e.g. `attention-items/domain/`). A context takes its target
-name (`tagging`, `scheduling`, `attention`, `focus`, …) the first time it is
-restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
-`apps/api/test/<module>/<file>.unit.test.ts`.
+**Placement (since Wave 3):** every context is layered
+`contract / domain / application / infrastructure / presentation` under its target name
+([03 §3](03-layering.md#3-folder-template)); lint enforces it. Tests mirror
+`apps/api/test/<context>/<file>.unit.test.ts`.
 
 ---
 
@@ -187,18 +186,44 @@ actor; `pnpm test:integration` unchanged and green.
   registry, in a small `GuestIdentityModule` (no better-auth). Public-views'
   `PublicViewGuestIdentityProvider` registers on init. No provider → guest tokens rejected.
 
-## Wave 3 — Layer folders + boundary lint
+## Wave 3 — Layer folders + boundary lint ✅
 
-**2–3 days, one context per commit.**
+**2–3 days.** Executed per [plans/wave-3.md](plans/wave-3.md).
 
-| #   | Step                                                                                                               | Effort |
-| --- | ------------------------------------------------------------------------------------------------------------------ | ------ |
-| 3.1 | Add `dependency-cruiser`, `eslint-plugin-boundaries` and `no-restricted-imports` (see Guardrails), as **warnings** | 2h     |
-| 3.2 | Move each context into `contract / domain / application / infrastructure / presentation`; rename to target names   | 2 days |
-| 3.3 | Promote rules to `error` per context as it goes clean; `pnpm lint:boundaries` in CI                                | 1h     |
+| #   | Step                                                                                                                  | Effort |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ------ |
+| 3.1 | Add `dependency-cruiser`, `eslint-plugin-boundaries` and `no-restricted-imports` (see Guardrails), as **warnings** ✅ | 2h     |
+| 3.2 | Move each context into `contract / domain / application / infrastructure / presentation`; rename to target names ✅   | 2 days |
+| 3.3 | Promote rules to `error`; `pnpm lint:boundaries` chained into `pnpm lint` ✅                                          | 1h     |
 
-Smallest first (`storage`→files, `timers`→focus, `networks`→network) before the
-2,000-line ones.
+As built:
+
+- Renames: `storage`→`files`, `timers`→`focus`, `networks`→`network`,
+  `public-views`→`sharing`, `attention-items`→`attention`, `messaging`→`conversations`;
+  module classes + `<ctx>.errors.ts` files follow. **Unchanged:** routes, error
+  namespaces, consumer-group / queue / job names. `auth`, `user-profile`,
+  `user-settings` layered in place (merge into `identity` is 8.3).
+- Auth transport helpers (decorators, `AuthUser`/`AuthGuest` types, `actor.mapper`,
+  `AdminApiKeyGuard`) → `platform/http/auth/`.
+- Wave 2 leftovers: `tasks/contract/task-suggestion.port.ts` (`TaskSuggestionPort.suggest`
+  + payload type; messaging injects it); `AttentionItemStatus` →
+  `attention/contract/attention-item-status.public.ts`.
+- Placement choices: `defineJob` definitions in `application/jobs/` (services schedule
+  them); `domain/` may import its own `contract/` types; entity files drop `.entity`;
+  wire-shape mappers used for event payloads live in `application/read/*.view.ts`
+  (attention, task suggestion). `TaskSuggestionsService`'s `@EventHandler`s extracted to
+  `presentation/events/suggestion-sync.handler.ts`.
+- Scheduling: one `SchedulingModule` (exports only `CalendarOccurrencePort`); jsonb shape
+  types declared in `domain/`; `CalendarProviderRegistry` built by a module factory.
+  Tests reaching it load dummy Google config (`test/helpers/googleTestConfig.ts`).
+- better-auth's `better-auth.ts` / module stay at the `auth` root (library boundary);
+  ESLint allows auth application/presentation to import them.
+- dependency-cruiser config lives in `apps/api/.dependency-cruiser.cjs` (run from
+  `apps/api`). `schema-ownership` deferred to 7.3. Extra rules:
+  `application-never-imports-presentation`, `domain-no-migrations-schema`,
+  `module-imports-module-or-contract`. `websockets` is `warn` until Wave 4.
+- Seen during the wave (pre-existing): cross-suite integration flakes (outbox claims,
+  dispatcher tick after pg-boss stop, one supertest 401) — each suite passes alone.
 
 ## Wave 4 — Transport adapters
 
@@ -284,8 +309,8 @@ unit test.
 
 ### dependency-cruiser — cross-boundary rules (Wave 3.1)
 
-Resolves the `@/api/*` aliases natively. Verify the `$1` backreference syntax against
-the installed version and prove each rule with a deliberately bad import.
+**As built:** `apps/api/.dependency-cruiser.cjs` (paths `^src/…`, run from `apps/api`;
+see Wave 3 notes for the differences). The original sketch:
 
 ```js
 // .dependency-cruiser.js
@@ -365,7 +390,8 @@ module.exports = {
 
 ### ESLint
 
-`eslint-plugin-boundaries` config in [03 §8](03-layering.md#8-enforcement-wave-3), plus:
+`eslint-plugin-boundaries` v7 config in `eslint.config.js` ([03 §8](03-layering.md#8-enforcement-wave-3)), plus
+(as built, banning `./*` and `../*` too):
 
 ```js
 {

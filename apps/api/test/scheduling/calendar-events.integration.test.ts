@@ -9,14 +9,16 @@ import { eq } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
-import { AuthUser } from "@/api/auth/auth.types";
 import { generateId } from "@/api/kernel/id";
+import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
+import { AuthUser } from "@/api/platform/http/auth/auth.types";
 import { SchedulingModule } from "@/api/scheduling/scheduling.module";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { users } from "@/migrations/schema/users";
+import { googleTestConfig } from "@/test/helpers/googleTestConfig";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
 import {
   makeTestUser,
@@ -44,9 +46,11 @@ describe("CalendarEventsController (integration)", () => {
         ConfigModule.forRoot({
           isGlobal: true,
           envFilePath: path.resolve(__dirname, "../../.env.test"),
+          load: [googleTestConfig],
         }),
         DbModule,
         TxModule,
+        ClockModule,
         SchedulingModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: MockAuthGuard }],

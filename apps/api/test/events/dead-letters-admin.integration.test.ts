@@ -8,7 +8,6 @@ import { eq } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
-import { ADMIN_API_KEY_HEADER } from "@/api/auth/admin-api-key.guard";
 import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
 import { generateId } from "@/api/kernel/id";
@@ -21,6 +20,7 @@ import {
   ConsumerGroup,
   EventOf,
 } from "@/api/platform/events/registry/events.types";
+import { ADMIN_API_KEY_HEADER } from "@/api/platform/http/auth/admin-api-key.guard";
 import { eventsDeadLetters } from "@/migrations/schema/eventsDeadLetters";
 import { pollUntil } from "@/test/helpers/pollUntil";
 

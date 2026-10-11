@@ -1,4 +1,4 @@
-import { TaskStatus } from "@/api/tasks/models/task.model";
+import { TaskStatus } from "@/api/tasks/domain/task.model";
 
 // Batch status: all completed → completed, empty or all todo → todo, else in progress.
 export function deriveBatchStatus(statuses: TaskStatus[]): TaskStatus {

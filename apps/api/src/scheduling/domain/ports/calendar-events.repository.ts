@@ -1,5 +1,5 @@
-import { CalendarEvent } from "@/api/scheduling/entities/calendar-event.entity";
-import { CalendarEventInstance } from "@/api/scheduling/models/calendar-event-instance.model";
+import { CalendarEvent } from "@/api/scheduling/domain/calendar-event";
+import { CalendarEventInstance } from "@/api/scheduling/domain/calendar-event-instance.model";
 
 export abstract class CalendarEventsRepository {
   abstract add(event: CalendarEvent): Promise<CalendarEvent>;

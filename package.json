@@ -21,7 +21,8 @@
     "test:integration": "pnpm --filter @asksynk/api test:integration",
     "test:all": "pnpm --filter @asksynk/api test:all",
     "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm -r lint && pnpm lint:boundaries",
+    "lint:boundaries": "pnpm --filter @asksynk/api lint:boundaries",
     "lint:fix": "pnpm -r lint --fix",
     "format": "prettier -w .",
     "format:check": "prettier --check .",
@@ -33,6 +34,8 @@
   "devDependencies": {
     "@eslint/js": "^9.7.0",
     "eslint": "^9.7.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.2.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-unused-imports": "^4.4.1",
     "prettier": "^3.3.3",

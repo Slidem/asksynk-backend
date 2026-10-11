@@ -5,8 +5,9 @@ order to get there. Audited against the code at `5129fc8` (2026-10-10).
 
 **Status:** Wave 0 (safety net, `kernel/` + `platform/` split, typed errors, events,
 jobs), Wave 1 (pure core: `Actor`, due-date policy, batch status, `Timer`,
-`RecurrenceRule`) and Wave 2 (repository ports, published contracts, `tagging` +
-`scheduling` renames, auth ↔ sharing inversion) are done. **Next: [Wave 3 — layer folders + boundary lint](07-roadmap.md#wave-3--layer-folders--boundary-lint).**
+`RecurrenceRule`), Wave 2 (repository ports, published contracts, `tagging` +
+`scheduling` renames, auth ↔ sharing inversion) and Wave 3 (every context layered and
+renamed, boundary lint as `error`) are done. **Next: [Wave 4 — transport adapters](07-roadmap.md#wave-4--transport-adapters).**
 
 ---
 

@@ -8,19 +8,19 @@ import { and, eq, inArray, or, SQL, sql } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
-import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
-import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
-import { AuthUser } from "@/api/auth/auth.types";
+import { AttentionModule } from "@/api/attention/attention.module";
+import { AttentionItemResponse } from "@/api/attention/presentation/rest/responses/attention-item.response";
 import { EventsModule } from "@/api/events/events.module";
 import { generateId } from "@/api/kernel/id";
-import { NetworksModule } from "@/api/networks/networks.module";
+import { NetworkModule } from "@/api/network/network.module";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
+import { AuthUser } from "@/api/platform/http/auth/auth.types";
 import { TaggingModule } from "@/api/tagging/tagging.module";
-import { TaskResponse } from "@/api/tasks/rest/responses/task.response";
-import { TaskBatchResponse } from "@/api/tasks/rest/responses/task-batch.response";
-import { TaskSuggestionResponse } from "@/api/tasks/rest/responses/task-suggestion.response";
+import { TaskResponse } from "@/api/tasks/presentation/rest/responses/task.response";
+import { TaskBatchResponse } from "@/api/tasks/presentation/rest/responses/task-batch.response";
+import { TaskSuggestionResponse } from "@/api/tasks/presentation/rest/responses/task-suggestion.response";
 import { TasksModule } from "@/api/tasks/tasks.module";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { eventsOutbox } from "@/migrations/schema/outbox";
@@ -30,6 +30,7 @@ import { tasks } from "@/migrations/schema/tasks";
 import { taskSuggestions } from "@/migrations/schema/taskSuggestions";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
+import { googleTestConfig } from "@/test/helpers/googleTestConfig";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
 import { pollUntil } from "@/test/helpers/pollUntil";
 import {
@@ -85,13 +86,14 @@ describe("Tasks → Attention Items (integration)", () => {
         ConfigModule.forRoot({
           isGlobal: true,
           envFilePath: path.resolve(__dirname, "../../.env.test"),
+          load: [googleTestConfig],
         }),
         DbModule,
         TxModule,
         EventsModule,
-        NetworksModule,
+        NetworkModule,
         TaggingModule,
-        AttentionItemsModule,
+        AttentionModule,
         TasksModule,
         ClockModule,
       ],

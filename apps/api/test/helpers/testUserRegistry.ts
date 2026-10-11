@@ -1,5 +1,5 @@
-import { AuthUser } from "@/api/auth/auth.types";
 import { generateId } from "@/api/kernel/id";
+import { AuthUser } from "@/api/platform/http/auth/auth.types";
 
 class TestUserRegistry {
   private users = new Map<string, AuthUser>();

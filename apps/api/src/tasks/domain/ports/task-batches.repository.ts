@@ -1,4 +1,4 @@
-import { TaskBatch } from "@/api/tasks/entities/task-batch.entity";
+import { TaskBatch } from "@/api/tasks/domain/task-batch";
 
 export abstract class TaskBatchesRepository {
   abstract add(

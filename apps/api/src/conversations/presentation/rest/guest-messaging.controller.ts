@@ -1,0 +1,109 @@
+import { Controller, Get, Query } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+
+import { MessagingService } from "@/api/conversations/application/messaging.service";
+import { ListMessagesQueryDto } from "@/api/conversations/presentation/rest/dto/list-messages-query.dto";
+import { resolveAttachmentsByMessage } from "@/api/conversations/presentation/rest/message-attachments.helper";
+import {
+  toMessageResponseDto,
+  toThreadMessageResponseDto,
+} from "@/api/conversations/presentation/rest/messaging.mapper";
+import {
+  MessageResponseDto,
+  ThreadMessageResponseDto,
+} from "@/api/conversations/presentation/rest/responses/message.response";
+import { ThreadStatsResponseDto } from "@/api/conversations/presentation/rest/responses/thread.response";
+import { AttachmentCatalogPort } from "@/api/files/contract/attachment-catalog.port";
+import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
+import { AllowGuest } from "@/api/platform/http/auth/allow-guest.decorator";
+import { AuthGuest as AuthGuestType } from "@/api/platform/http/auth/auth.types";
+import { AuthGuest } from "@/api/platform/http/auth/auth-guest.decorator";
+
+@ApiTags("Guest Messaging")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
+@Controller("public/thread")
+export class GuestMessagingController {
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly attachmentCatalog: AttachmentCatalogPort,
+  ) {}
+
+  /** List messages in the guest's thread */
+  @AllowGuest()
+  @Get("messages")
+  async listMessages(
+    @Query() query: ListMessagesQueryDto,
+    @AuthGuest() guest: AuthGuestType,
+  ): Promise<ThreadMessageResponseDto[]> {
+    const items = await this.messagingService.listGuestThreadMessages(guest, {
+      before: query.before ? new Date(query.before) : undefined,
+      limit: query.limit,
+    });
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentCatalog,
+      items.map((i) => i.message),
+    );
+    return items.map((i) =>
+      toThreadMessageResponseDto(
+        i,
+        attachmentsByMessage.get(i.message.id) ?? [],
+      ),
+    );
+  }
+
+  /** Get tagged-message status counts for the guest's thread */
+  @AllowGuest()
+  @Get("stats")
+  async getStats(
+    @AuthGuest() guest: AuthGuestType,
+  ): Promise<ThreadStatsResponseDto> {
+    return this.messagingService.getGuestThreadStats(guest);
+  }
+
+  /** List all tagged messages in the guest's thread (not paginated) */
+  @AllowGuest()
+  @Get("tagged-messages")
+  async listTaggedMessages(
+    @AuthGuest() guest: AuthGuestType,
+  ): Promise<ThreadMessageResponseDto[]> {
+    const items =
+      await this.messagingService.listGuestThreadTaggedMessages(guest);
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentCatalog,
+      items.map((i) => i.message),
+    );
+    return items.map((i) =>
+      toThreadMessageResponseDto(
+        i,
+        attachmentsByMessage.get(i.message.id) ?? [],
+      ),
+    );
+  }
+
+  /** List replies to a message in the guest's thread */
+  @AllowGuest()
+  @Get("messages/:messageId/replies")
+  async listReplies(
+    @UuidV7Param("messageId") messageId: string,
+    @Query() query: ListMessagesQueryDto,
+    @AuthGuest() guest: AuthGuestType,
+  ): Promise<MessageResponseDto[]> {
+    const replies = await this.messagingService.listGuestMessageReplies(
+      guest,
+      messageId,
+      {
+        before: query.before ? new Date(query.before) : undefined,
+        limit: query.limit,
+      },
+    );
+    const attachmentsByMessage = await resolveAttachmentsByMessage(
+      this.attachmentCatalog,
+      replies,
+    );
+    return replies.map((r) =>
+      toMessageResponseDto(r, attachmentsByMessage.get(r.id) ?? []),
+    );
+  }
+}

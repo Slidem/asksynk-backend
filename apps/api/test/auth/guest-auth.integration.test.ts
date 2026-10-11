@@ -13,19 +13,19 @@ import { eq } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
-import { AuthGuard } from "@/api/auth/auth.guard";
-import { AuthService } from "@/api/auth/auth.service";
+import { AuthService } from "@/api/auth/application/auth.service";
 import { GuestIdentityModule } from "@/api/auth/guest-identity.module";
+import { AuthGuard } from "@/api/auth/presentation/rest/auth.guard";
 import { generateId } from "@/api/kernel/id";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
-import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { SharingModule } from "@/api/sharing/sharing.module";
 import { publicViewGuests, publicViews } from "@/migrations/schema/publicViews";
 import { users } from "@/migrations/schema/users";
 
 // better-auth ships ESM that Jest can't load; the user-session path is stubbed
 // to always reject so every request falls through to the real guest path.
-jest.mock("@/api/auth/auth.service", () => ({
+jest.mock("@/api/auth/application/auth.service", () => ({
   AuthService: class AuthService {
     async validateRequest(): Promise<never> {
       throw new UnauthorizedException();
@@ -51,7 +51,7 @@ describe("Guest auth (integration)", () => {
         DbModule,
         TxModule,
         GuestIdentityModule,
-        PublicViewsModule,
+        SharingModule,
       ],
       providers: [
         AuthService,

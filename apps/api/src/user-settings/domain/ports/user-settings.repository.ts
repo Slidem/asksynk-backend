@@ -1,5 +1,5 @@
-import { UserSettings } from "@/api/user-settings/entities/user-settings.entity";
-import { UpdateUserSettingsInput } from "@/api/user-settings/models/user-settings.model";
+import { UserSettings } from "@/api/user-settings/domain/user-settings";
+import { UpdateUserSettingsInput } from "@/api/user-settings/domain/user-settings.model";
 
 export abstract class UserSettingsRepository {
   abstract ensure(userId: string): Promise<UserSettings>;

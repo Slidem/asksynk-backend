@@ -1,5 +1,5 @@
+import { TaskStatus } from "@/api/tasks/domain/task.model";
 import { deriveBatchStatus } from "@/api/tasks/domain/task-batch-status";
-import { TaskStatus } from "@/api/tasks/models/task.model";
 
 describe("Derive batch status", () => {
   it.each<[TaskStatus[], TaskStatus]>([

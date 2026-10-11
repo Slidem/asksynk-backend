@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 
+import { UserSettingsService } from "@/api/user-settings/application/user-settings.service";
 import { UserSettingsRepository } from "@/api/user-settings/domain/ports/user-settings.repository";
-import { DrizzleUserSettingsRepository } from "@/api/user-settings/drizzle-user-settings.repository";
-import { UserSettingsController } from "@/api/user-settings/rest/user-settings.controller";
-import { UserSettingsService } from "@/api/user-settings/user-settings.service";
+import { DrizzleUserSettingsRepository } from "@/api/user-settings/infrastructure/persistence/drizzle-user-settings.repository";
+import { UserSettingsController } from "@/api/user-settings/presentation/rest/user-settings.controller";
 
 @Module({
   providers: [

@@ -32,17 +32,17 @@ Subdomain type decides how much modelling a context earns (Khononov): **core** g
 rich aggregates, pure policies, careful contracts; **supporting** is rich only where a
 state machine exists (`Timer`, `TaskSuggestion`, `Invite`); **generic** stays thin.
 
-| Context           | Today (module)                              | Type       | Owns                                                                                                                                |
+| Context           | Folder (was)                                | Type       | Owns                                                                                                                                |
 | ----------------- | ------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **tagging**       | `tags`                                      | Core       | `tags`                                                                                                                              |
-| **attention**     | `attention-items`                           | Core       | `attention_items`, `attention_item_tags`                                                                                            |
-| **scheduling**    | `calendar-events` + `calendar-integrations` | Core       | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
-| **conversations** | `messaging`                                 | Supporting | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
+| **tagging**       | `tagging` (was `tags`)                      | Core       | `tags`                                                                                                                              |
+| **attention**     | `attention` (was `attention-items`)         | Core       | `attention_items`, `attention_item_tags`                                                                                            |
+| **scheduling**    | `scheduling` (was 2 modules)                | Core       | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
+| **conversations** | `conversations` (was `messaging`)           | Supporting | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
 | **tasks**         | `tasks`                                     | Supporting | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
-| **network**       | `networks`                                  | Supporting | `user_invites`, `user_network`                                                                                                      |
-| **sharing**       | `public-views`                              | Supporting | `public_views`, `public_view_guests`                                                                                                |
-| **focus**         | `timers`                                    | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
-| **files**         | `storage`                                   | Generic    | `attachments`                                                                                                                       |
+| **network**       | `network` (was `networks`)                  | Supporting | `user_invites`, `user_network`                                                                                                      |
+| **sharing**       | `sharing` (was `public-views`)              | Supporting | `public_views`, `public_view_guests`                                                                                                |
+| **focus**         | `focus` (was `timers`)                      | Supporting | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
+| **files**         | `files` (was `storage`)                     | Generic    | `attachments`                                                                                                                       |
 | **identity**      | `auth` + `user-profile` + `user-settings`   | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
 | _(platform)_      | `platform/`                                 | —          | `events_outbox`, `events_dead_letters`                                                                                              |
 

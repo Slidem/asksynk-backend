@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Patch, Query } from "@nestjs/common";
 
-import { AdminApi } from "@/api/auth/admin-api.decorator";
 import { ListDeadLettersQueryDto } from "@/api/events/rest/dto/list-dead-letters-query.dto";
 import { PatchDeadLetterRequestDto } from "@/api/events/rest/dto/patch-dead-letter.dto";
 import {
@@ -15,6 +14,7 @@ import {
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { DeadLetterFilter } from "@/api/platform/events/dead-letters/events-dead-letters.repository";
 import { EventsDeadLettersService } from "@/api/platform/events/dead-letters/events-dead-letters.service";
+import { AdminApi } from "@/api/platform/http/auth/admin-api.decorator";
 import { toNonNegativeNumberOptional } from "@/api/platform/mappers/string.utils";
 
 @AdminApi()

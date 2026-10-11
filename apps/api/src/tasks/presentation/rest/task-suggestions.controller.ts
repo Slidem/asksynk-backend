@@ -1,0 +1,151 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+
+import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
+import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
+import { AuthUser as AuthUserType } from "@/api/platform/http/auth/auth.types";
+import { AuthUser } from "@/api/platform/http/auth/auth-user.decorator";
+import { toTaskSuggestionView } from "@/api/tasks/application/read/task-suggestion.view";
+import { TaskSuggestionsService } from "@/api/tasks/application/task-suggestions.service";
+import { TaskSuggestionPayload } from "@/api/tasks/contract/task-suggestion.port";
+import { CreateTaskSuggestionRequestDto } from "@/api/tasks/presentation/rest/dto/create-task-suggestion.dto";
+import { ListTaskSuggestionsQueryDto } from "@/api/tasks/presentation/rest/dto/list-task-suggestions-query.dto";
+import { PatchTaskSuggestionRequestDto } from "@/api/tasks/presentation/rest/dto/patch-task-suggestion.dto";
+import { TaskSuggestionResponse } from "@/api/tasks/presentation/rest/responses/task-suggestion.response";
+import { tasksError } from "@/api/tasks/tasks.errors";
+
+@ApiTags("Task Suggestions")
+@ApiBearerAuth("bearer")
+@ApiStandardErrors()
+@Controller("task-suggestions")
+export class TaskSuggestionsController {
+  constructor(private readonly suggestionsService: TaskSuggestionsService) {}
+
+  /** Suggest a task (or batch) to another user */
+  @Post()
+  async createSuggestion(
+    @Body() body: CreateTaskSuggestionRequestDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TaskSuggestionResponse> {
+    const suggestion = await this.suggestionsService.suggest({
+      suggesterUserId: user.id,
+      suggesteeUserId: body.suggesteeUserId,
+      payload: this.toPayload(body.payload),
+    });
+    return toTaskSuggestionView(suggestion);
+  }
+
+  /** List task suggestions sent or received by the current user */
+  @Get()
+  async listSuggestions(
+    @Query() query: ListTaskSuggestionsQueryDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TaskSuggestionResponse[]> {
+    const suggestions = await this.suggestionsService.list(
+      user.id,
+      query.role,
+      query.status,
+    );
+    return suggestions.map((s) => toTaskSuggestionView(s));
+  }
+
+  /** Get a task suggestion by id */
+  @Get(":id")
+  async getSuggestion(
+    @UuidV7Param("id") id: string,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TaskSuggestionResponse> {
+    const { suggestion, materializedTasks } =
+      await this.suggestionsService.getSuggestionView(user.id, id);
+    return toTaskSuggestionView(suggestion, materializedTasks);
+  }
+
+  /** Accept/reject a suggestion, or edit its pending payload */
+  @Patch(":id")
+  async updateSuggestion(
+    @UuidV7Param("id") id: string,
+    @Body() body: PatchTaskSuggestionRequestDto,
+    @AuthUser() user: AuthUserType,
+  ): Promise<TaskSuggestionResponse> {
+    const hasPayloadEdit =
+      body.title !== undefined ||
+      body.description !== undefined ||
+      body.dueDate !== undefined ||
+      body.tagIds !== undefined ||
+      body.tasks !== undefined;
+
+    if (body.status !== undefined && hasPayloadEdit) {
+      throw tasksError("invalid_suggestion_update", {
+        reason: "cannot change status and edit payload in the same request",
+      });
+    }
+
+    if (body.status !== undefined) {
+      const suggestion =
+        body.status === "accepted"
+          ? await this.suggestionsService.accept(user.id, id)
+          : await this.suggestionsService.reject(user.id, id);
+      return toTaskSuggestionView(suggestion);
+    }
+
+    if (!hasPayloadEdit) {
+      throw tasksError("invalid_suggestion_update", {
+        reason: "nothing to update",
+      });
+    }
+
+    const suggestion = await this.suggestionsService.editPayload({
+      id,
+      userId: user.id,
+      title: body.title,
+      description: body.description,
+      dueDate: body.dueDate,
+      tagIds: body.tagIds,
+      tasks: body.tasks?.map((t) => ({
+        title: t.title,
+        description: t.description ?? null,
+      })),
+    });
+    return toTaskSuggestionView(suggestion);
+  }
+
+  /** Rescind a task suggestion */
+  @Delete(":id")
+  @HttpCode(204)
+  async deleteSuggestion(
+    @UuidV7Param("id") id: string,
+    @AuthUser() user: AuthUserType,
+  ): Promise<void> {
+    await this.suggestionsService.rescind(user.id, id);
+  }
+
+  private toPayload(
+    payload: CreateTaskSuggestionRequestDto["payload"],
+  ): TaskSuggestionPayload {
+    return {
+      kind: payload.kind,
+      title: payload.title,
+      description: payload.description ?? null,
+      // dueDate applies to both kinds (task due date / batch-level due date).
+      dueDate: payload.dueDate ?? null,
+      // The suggestee's tags (task-level or batch-level).
+      tagIds: payload.tagIds ?? [],
+      tasks:
+        payload.kind === "batch"
+          ? (payload.tasks ?? []).map((t) => ({
+              title: t.title,
+              description: t.description ?? null,
+            }))
+          : [],
+    };
+  }
+}

@@ -1,4 +1,4 @@
-import { CalendarEventLink } from "@/api/scheduling/entities/calendar-event-link.entity";
+import { CalendarEventLink } from "@/api/scheduling/domain/calendar-event-link";
 
 export abstract class CalendarEventLinkRepository {
   abstract add(link: CalendarEventLink): Promise<CalendarEventLink>;

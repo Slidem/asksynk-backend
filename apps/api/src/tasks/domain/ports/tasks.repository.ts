@@ -1,9 +1,9 @@
-import { Task } from "@/api/tasks/entities/task.entity";
+import { Task } from "@/api/tasks/domain/task";
 import {
   CreateTaskInput,
   ListTasksInput,
   TaskStatus,
-} from "@/api/tasks/models/task.model";
+} from "@/api/tasks/domain/task.model";
 
 export abstract class TasksRepository {
   abstract add(id: string, input: CreateTaskInput): Promise<Task>;

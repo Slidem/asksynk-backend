@@ -1,4 +1,4 @@
-import { Calendar } from "@/api/scheduling/entities/calendar.entity";
+import { Calendar } from "@/api/scheduling/domain/calendar";
 
 export abstract class CalendarRepository {
   abstract ensureAsksynkCalendar(userId: string, id: string): Promise<Calendar>;

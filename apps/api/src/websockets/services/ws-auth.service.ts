@@ -2,10 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 import { Socket } from "socket.io";
 
-import { guestActor, userActor } from "@/api/auth/actor.mapper";
-import { AuthService } from "@/api/auth/auth.service";
-import { GuestAuthService } from "@/api/auth/guest-auth.service";
+import { AuthService } from "@/api/auth/application/auth.service";
+import { GuestAuthService } from "@/api/auth/application/guest-auth.service";
 import { Actor } from "@/api/kernel/actor/actor";
+import { guestActor, userActor } from "@/api/platform/http/auth/actor.mapper";
 import { extractBearerToken } from "@/api/platform/http/bearer-token";
 
 @Injectable()

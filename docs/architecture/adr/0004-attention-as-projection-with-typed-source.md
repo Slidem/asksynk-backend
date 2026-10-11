@@ -12,12 +12,12 @@ service `.filter()`.
 
 ## Decision 1 — aggregate or read model? **An aggregate with a projected slice.**
 
-| Data                                           | Owner         | Written by                       |
-| ---------------------------------------------- | ------------- | -------------------------------- |
-| `source_context` / `source_kind` / `source_id` | source        | ingestion, once                  |
-| `preview`, `tagIds`                            | source        | ingestion, every update          |
-| `status`                                       | contested     | the user _and_ the source        |
-| `dueDate`, `dueDatePinned`, `note`             | **attention** | the policy or the user           |
+| Data                                           | Owner         | Written by                |
+| ---------------------------------------------- | ------------- | ------------------------- |
+| `source_context` / `source_kind` / `source_id` | source        | ingestion, once           |
+| `preview`, `tagIds`                            | source        | ingestion, every update   |
+| `status`                                       | contested     | the user _and_ the source |
+| `dueDate`, `dueDatePinned`, `note`             | **attention** | the policy or the user    |
 
 Pure projection would lose status transitions and the pinned date (the product);
 pure aggregate would duplicate source content or join across contexts.
@@ -41,8 +41,9 @@ UNIQUE (user_id, source_context, source_kind, source_id)
 
 Attention (core) publishes `attention.source.upserted` / `attention.source.removed`;
 each source publishes them from a thin outbound translator it owns (Open Host Service
-+ Published Language; sources conform). Attention keeps three handlers permanently:
-source upserted/removed, tag changed, calendar changed.
+
+- Published Language; sources conform). Attention keeps three handlers permanently:
+  source upserted/removed, tag changed, calendar changed.
 
 ## Consequences
 

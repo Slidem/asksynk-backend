@@ -1,0 +1,43 @@
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+import {
+  MANAGED_MESSAGE_STATUSES,
+  ManagedMessageStatus,
+} from "@/api/conversations/domain/message";
+import { MessageAttachmentResponseDto } from "@/api/conversations/presentation/rest/responses/message-attachment.response";
+
+export const SENDER_KINDS = ["user", "guest"] as const;
+export type SenderKind = (typeof SENDER_KINDS)[number];
+
+export class ManagedStatusDto {
+  @ApiProperty({ enum: ["tagged_message"] })
+  type!: "tagged_message";
+
+  @ApiProperty({ enum: [...MANAGED_MESSAGE_STATUSES] })
+  status!: ManagedMessageStatus;
+}
+
+export class MessageResponseDto {
+  id!: string;
+  threadId!: string;
+  parentMessageId!: string | null;
+
+  @ApiProperty({ enum: [...SENDER_KINDS], enumName: "SenderKind" })
+  senderKind!: SenderKind;
+
+  senderId!: string;
+  body!: string;
+  tagIds!: string[];
+  attachments!: MessageAttachmentResponseDto[];
+  suggestionId!: string | null;
+
+  // Present only on tagged messages; omitted otherwise (not manageable).
+  @ApiPropertyOptional({ type: ManagedStatusDto })
+  managedStatus?: ManagedStatusDto;
+
+  createdAt!: string;
+}
+
+export class ThreadMessageResponseDto extends MessageResponseDto {
+  replyCount!: number;
+}

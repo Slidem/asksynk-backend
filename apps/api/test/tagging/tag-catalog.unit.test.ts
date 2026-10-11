@@ -1,10 +1,10 @@
 import { UUID,uuidv7 } from "uuidv7";
 
-import { ConnectionPolicyPort } from "@/api/networks/contract/connection-policy.port";
+import { ConnectionPolicyPort } from "@/api/network/contract/connection-policy.port";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import { TagsService } from "@/api/tagging/application/tags.service";
 import { TagRepository } from "@/api/tagging/domain/ports/tag.repository";
 import { AnswerMode, Tag } from "@/api/tagging/domain/tag";
-import { TagsService } from "@/api/tagging/services/tags.service";
 
 class FakeTagRepository extends TagRepository {
   constructor(private readonly tags: Tag[]) {

@@ -25,9 +25,9 @@ Spine: _input → tagging → attention → scheduling_. A tag is a policy (answ
 - **Ports:** `abstract class` = contract + DI token (no `Symbol` tokens). Services never hit DB directly — always via repository.
 - **Errors:** one `DomainError` + per-context catalogs; HTTP status decided at edge.
 - **Events/jobs:** outbox events, one `key_strict_fifo` queue per consumer group + dead-letter table; one typed jobs API.
-- **Status (2026-10-10):** Wave 0 ✅ (test split, kernel/platform, typed errors, events, jobs), Wave 1 ✅ (`Actor`, due-date policy, batch status, `Timer`, `RecurrenceRule`), Wave 2 ✅ (repository ports in `<ctx>/domain/ports/` + `Drizzle…` adapters, `contract/` ports, `tags`→`tagging`, calendar→`scheduling`, auth↔sharing inversion).
-- **Next: Wave 3** — layer folders + boundary lint (3.1 dependency-cruiser/boundaries as warnings, 3.2 move each context into layers, 3.3 promote to errors). Then: 4 transport adapters, 5 rich aggregates, 6 attention core redesign, 7 schema per context, 8 cleanup.
-- **Placement rule:** until a context is restructured, new `domain/` files go inside the _current_ module folder (e.g. `attention-items/domain/`); a context takes its target name the first time it's restructured.
+- **Status (2026-10-11):** Wave 0 ✅ (test split, kernel/platform, typed errors, events, jobs), Wave 1 ✅ (`Actor`, due-date policy, batch status, `Timer`, `RecurrenceRule`), Wave 2 ✅ (repository ports, `contract/` ports, auth↔sharing inversion), Wave 3 ✅ (all contexts layered + renamed: `files`, `focus`, `network`, `sharing`, `attention`, `conversations`; boundary lint as `error`).
+- **Next: Wave 4** — transport adapters (untangle `websockets`, the only boundary warnings). Then: 5 rich aggregates, 6 attention core redesign, 7 schema per context, 8 cleanup.
+- **Placement:** `<ctx>/{contract,domain,application,infrastructure,presentation}/` + root `<ctx>.module.ts`, `<ctx>.errors.ts` (docs/architecture/03-layering.md §3). Job definitions in `application/jobs/`; event-payload views in `application/read/`. `pnpm lint` enforces layers (ESLint boundaries) + cross-context rules (`pnpm lint:boundaries`, dependency-cruiser).
 - **Roadmap upkeep:** mark shipped steps ✅ (table + heading), don't delete them; keep `01-current-state.md` reflecting reality.
 - New/touched application methods take `Actor`, not `userId: string`.
 

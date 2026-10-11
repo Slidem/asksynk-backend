@@ -1,6 +1,6 @@
-import { AttentionItemStatus } from "@/api/attention-items/models/attention-item.model";
-import { TaskStatus } from "@/api/tasks/models/task.model";
-import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
+import { AttentionItemStatus } from "@/api/attention/contract/attention-item-status.public";
+import { mapTaskStatusToAttention } from "@/api/tasks/application/task-status.util";
+import { TaskStatus } from "@/api/tasks/domain/task.model";
 
 describe("Map task status to attention", () => {
   it.each<[TaskStatus, AttentionItemStatus]>([

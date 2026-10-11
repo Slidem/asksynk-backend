@@ -1,7 +1,7 @@
 # 03 — Layering
 
 Every context gets the same layers and dependency rule, over two shared tiers
-(`kernel/`, `platform/`). Enforced by lint (Wave 3), not discipline.
+(`kernel/`, `platform/`). Enforced by lint (since Wave 3), not discipline.
 
 ## 1. The rule
 
@@ -17,11 +17,11 @@ Every context gets the same layers and dependency rule, over two shared tiers
 
 | Layer             | May import                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------- |
-| `domain/`         | own `domain/`, `kernel/`                                                                |
+| `domain/`         | own `domain/` + own `contract/` types + own `<ctx>.errors.ts`, `kernel/`                 |
 | `contract/`       | `kernel/`, other `contract/`, `platform/events/registry` (`defineEvent`) + zod          |
 | `application/`    | own `domain/` + `application/`, `kernel/`, `platform/`, **other contexts' `contract/`** |
 | `infrastructure/` | own `domain/` + `application/`, `kernel/`, `platform/`, Drizzle, SDKs                   |
-| `presentation/`   | own `application/` + `domain/` (types), `kernel/`, `platform/`                          |
+| `presentation/`   | own `application/` + `domain/` (types), `kernel/`, `platform/`, other `contract/`       |
 | `kernel/`         | nothing outside itself; plain libraries only (`uuidv7`, `lodash`), no framework         |
 | `platform/`       | `kernel/`, frameworks — never a context                                                 |
 
@@ -36,7 +36,7 @@ touch repositories (already true).
 | ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Contains          | pure domain vocabulary                                                          | framework-aware shared infra                                                      |
 | Imported by       | everything, **including `domain/`**                                             | `application/`, `infrastructure/`, `presentation/` — never `domain/`              |
-| Today             | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http, jobs, logger, mappers |
+| Today             | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http (incl. `http/auth/` request decorators + principal types), jobs, logger, mappers |
 | Planned additions | —                                                                               | `realtime/realtime-broadcaster.ts` (Wave 4.1)                                     |
 
 **Placement test for `kernel/` — both must be yes:** (1) it is pure, transitively;
@@ -80,7 +80,8 @@ apps/api/src/<context>/
 
   application/
     <verb>-<noun>.usecase.ts       # or one service per aggregate; @Transactional here
-    read/<name>.view.ts            # view types
+    read/<name>.view.ts            # view types (+ mapper when it is also an event payload)
+    jobs/<name>.job.ts             # defineJob — the application schedules it
 
   infrastructure/
     persistence/drizzle-<name>.repository.ts, <name>.query.ts, <name>.mapper.ts
@@ -90,7 +91,7 @@ apps/api/src/<context>/
     rest/    controller, dto/, responses/, mapper
     ws/      <name>.broadcaster.ts, <name>.gateway.ts
     events/  <name>.handler.ts, <group>.consumer-group.ts
-    jobs/    <name>.job.ts, <name>.job-handler.ts
+    jobs/    <name>.job-handler.ts
 ```
 
 `contract/` is a directory of first-class declarations, not a re-export file —
@@ -195,52 +196,26 @@ Value objects only where a rule attaches: `AnswerMode` (tagging), `RecurrenceRul
 
 ## 8. Enforcement (Wave 3)
 
-`eslint-plugin-boundaries` for in-editor layer rules; `dependency-cruiser` for
-cross-context rules ([07 §Guardrails](07-roadmap.md#guardrails)).
+`eslint-plugin-boundaries` (v7, `eslint.config.js`) for in-editor layer rules;
+`dependency-cruiser` (`apps/api/.dependency-cruiser.cjs`) for cross-context rules
+([07 §Guardrails](07-roadmap.md#guardrails)). Both run in `pnpm lint`; both `error`,
+except `websockets` (`warn` until Wave 4).
 
-```js
-// eslint.config.js (additions) — verify option shape against the installed v7 first
-settings: {
-  "boundaries/elements": [
-    { type: "kernel",         pattern: "apps/api/src/kernel/**" },
-    { type: "platform",       pattern: "apps/api/src/platform/**" },
-    { type: "contract",       pattern: "apps/api/src/*/contract/**",       capture: ["context"] },
-    { type: "domain",         pattern: "apps/api/src/*/domain/**",         capture: ["context"] },
-    { type: "application",    pattern: "apps/api/src/*/application/**",    capture: ["context"] },
-    { type: "infrastructure", pattern: "apps/api/src/*/infrastructure/**", capture: ["context"] },
-    { type: "presentation",   pattern: "apps/api/src/*/presentation/**",   capture: ["context"] },
-  ],
-},
-rules: {
-  "boundaries/element-types": ["error", {
-    default: "disallow",
-    rules: [
-      { from: "kernel",   allow: ["kernel"] },
-      { from: "platform", allow: ["kernel", "platform"] },
-      { from: "contract", allow: ["kernel", "platform", "contract"] }, // platform: defineEvent only
-      { from: "domain",   allow: ["kernel", ["domain", { context: "${from.context}" }]] }, // no platform
-      { from: ["application", "infrastructure", "presentation"], allow: [
-        "kernel", "platform", "contract",
-        ["domain",      { context: "${from.context}" }],
-        ["application", { context: "${from.context}" }],
-      ]},
-    ],
-  }],
-  "boundaries/external": ["error", {
-    default: "allow",
-    rules: [
-      { from: ["domain", "kernel"],
-        disallow: ["@nestjs/*", "drizzle-orm", "drizzle-orm/*", "class-validator",
-                   "class-transformer", "zod", "socket.io", "pg-boss", "@nestjs-cls/*"] },
-      { from: ["contract"], // event schemas need zod; nothing else framework-y
-        disallow: ["@nestjs/*", "drizzle-orm", "drizzle-orm/*", "class-validator",
-                   "class-transformer", "socket.io", "pg-boss", "@nestjs-cls/*"] },
-    ],
-  }],
-},
-```
+ESLint, as built:
+
+- **Elements** (v7 patterns match folders only): `kernel`, `platform`, one per layer
+  `apps/api/src/*/<layer>` capturing `context`, and `root` (`apps/api/src/*` — the
+  context root: `<ctx>.module.ts`, `<ctx>.errors.ts`). File categories `module` /
+  `errors` distinguish root files. Composition-root `src/*.ts` is excluded.
+- **`boundaries/dependencies`**, `default: "disallow"`, last matching policy wins:
+  externals allowed; then the §1 table per layer (plus same-layer imports); `root` may
+  import its own everything, other contexts' `contract/` and `*.module.ts`; finally the
+  framework bans (`@nestjs/*`, `@nestjs-cls/*`, `drizzle-orm`, `class-validator`,
+  `class-transformer`, `zod`, `socket.io`, `pg-boss`) for `domain` and `kernel`, and
+  the same minus `zod` for `contract`.
+- One exception: auth's application/presentation may import `auth/better-auth*.ts`
+  (better-auth `Auth` type + `BETTER_AUTH` token; library boundary).
 
 The two rules that carry the weight: `domain` does not list `platform`, and `kernel`
 gets the same external ban as `domain`. `contract/` is looser only because
-`<ctx>.events.ts` needs `defineEvent` + zod. Roll out per context: `warn` → clean →
-`error`.
+`<ctx>.events.ts` needs `defineEvent` + zod.

@@ -1,9 +1,6 @@
-import { TaskSuggestion } from "@/api/tasks/entities/task-suggestion.entity";
-import {
-  CreateTaskSuggestionInput,
-  TaskSuggestionPayload,
-  TaskSuggestionStatus,
-} from "@/api/tasks/models/task.model";
+import { TaskSuggestionPayload } from "@/api/tasks/contract/task-suggestion.port";
+import { CreateTaskSuggestionInput, TaskSuggestionStatus } from "@/api/tasks/domain/task.model";
+import { TaskSuggestion } from "@/api/tasks/domain/task-suggestion";
 
 export abstract class TaskSuggestionsRepository {
   abstract add(

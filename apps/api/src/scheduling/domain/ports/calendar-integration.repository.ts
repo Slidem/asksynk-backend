@@ -1,8 +1,8 @@
 import {
   CalendarIntegration,
   CalendarIntegrationStatus,
-} from "@/api/scheduling/entities/calendar-integration.entity";
-import { CalendarIntegrationCredentials } from "@/migrations/schema/calendarIntegrations";
+} from "@/api/scheduling/domain/calendar-integration";
+import { CalendarIntegrationCredentials } from "@/api/scheduling/domain/calendar-integration";
 
 export abstract class CalendarIntegrationRepository {
   abstract add(integration: CalendarIntegration): Promise<CalendarIntegration>;

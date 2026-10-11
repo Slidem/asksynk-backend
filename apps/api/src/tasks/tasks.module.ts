@@ -1,23 +1,25 @@
 import { Module } from "@nestjs/common";
 
-import { NetworksModule } from "@/api/networks/networks.module";
+import { NetworkModule } from "@/api/network/network.module";
 import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
 import { TaggingModule } from "@/api/tagging/tagging.module";
+import { TaskBatchesService } from "@/api/tasks/application/task-batches.service";
+import { TaskSuggestionsService } from "@/api/tasks/application/task-suggestions.service";
+import { TasksService } from "@/api/tasks/application/tasks.service";
+import { TaskSuggestionPort } from "@/api/tasks/contract/task-suggestion.port";
 import { TaskBatchesRepository } from "@/api/tasks/domain/ports/task-batches.repository";
 import { TaskSuggestionsRepository } from "@/api/tasks/domain/ports/task-suggestions.repository";
 import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
-import { DrizzleTaskBatchesRepository } from "@/api/tasks/repositories/drizzle-task-batches.repository";
-import { DrizzleTaskSuggestionsRepository } from "@/api/tasks/repositories/drizzle-task-suggestions.repository";
-import { DrizzleTasksRepository } from "@/api/tasks/repositories/drizzle-tasks.repository";
-import { TaskBatchesController } from "@/api/tasks/rest/task-batches.controller";
-import { TaskSuggestionsController } from "@/api/tasks/rest/task-suggestions.controller";
-import { TasksController } from "@/api/tasks/rest/tasks.controller";
-import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
-import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
-import { TasksService } from "@/api/tasks/services/tasks.service";
+import { DrizzleTaskBatchesRepository } from "@/api/tasks/infrastructure/persistence/drizzle-task-batches.repository";
+import { DrizzleTaskSuggestionsRepository } from "@/api/tasks/infrastructure/persistence/drizzle-task-suggestions.repository";
+import { DrizzleTasksRepository } from "@/api/tasks/infrastructure/persistence/drizzle-tasks.repository";
+import { SuggestionSyncHandler } from "@/api/tasks/presentation/events/suggestion-sync.handler";
+import { TaskBatchesController } from "@/api/tasks/presentation/rest/task-batches.controller";
+import { TaskSuggestionsController } from "@/api/tasks/presentation/rest/task-suggestions.controller";
+import { TasksController } from "@/api/tasks/presentation/rest/tasks.controller";
 
 @Module({
-  imports: [NetworksModule, TaggingModule, EventsPublisherModule],
+  imports: [NetworkModule, TaggingModule, EventsPublisherModule],
   providers: [
     { provide: TasksRepository, useClass: DrizzleTasksRepository },
     { provide: TaskBatchesRepository, useClass: DrizzleTaskBatchesRepository },
@@ -25,12 +27,14 @@ import { TasksService } from "@/api/tasks/services/tasks.service";
     TasksService,
     TaskBatchesService,
     TaskSuggestionsService,
+    { provide: TaskSuggestionPort, useExisting: TaskSuggestionsService },
+    SuggestionSyncHandler,
   ],
   controllers: [
     TasksController,
     TaskBatchesController,
     TaskSuggestionsController,
   ],
-  exports: [TaskSuggestionsService],
+  exports: [TaskSuggestionPort],
 })
 export class TasksModule {}

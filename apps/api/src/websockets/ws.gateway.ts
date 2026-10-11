@@ -11,17 +11,17 @@ import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 import { Server, Socket } from "socket.io";
 
-import { toAuthGuest } from "@/api/auth/actor.mapper";
-import { Actor } from "@/api/kernel/actor/actor";
-import { DomainError } from "@/api/kernel/errors/domain-errors";
-import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/api/messaging/attachments/message-attachment.constants";
+import { MessagingService } from "@/api/conversations/application/messaging.service";
 import {
   MANAGED_MESSAGE_STATUSES,
   ManagedMessageStatus,
-} from "@/api/messaging/entities/message.entity";
-import { toMessageAttachmentResponse } from "@/api/messaging/rest/messaging.mapper";
-import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
-import { MessagingService } from "@/api/messaging/services/messaging.service";
+} from "@/api/conversations/domain/message";
+import { MAX_ATTACHMENTS_PER_MESSAGE } from "@/api/conversations/domain/message-attachment.constants";
+import { toMessageAttachmentResponse } from "@/api/conversations/presentation/rest/messaging.mapper";
+import { MessageResponseDto } from "@/api/conversations/presentation/rest/responses/message.response";
+import { AttachmentCatalogPort } from "@/api/files/contract/attachment-catalog.port";
+import { Actor } from "@/api/kernel/actor/actor";
+import { DomainError } from "@/api/kernel/errors/domain-errors";
 import { DomainErrorsTranslator } from "@/api/platform/errors/errors.translator";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import {
@@ -34,8 +34,8 @@ import {
   TimerLifecycle,
 } from "@/api/platform/events/registry/events.registry";
 import { EventOf } from "@/api/platform/events/registry/events.types";
-import { AttachmentCatalogPort } from "@/api/storage/contract/attachment-catalog.port";
-import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
+import { toAuthGuest } from "@/api/platform/http/auth/actor.mapper";
+import { TaskSuggestionPayload } from "@/api/tasks/contract/task-suggestion.port";
 import { WsAuthService } from "@/api/websockets/services/ws-auth.service";
 import { guestRoom, threadRoom, userRoom } from "@/api/websockets/ws.rooms";
 import { Ack, SendAck } from "@/api/websockets/ws.types";
