@@ -1,20 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
-import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
-import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
-import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
+import { AttachmentCatalogPort } from "@/api/storage/contract/attachment-catalog.port";
+import { UserProfileRepository } from "@/api/user-profile/domain/ports/user-profile.repository";
 import { UserProfile } from "@/api/user-profile/entities/user-profile.entity";
 import { UpdateUserProfileInput } from "@/api/user-profile/models/update-user-profile.model";
-import { UserProfileRepository } from "@/api/user-profile/repositories/user-profile.repository";
 import { userProfileError } from "@/api/user-profile/user-profile.errors";
 
 @Injectable()
 export class UserProfileService {
   constructor(
     private readonly userProfileRepository: UserProfileRepository,
-    private readonly attachmentsService: AttachmentsService,
-    private readonly attachmentsRepository: AttachmentsRepository,
+    private readonly attachmentCatalog: AttachmentCatalogPort,
   ) {}
 
   @Transactional()
@@ -45,12 +42,10 @@ export class UserProfileService {
       if (input.avatarAttachmentId === null) {
         profile.image = null;
       } else {
-        const attachment = await this.loadUsableAvatar(
+        profile.image = await this.resolveAvatarUrl(
           input.userId,
           input.avatarAttachmentId,
         );
-        profile.image =
-          this.attachmentsService.publicUrlForAttachment(attachment);
       }
     }
 
@@ -58,19 +53,20 @@ export class UserProfileService {
   }
 
   /** Avatar must be a public, finalized attachment owned by the same user. */
-  private async loadUsableAvatar(
+  private async resolveAvatarUrl(
     userId: string,
     attachmentId: string,
-  ): Promise<Attachment> {
-    const attachment = await this.attachmentsRepository.getById(attachmentId);
-    if (
-      !attachment ||
-      !attachment.isOwnedBy(userId) ||
-      attachment.placement !== "public" ||
-      !attachment.isActive()
-    ) {
+  ): Promise<string> {
+    await this.attachmentCatalog.assertUsable([attachmentId], {
+      ownerUserId: userId,
+      placement: "public",
+    });
+    // Public placement → stable public url.
+    const [avatar] = await this.attachmentCatalog.resolveMany([attachmentId]);
+    if (!avatar) {
+      // Deactivated between the check and the resolve.
       throw userProfileError("invalid_avatar_attachment", { attachmentId });
     }
-    return attachment;
+    return avatar.url;
   }
 }

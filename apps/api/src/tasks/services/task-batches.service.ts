@@ -7,7 +7,9 @@ import {
   TaskBatchDeleted,
   TaskBatchUpserted,
 } from "@/api/platform/events/registry/events.registry";
-import { TagsService } from "@/api/tags/services/tags.service";
+import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
+import { TaskBatchesRepository } from "@/api/tasks/domain/ports/task-batches.repository";
+import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
 import { deriveBatchStatus } from "@/api/tasks/domain/task-batch-status";
 import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskBatch } from "@/api/tasks/entities/task-batch.entity";
@@ -15,8 +17,6 @@ import {
   CreateTaskBatchInput,
   UpdateTaskBatchInput,
 } from "@/api/tasks/models/task.model";
-import { TaskBatchesRepository } from "@/api/tasks/repositories/task-batches.repository";
-import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
 import { tasksError } from "@/api/tasks/tasks.errors";
 
@@ -25,7 +25,7 @@ export class TaskBatchesService {
   constructor(
     private readonly batchesRepository: TaskBatchesRepository,
     private readonly tasksRepository: TasksRepository,
-    private readonly tags: TagsService,
+    private readonly tags: TagCatalogPort,
     private readonly eventsPublisher: EventsPublisher,
   ) {}
 

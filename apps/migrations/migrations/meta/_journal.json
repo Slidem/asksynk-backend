@@ -78,6 +78,13 @@
       "when": 1791603697947,
       "tag": "0010_hash_guest_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791635847338,
+      "tag": "0011_guest_message_count",
+      "breakpoints": true
     }
   ]
 }

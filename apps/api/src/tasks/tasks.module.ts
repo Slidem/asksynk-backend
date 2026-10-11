@@ -2,10 +2,13 @@ import { Module } from "@nestjs/common";
 
 import { NetworksModule } from "@/api/networks/networks.module";
 import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
-import { TagsModule } from "@/api/tags/tags.module";
-import { TaskBatchesRepository } from "@/api/tasks/repositories/task-batches.repository";
-import { TaskSuggestionsRepository } from "@/api/tasks/repositories/task-suggestions.repository";
-import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
+import { TaggingModule } from "@/api/tagging/tagging.module";
+import { TaskBatchesRepository } from "@/api/tasks/domain/ports/task-batches.repository";
+import { TaskSuggestionsRepository } from "@/api/tasks/domain/ports/task-suggestions.repository";
+import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
+import { DrizzleTaskBatchesRepository } from "@/api/tasks/repositories/drizzle-task-batches.repository";
+import { DrizzleTaskSuggestionsRepository } from "@/api/tasks/repositories/drizzle-task-suggestions.repository";
+import { DrizzleTasksRepository } from "@/api/tasks/repositories/drizzle-tasks.repository";
 import { TaskBatchesController } from "@/api/tasks/rest/task-batches.controller";
 import { TaskSuggestionsController } from "@/api/tasks/rest/task-suggestions.controller";
 import { TasksController } from "@/api/tasks/rest/tasks.controller";
@@ -14,11 +17,11 @@ import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.se
 import { TasksService } from "@/api/tasks/services/tasks.service";
 
 @Module({
-  imports: [NetworksModule, TagsModule, EventsPublisherModule],
+  imports: [NetworksModule, TaggingModule, EventsPublisherModule],
   providers: [
-    TasksRepository,
-    TaskBatchesRepository,
-    TaskSuggestionsRepository,
+    { provide: TasksRepository, useClass: DrizzleTasksRepository },
+    { provide: TaskBatchesRepository, useClass: DrizzleTaskBatchesRepository },
+    { provide: TaskSuggestionsRepository, useClass: DrizzleTaskSuggestionsRepository },
     TasksService,
     TaskBatchesService,
     TaskSuggestionsService,

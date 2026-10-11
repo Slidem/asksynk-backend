@@ -5,6 +5,8 @@ import { Clock } from "@/api/platform/clock/clock";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import { TimerLifecycle } from "@/api/platform/events/registry/events.registry";
 import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
+import { TimerSettingsRepository } from "@/api/timers/domain/ports/timer-settings.repository";
+import { TimersRepository } from "@/api/timers/domain/ports/timers.repository";
 import {
   assertValidTransitionInput,
   Timer,
@@ -23,9 +25,7 @@ import {
   timerCompletionJobId,
   TimerCompletionPayload,
 } from "@/api/timers/scheduling/timer-completion.job";
-import { TimerSettingsRepository } from "@/api/timers/timer-settings.repository";
 import { timersError } from "@/api/timers/timers.errors";
-import { TimersRepository } from "@/api/timers/timers.repository";
 
 interface PersistResult {
   entity: Timer;

@@ -1,9 +1,9 @@
-import { ReadableAttachment } from "@/api/storage/attachments/models/attachment.model";
 import {
   AttachmentResponseDto,
   AttachmentUploadResponseDto,
 } from "@/api/storage/attachments/rest/responses/attachment.response";
 import { CreatedUpload } from "@/api/storage/attachments/services/attachments.service";
+import { ReadableAttachment } from "@/api/storage/contract/attachment-catalog.port";
 
 export function toAttachmentResponse(
   attachment: ReadableAttachment,

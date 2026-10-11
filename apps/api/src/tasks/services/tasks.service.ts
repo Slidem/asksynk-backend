@@ -7,14 +7,14 @@ import {
   TaskDeleted,
   TaskUpserted,
 } from "@/api/platform/events/registry/events.registry";
-import { TagsService } from "@/api/tags/services/tags.service";
+import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
+import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
 import { Task } from "@/api/tasks/entities/task.entity";
 import {
   CreateTaskInput,
   ListTasksInput,
   UpdateTaskInput,
 } from "@/api/tasks/models/task.model";
-import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
 import { mapTaskStatusToAttention } from "@/api/tasks/task-status.util";
 import { tasksError } from "@/api/tasks/tasks.errors";
@@ -23,7 +23,7 @@ import { tasksError } from "@/api/tasks/tasks.errors";
 export class TasksService {
   constructor(
     private readonly tasksRepository: TasksRepository,
-    private readonly tags: TagsService,
+    private readonly tags: TagCatalogPort,
     private readonly taskBatches: TaskBatchesService,
     private readonly eventsPublisher: EventsPublisher,
   ) {}

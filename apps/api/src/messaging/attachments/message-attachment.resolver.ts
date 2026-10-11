@@ -1,16 +1,15 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 
-import { MessageAttachmentRepository } from "@/api/messaging/attachments/message-attachment.repository";
-import { messagingError } from "@/api/messaging/messaging.errors";
-import { AttachmentAccessService } from "@/api/storage/attachment-access.service";
-import { AttachmentPermissionResolver } from "@/api/storage/attachment-permission-resolver";
-import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
-import { AttachmentActor } from "@/api/storage/attachments/models/attachment.model";
-import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
+import { MessageAttachmentRepository } from "@/api/messaging/domain/ports/message-attachment.repository";
+import {
+  AttachmentAccessPort,
+  AttachmentActor,
+  AttachmentPermissionResolver,
+} from "@/api/storage/contract/attachment-access.port";
 
 /**
- * The "message" placement micro-module: owns read-authz (thread participation) and the
- * linkability gate. Registers itself on the AttachmentAccessService at bootstrap.
+ * The "message" placement read-authz (thread participation). Registers itself on the
+ * storage access registry at bootstrap.
  */
 @Injectable()
 export class MessageAttachmentResolver
@@ -19,45 +18,15 @@ export class MessageAttachmentResolver
   readonly placement = "message" as const;
 
   constructor(
-    private readonly access: AttachmentAccessService,
+    private readonly access: AttachmentAccessPort,
     private readonly repo: MessageAttachmentRepository,
-    private readonly attachmentsRepository: AttachmentsRepository,
   ) {}
 
   onModuleInit(): void {
     this.access.register(this);
   }
 
-  async canRead(
-    attachment: Attachment,
-    actor: AttachmentActor,
-  ): Promise<boolean> {
-    return this.repo.userCanReachAttachment(attachment.id, actor.userId);
-  }
-
-  /**
-   * Authz gate run before attaching blobs to a message on send: each must be owned by the
-   * sender, finalized (`active`), and declared for the `message` placement.
-   */
-  async assertLinkable(
-    attachmentIds: string[],
-    senderUserId: string,
-  ): Promise<void> {
-    if (attachmentIds.length === 0) {
-      return;
-    }
-    const found = await this.attachmentsRepository.getByIds(attachmentIds);
-    const byId = new Map(found.map((a) => [a.id, a] as const));
-    for (const id of attachmentIds) {
-      const attachment = byId.get(id);
-      if (
-        !attachment ||
-        !attachment.isOwnedBy(senderUserId) ||
-        !attachment.isActive() ||
-        attachment.placement !== "message"
-      ) {
-        throw messagingError("invalid_attachment", { attachmentId: id });
-      }
-    }
+  async canRead(attachmentId: string, actor: AttachmentActor): Promise<boolean> {
+    return this.repo.userCanReachAttachment(attachmentId, actor.userId);
   }
 }

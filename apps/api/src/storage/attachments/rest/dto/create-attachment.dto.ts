@@ -11,10 +11,12 @@ import {
 
 import {
   ALLOWED_CONTENT_TYPES,
-  ATTACHMENT_PLACEMENTS,
-  AttachmentPlacement,
   MAX_ATTACHMENT_BYTES,
 } from "@/api/storage/attachments/models/attachment.model";
+import {
+  ATTACHMENT_PLACEMENTS,
+  AttachmentPlacement,
+} from "@/api/storage/contract/attachment-catalog.port";
 
 export class CreateAttachmentDto {
   @ApiProperty({

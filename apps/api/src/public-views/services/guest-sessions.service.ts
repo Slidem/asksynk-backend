@@ -2,15 +2,15 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
 import { generateId } from "@/api/kernel/id";
+import { PublicViewGuestsRepository } from "@/api/public-views/domain/ports/public-view-guests.repository";
+import {
+  PublicViewMetadata,
+  PublicViewsRepository,
+} from "@/api/public-views/domain/ports/public-views.repository";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { PublicViewGuest } from "@/api/public-views/entities/public-view-guest.entity";
 import { GUEST_SESSION_TTL_MS } from "@/api/public-views/public-views.constants";
 import { publicViewsError } from "@/api/public-views/public-views.errors";
-import { PublicViewGuestsRepository } from "@/api/public-views/repositories/public-view-guests.repository";
-import {
-  PublicViewMetadata,
-  PublicViewsRepository,
-} from "@/api/public-views/repositories/public-views.repository";
 import {
   generateGuestToken,
   hashGuestToken,

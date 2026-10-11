@@ -19,6 +19,7 @@ import {
   MANAGED_MESSAGE_STATUSES,
   ManagedMessageStatus,
 } from "@/api/messaging/entities/message.entity";
+import { toMessageAttachmentResponse } from "@/api/messaging/rest/messaging.mapper";
 import { MessageResponseDto } from "@/api/messaging/rest/responses/message.response";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { DomainErrorsTranslator } from "@/api/platform/errors/errors.translator";
@@ -33,8 +34,7 @@ import {
   TimerLifecycle,
 } from "@/api/platform/events/registry/events.registry";
 import { EventOf } from "@/api/platform/events/registry/events.types";
-import { toAttachmentResponse } from "@/api/storage/attachments/rest/attachments.mapper";
-import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
+import { AttachmentCatalogPort } from "@/api/storage/contract/attachment-catalog.port";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { WsAuthService } from "@/api/websockets/services/ws-auth.service";
 import { guestRoom, threadRoom, userRoom } from "@/api/websockets/ws.rooms";
@@ -50,7 +50,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly wsAuthService: WsAuthService,
     private readonly messagingService: MessagingService,
-    private readonly attachmentsService: AttachmentsService,
+    private readonly attachmentCatalog: AttachmentCatalogPort,
     private readonly errorTranslator: DomainErrorsTranslator,
   ) {}
 
@@ -374,7 +374,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Resolve attachments at emit time (fresh signed urls), not at publish time — the
     // event payload is persisted in the durable outbox, so it carries only ids. Trusted:
     // everyone in these rooms is a thread participant, so all are authorized to read.
-    const attachments = await this.attachmentsService.resolveMany(
+    const attachments = await this.attachmentCatalog.resolveMany(
       payload.message.attachmentIds ?? [],
     );
 
@@ -386,7 +386,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       senderId: payload.message.senderId,
       body: payload.message.body,
       tagIds: payload.message.tagIds ?? [],
-      attachments: attachments.map(toAttachmentResponse),
+      attachments: attachments.map(toMessageAttachmentResponse),
       suggestionId: payload.message.suggestionId ?? null,
       managedStatus: payload.message.managedStatus,
       createdAt: payload.message.createdAt,

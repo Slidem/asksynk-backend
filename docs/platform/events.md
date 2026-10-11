@@ -53,9 +53,10 @@ bootstrap (`EventHandlersRegistry`); there is no registration step.
 | ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `attention-items` | `attention-items/attention-items.consumer-group.ts`     | `user:` + first of `sentToUserId`, `sentToGuestId`, `assigneeUserId`, `suggesteeUserId`, `userId`; else `user:unknown` (a bug if reached) | `task.*`, `task.batch.*`, `task.suggestion.*` (task-attention), `message.*` (message-attention), `calendar.event.*`, `tag.*` (tag-calendar-attention) — 15 events |
 | `suggestion-sync` | `tasks/suggestion-sync.consumer-group.ts`               | `assignee:<assigneeUserId>`                                                                        | `task.upserted`, `task.batch.upserted` (task-suggestions.service)        |
-| `calendar-sync`   | `calendar-integrations/calendar-sync.consumer-group.ts` | `<userId>`                                                                                         | `calendar.event.*` (calendar-sync.event-handler)                        |
+| `calendar-sync`   | `scheduling/sync/calendar-sync.consumer-group.ts`       | `<userId>`                                                                                         | `calendar.event.*` (calendar-sync.event-handler)                        |
 | `messaging`       | `messaging/messaging.consumer-group.ts`                 | `<messageId>`                                                                                      | `attention.message.synced`                                              |
 | `timer-event-log` | `timers/timer-event-log.consumer-group.ts`              | `user:<userId>`                                                                                    | `timer.lifecycle`                                                       |
+| `public-views`    | `public-views/public-views.consumer-group.ts`           | `sender:<message.senderId>`                                                                        | `message.created` (guest-message-count: `public_view_guests.message_count`) |
 
 Realtime handlers all live in `websockets/ws.gateway.ts` (7; moves per context in Wave 4).
 

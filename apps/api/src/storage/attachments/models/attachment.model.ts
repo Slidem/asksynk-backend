@@ -1,24 +1,6 @@
+import { AttachmentPlacement } from "@/api/storage/contract/attachment-catalog.port";
 import { StorageBucket } from "@/api/storage/object-storage";
-
-export const ATTACHMENT_PLACEMENTS = ["public", "message"] as const;
-export type AttachmentPlacement = (typeof ATTACHMENT_PLACEMENTS)[number];
 export type AttachmentStatus = "pending" | "active";
-
-/** Who is acting; resolvers authorize against this. */
-export interface AttachmentActor {
-  userId: string;
-}
-
-/** A resolved, client-consumable view of an attachment (with a fresh url). */
-export interface ReadableAttachment {
-  id: string;
-  contentType: string;
-  fileName: string | null;
-  sizeBytes: number | null;
-  url: string;
-  /** null for public (stable) urls; a date for short-lived signed urls. */
-  expiresAt: Date | null;
-}
 
 /** Max upload size enforced both in the POST policy and re-checked on finalize. */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB

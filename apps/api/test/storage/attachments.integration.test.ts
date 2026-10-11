@@ -11,9 +11,9 @@ import request from "supertest";
 import { uuidv7 } from "uuidv7";
 
 import { AuthUser } from "@/api/auth/auth.types";
-import { MessageAttachmentRepository } from "@/api/messaging/attachments/message-attachment.repository";
+import { DrizzleMessageAttachmentRepository } from "@/api/messaging/attachments/drizzle-message-attachment.repository";
 import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
-import { MessagingRepository } from "@/api/messaging/repositories/messaging.repository";
+import { MessageAttachmentRepository } from "@/api/messaging/domain/ports/message-attachment.repository";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
@@ -65,8 +65,10 @@ describe("Attachments (integration, real Garage)", () => {
       providers: [
         { provide: APP_GUARD, useClass: MockAuthGuard },
         // Just enough of messaging to register the "message" placement resolver.
-        MessagingRepository,
-        MessageAttachmentRepository,
+        {
+          provide: MessageAttachmentRepository,
+          useClass: DrizzleMessageAttachmentRepository,
+        },
         MessageAttachmentResolver,
       ],
     }).compile();

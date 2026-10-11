@@ -1,12 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { ContextLogger } from "nestjs-context-logger";
 
-import { AttachmentPermissionResolver } from "@/api/storage/attachment-permission-resolver";
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import {
+  AttachmentAccessPort,
   AttachmentActor,
-  AttachmentPlacement,
-} from "@/api/storage/attachments/models/attachment.model";
+  AttachmentPermissionResolver,
+} from "@/api/storage/contract/attachment-access.port";
+import { AttachmentPlacement } from "@/api/storage/contract/attachment-catalog.port";
 
 /**
  * Registry + dispatcher for per-placement read authorization. Feature resolvers register
@@ -14,7 +15,7 @@ import {
  * dependency direction feature → storage and avoids cross-module provider aggregation).
  */
 @Injectable()
-export class AttachmentAccessService {
+export class AttachmentAccessService extends AttachmentAccessPort {
   private readonly logger = new ContextLogger(AttachmentAccessService.name);
   private readonly resolvers = new Map<
     AttachmentPlacement,
@@ -48,6 +49,6 @@ export class AttachmentAccessService {
       });
       return false;
     }
-    return resolver.canRead(attachment, actor);
+    return resolver.canRead(attachment.id, actor);
   }
 }

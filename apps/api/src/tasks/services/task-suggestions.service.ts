@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
 import { generateId } from "@/api/kernel/id";
-import { NetworksService } from "@/api/networks/services/networks.service";
+import { ConnectionPolicyPort } from "@/api/networks/contract/connection-policy.port";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import {
@@ -14,7 +14,9 @@ import {
   TaskUpserted,
 } from "@/api/platform/events/registry/events.registry";
 import { EventOf } from "@/api/platform/events/registry/events.types";
-import { TagsService } from "@/api/tags/services/tags.service";
+import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
+import { TaskSuggestionsRepository } from "@/api/tasks/domain/ports/task-suggestions.repository";
+import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
 import { Task } from "@/api/tasks/entities/task.entity";
 import { TaskSuggestion } from "@/api/tasks/entities/task-suggestion.entity";
 import {
@@ -23,8 +25,6 @@ import {
   TaskSuggestionStatus,
   UpdateTaskSuggestionPayloadInput,
 } from "@/api/tasks/models/task.model";
-import { TaskSuggestionsRepository } from "@/api/tasks/repositories/task-suggestions.repository";
-import { TasksRepository } from "@/api/tasks/repositories/tasks.repository";
 import { toTaskSuggestionResponse } from "@/api/tasks/rest/mappers/task.mapper";
 import { MaterializedTask } from "@/api/tasks/rest/responses/task-suggestion.response";
 import { TaskBatchesService } from "@/api/tasks/services/task-batches.service";
@@ -40,8 +40,8 @@ export class TaskSuggestionsService {
     private readonly taskBatchesService: TaskBatchesService,
     private readonly tasksRepository: TasksRepository,
     private readonly eventsPublisher: EventsPublisher,
-    private readonly networks: NetworksService,
-    private readonly tags: TagsService,
+    private readonly connections: ConnectionPolicyPort,
+    private readonly tags: TagCatalogPort,
   ) {}
 
   @Transactional()
@@ -49,7 +49,7 @@ export class TaskSuggestionsService {
     if (input.suggesterUserId === input.suggesteeUserId) {
       throw tasksError("cannot_suggest_to_self");
     }
-    await this.networks.validateIsActiveConnection(
+    await this.connections.assertConnected(
       input.suggesterUserId,
       input.suggesteeUserId,
     );

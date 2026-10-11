@@ -4,7 +4,13 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { AuthGuest } from "@/api/auth/auth.types";
 import { Actor } from "@/api/kernel/actor/actor";
 import { generateId } from "@/api/kernel/id";
-import { MessageAttachmentResolver } from "@/api/messaging/attachments/message-attachment.resolver";
+import {
+  MessagingRepository,
+  ThreadListItem,
+  ThreadMessageListItem,
+  ThreadParticipantRow,
+  ThreadStats,
+} from "@/api/messaging/domain/ports/messaging.repository";
 import {
   ManagedMessageStatus,
   ManagedStatus,
@@ -13,22 +19,16 @@ import {
 } from "@/api/messaging/entities/message.entity";
 import { Thread } from "@/api/messaging/entities/thread.entity";
 import { messagingError } from "@/api/messaging/messaging.errors";
-import {
-  MessagingRepository,
-  ThreadListItem,
-  ThreadMessageListItem,
-  ThreadParticipantRow,
-  ThreadStats,
-} from "@/api/messaging/repositories/messaging.repository";
-import { NetworksService } from "@/api/networks/services/networks.service";
+import { ConnectionPolicyPort } from "@/api/networks/contract/connection-policy.port";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
 import {
   MessageCreated,
   MessageManagedStatusChanged,
   MessageUpdated,
 } from "@/api/platform/events/registry/events.registry";
-import { PublicViewsRepository } from "@/api/public-views/repositories/public-views.repository";
-import { TagsService } from "@/api/tags/services/tags.service";
+import { PublicLinkPort } from "@/api/public-views/contract/public-link.port";
+import { AttachmentCatalogPort } from "@/api/storage/contract/attachment-catalog.port";
+import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 import { TaskSuggestionPayload } from "@/api/tasks/models/task.model";
 import { TaskSuggestionsService } from "@/api/tasks/services/task-suggestions.service";
 
@@ -38,16 +38,54 @@ const MAX_MESSAGE_LIMIT = 100;
 export class MessagingService {
   constructor(
     private readonly messagingRepository: MessagingRepository,
-    private readonly networksService: NetworksService,
-    private readonly publicViewsRepository: PublicViewsRepository,
+    private readonly connections: ConnectionPolicyPort,
+    private readonly publicLinks: PublicLinkPort,
     private readonly eventsPublisher: EventsPublisher,
-    private readonly tagsService: TagsService,
-    private readonly messageAttachmentResolver: MessageAttachmentResolver,
+    private readonly tagCatalog: TagCatalogPort,
+    private readonly attachmentCatalog: AttachmentCatalogPort,
     private readonly taskSuggestionsService: TaskSuggestionsService,
   ) {}
 
   async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
-    return this.messagingRepository.listThreadsForUser(userId);
+    const rows = await this.messagingRepository.listThreadsForUser(userId);
+
+    const otherUserIds: string[] = [];
+    const guestIds: string[] = [];
+    const publicViewIds: string[] = [];
+    for (const r of rows) {
+      if (r.other.kind === "user") otherUserIds.push(r.other.userId);
+      else guestIds.push(r.other.guestId);
+      if (r.thread.publicViewId) publicViewIds.push(r.thread.publicViewId);
+    }
+
+    const [connected, guests, links] = await Promise.all([
+      this.connections.connectedAmong(userId, otherUserIds),
+      this.publicLinks.getGuestSummaries(guestIds),
+      this.publicLinks.getLinkSummaries(publicViewIds),
+    ]);
+
+    return rows.map(({ thread, other, lastMessage }) => {
+      if (other.kind === "user") {
+        return {
+          thread,
+          lastMessage,
+          other: { ...other, isActiveConnection: connected.has(other.userId) },
+        };
+      }
+      const link = links.get(thread.publicViewId!);
+      return {
+        thread,
+        lastMessage,
+        other: {
+          kind: "guest",
+          guestId: other.guestId,
+          displayName: guests.get(other.guestId)?.displayName ?? "",
+          publicViewId: thread.publicViewId!,
+          publicViewName: link?.name ?? null,
+          publicViewExpired: !link?.live,
+        },
+      };
+    });
   }
 
   async listThreadMessages(
@@ -186,7 +224,7 @@ export class MessagingService {
         reason: "Cannot start a thread with yourself",
       });
     }
-    const connected = await this.networksService.isActiveConnection(
+    const connected = await this.connections.areConnected(
       userId,
       recipientUserId,
     );
@@ -254,7 +292,7 @@ export class MessagingService {
           reason: "Tagging not supported on this thread",
         });
       }
-      await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
+      await this.tagCatalog.assertOwnedBy(recipientUserId, tagIds);
     }
 
     if (parentMessageId) {
@@ -262,10 +300,10 @@ export class MessagingService {
     }
 
     // Authz gate: sender must own each blob, finalized + declared for "message" placement.
-    await this.messageAttachmentResolver.assertLinkable(
-      attachmentIds,
-      senderUserId,
-    );
+    await this.attachmentCatalog.assertUsable(attachmentIds, {
+      ownerUserId: senderUserId,
+      placement: "message",
+    });
 
     // Inline task suggestion → a real suggestion for the thread's other user.
     // suggest() enforces the active network connection + tag ownership and opens
@@ -312,7 +350,7 @@ export class MessagingService {
   ): Promise<Message> {
     // Guest tags the owner's own tags — they drive the owner's attention item.
     if (tagIds.length > 0) {
-      await this.tagsService.assertOwnedBy(guest.ownerUserId, tagIds);
+      await this.tagCatalog.assertOwnedBy(guest.ownerUserId, tagIds);
     }
 
     let thread = await this.messagingRepository.findGuestThread(guest.id);
@@ -389,7 +427,7 @@ export class MessagingService {
       });
     }
 
-    await this.tagsService.assertOwnedBy(recipientUserId, tagIds);
+    await this.tagCatalog.assertOwnedBy(recipientUserId, tagIds);
     await this.messagingRepository.replaceMessageTags(messageId, tagIds);
     await this.reconcileManagedStatus(message.managedStatus, messageId, tagIds);
 
@@ -436,7 +474,7 @@ export class MessagingService {
       });
     }
 
-    await this.tagsService.assertOwnedBy(guest.ownerUserId, tagIds);
+    await this.tagCatalog.assertOwnedBy(guest.ownerUserId, tagIds);
     await this.messagingRepository.replaceMessageTags(messageId, tagIds);
     await this.reconcileManagedStatus(message.managedStatus, messageId, tagIds);
 
@@ -679,10 +717,7 @@ export class MessagingService {
     userSenderId: string,
   ): Promise<void> {
     if (thread.isGuestThread()) {
-      const view = await this.publicViewsRepository.getById(
-        thread.publicViewId!,
-      );
-      if (!view || !view.isLive()) {
+      if (!(await this.publicLinks.isLive(thread.publicViewId!))) {
         throw messagingError("thread_is_frozen", {
           threadId: thread.id,
         });
@@ -703,7 +738,7 @@ export class MessagingService {
       });
     }
 
-    const connected = await this.networksService.isActiveConnection(
+    const connected = await this.connections.areConnected(
       userSenderId,
       otherUser.userId,
     );

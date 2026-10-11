@@ -61,8 +61,8 @@ final attempt, and rethrow; a final failure is left `failed` (no DLQ).
 | Name                 | Kind            | Where                                                    | Notes                                                                                   |
 | -------------------- | --------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `timer.completion`   | queued, delayed | `timers/scheduling/timer-completion.job.ts`              | id `userId:transitionedAt`; scheduled on start/resume at `completesAt`, cancelled on start/pause/stop in the same tx |
-| `calendar.sync`      | queued          | `calendar-integrations/sync/calendar-sync.jobs.ts`       | retry 3, 30 s backoff, concurrency 4; id `calendarId:floor(epochSec/240)` (4-min dedup bucket) |
-| `calendar.sync.poll` | cron `*/1 * * * *` | `calendar-integrations/sync/calendar-sync.job-handlers.ts` | fans out one `calendar.sync` per sync-enabled calendar                                |
+| `calendar.sync`      | queued          | `scheduling/sync/calendar-sync.jobs.ts`                  | retry 3, 30 s backoff, concurrency 4; id `calendarId:floor(epochSec/240)` (4-min dedup bucket) |
+| `calendar.sync.poll` | cron `*/1 * * * *` | `scheduling/sync/calendar-sync.job-handlers.ts`            | fans out one `calendar.sync` per sync-enabled calendar                                |
 | `events.retention`   | cron `0 3 * * *` | `platform/events/retention/`                            | see [events](events.md#retention)                                                       |
 
 ## Handler contract

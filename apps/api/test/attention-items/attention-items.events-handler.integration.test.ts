@@ -12,7 +12,6 @@ import request from "supertest";
 import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
 import { AttentionItemResponse } from "@/api/attention-items/rest/responses/attention-item.response";
 import { AuthGuest, AuthUser } from "@/api/auth/auth.types";
-import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
 import { EventsModule } from "@/api/events/events.module";
 import { generateId } from "@/api/kernel/id";
 import { MessagingModule } from "@/api/messaging/messaging.module";
@@ -22,8 +21,9 @@ import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { SchedulingModule } from "@/api/scheduling/scheduling.module";
 import { StorageModule } from "@/api/storage/storage.module";
-import { TagsModule } from "@/api/tags/tags.module";
+import { TaggingModule } from "@/api/tagging/tagging.module";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendars } from "@/migrations/schema/calendars";
@@ -102,8 +102,8 @@ describe("AttentionItemsEventHandler (integration)", () => {
         TxModule,
         EventsModule,
         NetworksModule,
-        TagsModule,
-        CalendarEventsModule,
+        TaggingModule,
+        SchedulingModule,
         MessagingModule,
         AttentionItemsModule,
         PublicViewsModule,
@@ -250,6 +250,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
     start: Date;
     durationSeconds?: number;
     tagIds?: string[];
+    rrule?: string;
   }): Promise<string> {
     const id = generateId();
     await request(app.getHttpServer())
@@ -262,6 +263,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
         durationSeconds: opts.durationSeconds ?? 3600,
         timezone: "UTC",
         tagIds: opts.tagIds,
+        rrule: opts.rrule,
       })
       .expect(201);
     return id;
@@ -864,6 +866,61 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(updated.dueDate).not.toBeNull();
       expect(updated.dueDate).toBe(isoToTruncatedMillis(startB));
     });
+
+    describe("recurring timeblocks", () => {
+      const DAY = 24 * 60 * 60 * 1000;
+      // Series started yesterday; its first instance is over, the next one
+      // starts in ~1h.
+      const seriesStart = () =>
+        new Date(Date.parse(isoNoMillis(new Date(Date.now() - 23 * 3600_000))));
+
+      it("should set due date to the next upcoming occurrence of a recurring timeblock", async () => {
+        const start = seriesStart();
+        const tagId = await createTag({ type: "timeblock" });
+        const tbId = await createTimeblock({
+          start,
+          tagIds: [tagId],
+          rrule: "FREQ=DAILY",
+        });
+        const msgId = await sendTaggedMessage("hi", [tagId]);
+
+        const item = await awaitItem(
+          (i) =>
+            msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+        );
+        expect(item.dueDate).toBe(
+          isoToTruncatedMillis(new Date(start.getTime() + DAY)),
+        );
+      });
+
+      it("should skip a cancelled occurrence (exception) of a recurring timeblock", async () => {
+        const start = seriesStart();
+        const tagId = await createTag({ type: "timeblock" });
+        const tbId = await createTimeblock({
+          start,
+          tagIds: [tagId],
+          rrule: "FREQ=DAILY",
+        });
+        await request(app.getHttpServer())
+          .post(`/calendar-events/${tbId}/exceptions`)
+          .set("x-test-user-id", recipient.id)
+          .send({
+            occurrenceStart: isoNoMillis(
+              new Date(start.getTime() + DAY),
+            ).replace("Z", "+00:00"),
+          })
+          .expect(204);
+        const msgId = await sendTaggedMessage("hi", [tagId]);
+
+        const item = await awaitItem(
+          (i) =>
+            msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+        );
+        expect(item.dueDate).toBe(
+          isoToTruncatedMillis(new Date(start.getTime() + 2 * DAY)),
+        );
+      });
+    });
   });
 
   describe("managed status sync (message <-> attention item)", () => {
@@ -1002,6 +1059,57 @@ describe("AttentionItemsEventHandler (integration)", () => {
       );
       const finalItem = (await getItems()).find((i) => i.id === item.id);
       expect(finalItem?.status).toBe("resolved");
+    });
+  });
+
+  describe("thread list facts via sharing/network ports", () => {
+    it("lists threads with guest, link and connection facts", async () => {
+      const listThreads = async () =>
+        (
+          await request(app.getHttpServer())
+            .get("/threads")
+            .set("x-test-user-id", recipient.id)
+            .expect(200)
+        ).body as Array<{
+          threadId: string;
+          frozen: boolean;
+          other: Record<string, unknown>;
+        }>;
+
+      const threads = await listThreads();
+      const userThread = threads.find((t) => t.threadId === threadId)!;
+      const guestThread = threads.find((t) => t.threadId === guestThreadId)!;
+
+      expect(userThread.other).toMatchObject({
+        kind: "user",
+        userId: sender.id,
+        isActiveConnection: true,
+      });
+      expect(userThread.frozen).toBe(false);
+      expect(guestThread.other).toMatchObject({
+        kind: "guest",
+        guestId: guest.id,
+        displayName: "Guest",
+        publicViewId,
+        publicViewExpired: false,
+      });
+      expect(guestThread.frozen).toBe(false);
+
+      await db
+        .update(publicViews)
+        .set({ revokedAt: new Date() })
+        .where(eq(publicViews.id, publicViewId));
+      try {
+        const after = await listThreads();
+        expect(after.find((t) => t.threadId === guestThreadId)!.frozen).toBe(
+          true,
+        );
+      } finally {
+        await db
+          .update(publicViews)
+          .set({ revokedAt: null })
+          .where(eq(publicViews.id, publicViewId));
+      }
     });
   });
 });

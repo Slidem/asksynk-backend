@@ -1,5 +1,7 @@
-import { ReadableAttachment } from "@/api/storage/attachments/models/attachment.model";
-import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
+import {
+  AttachmentCatalogPort,
+  ReadableAttachment,
+} from "@/api/storage/contract/attachment-catalog.port";
 
 /**
  * Resolve all attachments for a batch of messages in one round-trip, grouped by message
@@ -8,10 +10,10 @@ import { AttachmentsService } from "@/api/storage/attachments/services/attachmen
  * check is run here (it would be both redundant and an N+1).
  */
 export async function resolveAttachmentsByMessage(
-  attachmentsService: AttachmentsService,
+  attachmentCatalog: AttachmentCatalogPort,
   messages: { id: string; attachmentIds: string[] }[],
 ): Promise<Map<string, ReadableAttachment[]>> {
-  const readables = await attachmentsService.resolveMany(
+  const readables = await attachmentCatalog.resolveMany(
     messages.flatMap((m) => m.attachmentIds),
   );
   const byId = new Map(readables.map((a) => [a.id, a] as const));

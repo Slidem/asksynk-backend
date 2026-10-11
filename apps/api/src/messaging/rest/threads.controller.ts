@@ -23,7 +23,7 @@ import {
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
-import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
+import { AttachmentCatalogPort } from "@/api/storage/contract/attachment-catalog.port";
 
 @ApiTags("Threads")
 @ApiBearerAuth("bearer")
@@ -32,7 +32,7 @@ import { AttachmentsService } from "@/api/storage/attachments/services/attachmen
 export class ThreadsController {
   constructor(
     private readonly messagingService: MessagingService,
-    private readonly attachmentService: AttachmentsService,
+    private readonly attachmentCatalog: AttachmentCatalogPort,
   ) {}
 
   /** List the current user's threads */
@@ -77,7 +77,7 @@ export class ThreadsController {
       threadId,
     );
     const attachmentsByMessage = await resolveAttachmentsByMessage(
-      this.attachmentService,
+      this.attachmentCatalog,
       items.map((i) => i.message),
     );
     return items.map((item) =>
@@ -105,7 +105,7 @@ export class ThreadsController {
     );
 
     const attachmentsByMessage = await resolveAttachmentsByMessage(
-      this.attachmentService,
+      this.attachmentCatalog,
       items.map((i) => i.message),
     );
 
@@ -135,7 +135,7 @@ export class ThreadsController {
       },
     );
     const attachmentsByMessage = await resolveAttachmentsByMessage(
-      this.attachmentService,
+      this.attachmentCatalog,
       replies,
     );
     return replies.map((r) =>

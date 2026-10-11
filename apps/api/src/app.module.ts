@@ -4,8 +4,6 @@ import { ConfigModule } from "@nestjs/config";
 import { AttentionItemsModule } from "@/api/attention-items/attention-items.module";
 import { AuthController } from "@/api/auth/auth.controller";
 import { AuthGuardModule } from "@/api/auth/authGuard.module";
-import { CalendarEventsModule } from "@/api/calendar-events/calendar-events.module";
-import { CalendarIntegrationsModule } from "@/api/calendar-integrations/calendar-integrations.module";
 import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
 import { HealthController } from "@/api/health/health.controller";
@@ -17,8 +15,10 @@ import { TxModule } from "@/api/platform/db/tx.module";
 import { ErrorsModule } from "@/api/platform/errors/errors.module";
 import { LoggerConfigModule } from "@/api/platform/logger/logger.config";
 import { PublicViewsModule } from "@/api/public-views/public-views.module";
+import { CalendarIntegrationsModule } from "@/api/scheduling/calendar-integrations.module";
+import { SchedulingModule } from "@/api/scheduling/scheduling.module";
 import { StorageModule } from "@/api/storage/storage.module";
-import { TagsModule } from "@/api/tags/tags.module";
+import { TaggingModule } from "@/api/tagging/tagging.module";
 import { TasksModule } from "@/api/tasks/tasks.module";
 import { TimersModule } from "@/api/timers/timers.module";
 import { UserProfileModule } from "@/api/user-profile/user-profile.module";
@@ -34,9 +34,9 @@ import { WebsocketsModule } from "@/api/websockets/ws.module";
     DbModule,
     TxModule,
     AttentionItemsModule,
-    TagsModule,
+    TaggingModule,
     TasksModule,
-    CalendarEventsModule,
+    SchedulingModule,
     CalendarIntegrationsModule,
     NetworksModule,
     PublicViewsModule,

@@ -1,23 +1,24 @@
 import { Injectable } from "@nestjs/common";
 
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
 import {
   AnswerModeSpec,
   decideDueDate,
   TimeblockOccurrence,
 } from "@/api/attention-items/domain/due-date.policy";
+import { AttentionItemsRepository } from "@/api/attention-items/domain/ports/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import { Clock } from "@/api/platform/clock/clock";
-import { Tag } from "@/api/tags/entities/tag.entity";
-import { TagRepository } from "@/api/tags/repositories/tags.repository";
+import { CalendarOccurrencePort } from "@/api/scheduling/contract/occurrence.port";
+import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 
-// Loads tags + upcoming tagged occurrences and applies `decideDueDate`.
+// Loads tag answer modes + upcoming tagged occurrences and applies `decideDueDate`.
 // Shared by messages and tasks.
 @Injectable()
 export class AttentionDueDateService {
   constructor(
     private readonly attentionItemsRepository: AttentionItemsRepository,
-    private readonly tagRepository: TagRepository,
+    private readonly tagCatalog: TagCatalogPort,
+    private readonly occurrences: CalendarOccurrencePort,
     private readonly clock: Clock,
   ) {}
 
@@ -29,10 +30,10 @@ export class AttentionDueDateService {
       return { dueDate: null, sourceCalendarEventId: null };
     }
 
-    const tags = await this.tagRepository.getByIds(tagIds);
-    const occurrences = await this.fetchOccurrences(tags, base);
+    const answerModes = await this.tagCatalog.getAnswerModes(tagIds);
+    const occurrences = await this.fetchOccurrences(answerModes, base);
     const { dueDate, dueSourceEventId } = decideDueDate({
-      answerModes: tags.map(toAnswerModeSpec),
+      answerModes,
       occurrences,
       base,
     });
@@ -45,12 +46,13 @@ export class AttentionDueDateService {
     if (recomputable.length === 0) return;
 
     const allTagIds = [...new Set(recomputable.flatMap((i) => i.tagIds))];
-    const tags = await this.tagRepository.getByIds(allTagIds);
-    const answerModeByTagId = new Map(
-      tags.map((t) => [t.id.toString(), toAnswerModeSpec(t)]),
-    );
+    const answerModes = await this.tagCatalog.getAnswerModes(allTagIds);
+    const answerModeByTagId = new Map(answerModes.map((m) => [m.tagId, m]));
 
-    const occurrences = await this.fetchOccurrences(tags, this.clock.now());
+    const occurrences = await this.fetchOccurrences(
+      answerModes,
+      this.clock.now(),
+    );
 
     const updates = recomputable.map((item) => {
       const { dueDate, dueSourceEventId } = decideDueDate({
@@ -67,36 +69,17 @@ export class AttentionDueDateService {
   }
 
   private async fetchOccurrences(
-    tags: Tag[],
+    answerModes: AnswerModeSpec[],
     after: Date,
   ): Promise<Map<string, TimeblockOccurrence>> {
-    const timeblockTagIds = tags
-      .filter((t) => t.answerMode.type === "timeblock")
-      .map((t) => t.id.toString());
+    const timeblockTagIds = answerModes
+      .filter((m) => m.type === "timeblock")
+      .map((m) => m.tagId);
 
     if (timeblockTagIds.length === 0) {
       return new Map();
     }
 
-    const rows =
-      await this.attentionItemsRepository.findEarliestUpcomingOccurrenceForTags(
-        timeblockTagIds,
-        after,
-      );
-    return new Map(
-      [...rows].map(([tagId, { date, eventId }]) => [
-        tagId,
-        { startAt: date, eventId },
-      ]),
-    );
+    return this.occurrences.findNextOccurrenceByTag(timeblockTagIds, after);
   }
 }
-
-const toAnswerModeSpec = (tag: Tag): AnswerModeSpec =>
-  tag.answerMode.type === "immediately"
-    ? {
-        tagId: tag.id.toString(),
-        type: "immediately",
-        responseTimeMillis: tag.answerMode.responseTimeMillis,
-      }
-    : { tagId: tag.id.toString(), type: "timeblock" };

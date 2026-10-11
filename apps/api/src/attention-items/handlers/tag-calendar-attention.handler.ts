@@ -4,11 +4,11 @@ import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
+import { AttentionItemsRepository } from "@/api/attention-items/domain/ports/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
-import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import {
   CalendarEventCreated,
   CalendarEventDeleted,
@@ -17,7 +17,7 @@ import {
   TagUpdated,
 } from "@/api/platform/events/registry/events.registry";
 import { EventOf } from "@/api/platform/events/registry/events.types";
-import { TagRepository } from "@/api/tags/repositories/tags.repository";
+import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 
 // Cross-cutting: tag and calendar changes recompute due dates for ANY affected
 // attention item regardless of source type, and clean up items orphaned by a
@@ -29,7 +29,7 @@ export class TagCalendarAttentionHandler {
   constructor(
     private readonly attentionItemsRepository: AttentionItemsRepository,
     private readonly attentionItemsService: AttentionItemsService,
-    private readonly tagRepository: TagRepository,
+    private readonly tagCatalog: TagCatalogPort,
     private readonly dueDateService: AttentionDueDateService,
   ) {}
 
@@ -81,8 +81,9 @@ export class TagCalendarAttentionHandler {
     ]);
     if (affectedItems.length === 0) return;
 
-    const updatedTag = await this.tagRepository.getById(payload.id);
-    if (!updatedTag) return;
+    // Tag may already be gone (deleted after update); TagDeleted handles that.
+    const [answerMode] = await this.tagCatalog.getAnswerModes([payload.id]);
+    if (!answerMode) return;
 
     await this.dueDateService.recomputeForItems(affectedItems);
   }

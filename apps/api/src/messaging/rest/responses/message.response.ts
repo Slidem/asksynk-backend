@@ -4,7 +4,7 @@ import {
   MANAGED_MESSAGE_STATUSES,
   ManagedMessageStatus,
 } from "@/api/messaging/entities/message.entity";
-import { AttachmentResponseDto } from "@/api/storage/attachments/rest/responses/attachment.response";
+import { MessageAttachmentResponseDto } from "@/api/messaging/rest/responses/message-attachment.response";
 
 export const SENDER_KINDS = ["user", "guest"] as const;
 export type SenderKind = (typeof SENDER_KINDS)[number];
@@ -28,7 +28,7 @@ export class MessageResponseDto {
   senderId!: string;
   body!: string;
   tagIds!: string[];
-  attachments!: AttachmentResponseDto[];
+  attachments!: MessageAttachmentResponseDto[];
   suggestionId!: string | null;
 
   // Present only on tagged messages; omitted otherwise (not manageable).

@@ -5,16 +5,17 @@ import { ContextLogger } from "nestjs-context-logger";
 
 import { Actor } from "@/api/kernel/actor/actor";
 import { generateId } from "@/api/kernel/id";
+import { ConnectionPolicyPort } from "@/api/networks/contract/connection-policy.port";
+import { InvitesRepository } from "@/api/networks/domain/ports/invites.repository";
+import { NetworkRepository } from "@/api/networks/domain/ports/network.repository";
+import { UsersLookupRepository } from "@/api/networks/domain/ports/users-lookup.repository";
 import { Invite } from "@/api/networks/entities/invite.entity";
 import { NetworkConnection } from "@/api/networks/entities/network-connection.entity";
 import { networksError } from "@/api/networks/networks.errors";
-import { InvitesRepository } from "@/api/networks/repositories/invites.repository";
-import { NetworkRepository } from "@/api/networks/repositories/network.repository";
-import { UsersLookupRepository } from "@/api/networks/repositories/users-lookup.repository";
 import { EmailService } from "@/api/platform/email/email.service";
 
 @Injectable()
-export class NetworksService {
+export class NetworksService extends ConnectionPolicyPort {
   private readonly logger = new ContextLogger(NetworksService.name);
 
   constructor(
@@ -23,7 +24,9 @@ export class NetworksService {
     private readonly usersLookupRepository: UsersLookupRepository,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    super();
+  }
 
   @Transactional()
   async createInvite(
@@ -161,11 +164,19 @@ export class NetworksService {
     await this.networkRepository.softRemovePair(userId, connectionId);
   }
 
-  isActiveConnection(userIdA: string, userIdB: string): Promise<boolean> {
+  areConnected(userIdA: string, userIdB: string): Promise<boolean> {
     return this.networkRepository.isActiveConnection(userIdA, userIdB);
   }
 
-  async validateIsActiveConnection(
+  async connectedAmong(
+    userId: string,
+    otherUserIds: string[],
+  ): Promise<Set<string>> {
+    if (otherUserIds.length === 0) return new Set();
+    return this.networkRepository.connectedAmong(userId, otherUserIds);
+  }
+
+  async assertConnected(
     userIdA: string,
     userIdB: string,
   ): Promise<void> {
@@ -191,7 +202,7 @@ export class NetworksService {
       return actor.userId;
     }
 
-    await this.validateIsActiveConnection(actor.userId, requestedUserId);
+    await this.assertConnected(actor.userId, requestedUserId);
 
     return requestedUserId;
   }

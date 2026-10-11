@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import { users } from "@/migrations/schema/users";
 
@@ -34,6 +41,11 @@ export const publicViewGuests = pgTable(
       .references(() => publicViews.id, { onDelete: "cascade" }),
     displayName: text("display_name").notNull(),
     tokenHash: text("token_hash").notNull().unique(),
+    // Projection of messages sent by this guest (sharing's own copy; built from
+    // message.created), so sharing never reads messaging's tables.
+    messageCount: integer("message_count").notNull().default(0),
+    // Watermark making the count idempotent under redelivery (uuidv7 ids sort by time).
+    lastCountedMessageId: uuid("last_counted_message_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
       .notNull()

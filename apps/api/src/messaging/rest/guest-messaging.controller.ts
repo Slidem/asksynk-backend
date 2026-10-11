@@ -18,7 +18,7 @@ import { ThreadStatsResponseDto } from "@/api/messaging/rest/responses/thread.re
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
-import { AttachmentsService } from "@/api/storage/attachments/services/attachments.service";
+import { AttachmentCatalogPort } from "@/api/storage/contract/attachment-catalog.port";
 
 @ApiTags("Guest Messaging")
 @ApiBearerAuth("bearer")
@@ -27,7 +27,7 @@ import { AttachmentsService } from "@/api/storage/attachments/services/attachmen
 export class GuestMessagingController {
   constructor(
     private readonly messagingService: MessagingService,
-    private readonly attachmentService: AttachmentsService,
+    private readonly attachmentCatalog: AttachmentCatalogPort,
   ) {}
 
   /** List messages in the guest's thread */
@@ -42,7 +42,7 @@ export class GuestMessagingController {
       limit: query.limit,
     });
     const attachmentsByMessage = await resolveAttachmentsByMessage(
-      this.attachmentService,
+      this.attachmentCatalog,
       items.map((i) => i.message),
     );
     return items.map((i) =>
@@ -71,7 +71,7 @@ export class GuestMessagingController {
     const items =
       await this.messagingService.listGuestThreadTaggedMessages(guest);
     const attachmentsByMessage = await resolveAttachmentsByMessage(
-      this.attachmentService,
+      this.attachmentCatalog,
       items.map((i) => i.message),
     );
     return items.map((i) =>
@@ -99,7 +99,7 @@ export class GuestMessagingController {
       },
     );
     const attachmentsByMessage = await resolveAttachmentsByMessage(
-      this.attachmentService,
+      this.attachmentCatalog,
       replies,
     );
     return replies.map((r) =>

@@ -4,6 +4,10 @@ Each wave ships on its own and leaves the app working. Order: pure core → cont
 layers + lint → transport → aggregates → attention redesign → schemas → cleanup.
 Efforts are relative-size guesses for one developer.
 
+**Waves 0–2 are done.** Wave 2 left behind (outside its scope): `websockets` → feature
+internals (Wave 4), `messaging → TaskSuggestionsService` (publish
+`tasks/contract/task-suggestion.port.ts`), `tasks → AttentionItemStatus` (6.2).
+
 **Wave 0 is done** — jest unit/integration split, `kernel/` + `platform/`, typed
 errors, ordered events + dead letters + retention, typed jobs. Its leftovers moved:
 the `no-restricted-imports` rule → 3.1; case-insensitive tag names → backlog.
@@ -20,8 +24,8 @@ restructured — 2.1 / 2.2 for tags and calendar, 3.2 for the rest. Tests mirror
 
 **~1–2 days. No schema change. Every step is a move plus a unit test.**
 
-| #   | Step                                       | Effort | Risk       | Safety net                                                  |
-| --- | ------------------------------------------ | ------ | ---------- | ----------------------------------------------------------- |
+| #   | Step                                        | Effort | Risk       | Safety net                                                  |
+| --- | ------------------------------------------- | ------ | ---------- | ----------------------------------------------------------- |
 | 1.1 | `Actor` in `kernel/` ✅                     | 3h     | low        | integration suites (attention ↔ messaging)                  |
 | 1.2 | Due-date policy as a pure function ✅       | 2h     | none       | `attention-items.events-handler`, `tasks-attention`         |
 | 1.3 | Batch status derived in tasks' own terms ✅ | 1h     | none       | `task-status.util.unit`, `tasks-attention`                  |
@@ -123,24 +127,65 @@ actor; `pnpm test:integration` unchanged and green.
 
 ---
 
-## Wave 2 — Ports and contracts, one context at a time
+## Wave 2 — Ports and contracts, one context at a time ✅
 
 **3–5 days.** Smallest first to validate the template.
 
-| #   | Step                                                                                                                                                                                                                 | Effort | Risk              |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------- |
-| 2.1 | **`tags` → `tagging` pilot.** `domain/ports/tag.repository.ts` + Drizzle adapter; `contract/tag-catalog.port.ts` (`assertOwnedBy`, `getAnswerModes`). Module exports only the contract. Kills the 3× `TagRepository` | 4h     | low               |
-| 2.2 | **Merge into `scheduling`.** `calendar-events` + `calendar-integrations`, pure file moves, no behaviour change                                                                                                       | 1 day  | **medium**        |
-| 2.3 | `scheduling/contract/occurrence.port.ts`; move `attention-items.repository.ts:355-423` verbatim                                                                                                                      | 4h     | low               |
-| 2.4 | `storage` contract: `AttachmentCatalogPort` (`getSummaries`, `assertUsable`, `resolveMany`); drop `@Global` + repo export                                                                                            | 2h     | low               |
-| 2.5 | `networks` contract: `ConnectionPolicyPort`; `resolveTargetUserId` out of the two controllers into application code, using `Actor`                                                                                   | 3h     | low               |
-| 2.6 | Invert `auth → public-views`: `GuestIdentityProvider`, registered by sharing at bootstrap                                                                                                                            | 4h     | **medium** — auth |
-| 2.7 | `sharing` contract: public-link liveness for messaging; ports for the cross-table reads in `messaging.repository.ts:446-497` and `public-view-guests.repository.ts`                                                  | 3h     | low               |
-| 2.8 | Repository ports for the rest: `timers`, `tasks`, `networks`, `public-views`, `messaging`, `attention-items`                                                                                                         | 1 day  | low, mechanical   |
+| #   | Step                                                                                                                                                                                                                    | Effort | Risk              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------- |
+| 2.1 | **`tags` → `tagging` pilot ✅.** `domain/ports/tag.repository.ts` + Drizzle adapter; `contract/tag-catalog.port.ts` (`assertOwnedBy`, `getAnswerModes`). Module exports only the contract. Kills the 3× `TagRepository` | 4h     | low               |
+| 2.2 | **Merge into `scheduling` ✅.** `calendar-events` + `calendar-integrations`, pure file moves, no behaviour change                                                                                                       | 1 day  | **medium**        |
+| 2.3 | `scheduling/contract/occurrence.port.ts`; move `attention-items.repository.ts:355-423` verbatim ✅                                                                                                                      | 4h     | low               |
+| 2.4 | `storage` contract ✅: `AttachmentCatalogPort` (`getSummaries`, `assertUsable`, `resolveMany`); drop `@Global` + repo export                                                                                            | 2h     | low               |
+| 2.5 | `networks` contract ✅: `ConnectionPolicyPort`; `resolveTargetUserId` out of the two controllers into application code, using `Actor`                                                                                   | 3h     | low               |
+| 2.6 | Invert `auth → public-views` ✅: `GuestIdentityProvider`, registered by sharing at bootstrap                                                                                                                            | 4h     | **medium** — auth |
+| 2.7 | `sharing` contract ✅: public-link liveness for messaging; ports for the cross-table reads in `messaging.repository.ts:446-497` and `public-view-guests.repository.ts`                                                  | 3h     | low               |
+| 2.8 | Repository ports for the rest ✅: `timers`, `tasks`, `networks`, `public-views`, `messaging`, `attention-items`                                                                                                         | 1 day  | low, mechanical   |
 
 - After 2.1: `grep -rn "TagRepository" apps/api/src | grep -v "^apps/api/src/tagging/"` → empty.
-- After 2.2: both calendar integration suites green; `grep -rc "@/api/calendar-integrations"` → 0.
+  As built: `Tag` + answer-mode types in `tagging/domain/tag.ts`; adapter
+  `tagging/repositories/drizzle-tag.repository.ts` (layer folders wait for 3.2);
+  `TagsService extends TagCatalogPort`, bound `useExisting`. Error namespace stays
+  `tags`. Calendar tag validation now throws `tags.tags_not_found` (404) instead of
+  `calendar-events.one_or_more_tags_not_found` (409). Attention's `tags` join (ghost
+  filtering) stays until 7.2. Test: `test/tagging/tag-catalog.unit.test.ts`.
+- After 2.2: both calendar integration suites green;
+  `grep -rlE "@/api/calendar-(events|integrations)" apps/api/src apps/api/test` → empty.
+  As built: two Nest modules under `scheduling/` — `SchedulingModule` (native calendar)
+  and `CalendarIntegrationsModule` (provider sync, needs Google env + jobs) — merged in
+  3.2. Error namespaces, queue/job/cron names and routes unchanged. Tests in
+  `test/scheduling/`. Two unused model files deleted.
+- After 2.3: SQL moved byte-identical to `scheduling/repositories/calendar-occurrence.query.ts`
+  (`DrizzleCalendarOccurrenceQuery`); `SchedulingModule` exports `CalendarOccurrencePort`
+  (+ its repos for the sibling sync module). New attention cases: recurring timeblock,
+  cancelled occurrence.
+- After 2.4: `storage/contract/attachment-catalog.port.ts` (`assertUsable`, `resolveMany`;
+  `getSummaries` dropped — no consumer) + `attachment-access.port.ts` (resolver registry;
+  resolvers get the id, not the entity). New `storage` catalog: `storage.attachment_not_usable`
+  replaces `messaging.invalid_attachment` + `user-profile.invalid_avatar_attachment`.
+  Messaging owns `MessageAttachmentResponseDto`. Messaging, user-profile, websockets import
+  `StorageModule` explicitly.
+- After 2.5: `networks/contract/connection-policy.port.ts` (`areConnected`, `assertConnected`,
+  `resolveTargetUserId`), `NetworksService extends` it, bound `useExisting`; module exports
+  only the port. `TagsService.listTags` / `CalendarEventsService.listCalendarEvents` take
+  `Actor` + optional `userId`.
+- After 2.7: `public-views/contract/public-link.port.ts` (`isLive`, `getLinkSummaries`,
+  `getGuestSummaries`); module exports only it. Thread list SQL keeps messaging's tables +
+  `users`; `MessagingService` enriches via `PublicLinkPort` + `ConnectionPolicyPort.connectedAmong`
+  (now requires both network rows — a thread with none shows frozen). Guest message count is
+  sharing's projection: `public_view_guests.message_count` + `last_counted_message_id`
+  watermark (idempotent), migration `0011_guest_message_count` with backfill, group
+  `public-views`.
+- After 2.8: 20 more repositories → `<ctx>/domain/ports/<name>.repository.ts` +
+  `Drizzle…` adapter next to the old file (also `scheduling` ×4, `user-profile`,
+  `user-settings`, `storage`; platform events repos left alone). Exported row/view types
+  moved into the ports. `MessagingModule` / `NetworksModule` dropped dead repo exports.
 - **2.6 needs a test first** — guest sign-in has none. Write it before touching auth.
+  As built: `test/auth/guest-auth.integration.test.ts` (real `AuthGuard`; `AuthService`
+  jest-mocked — better-auth is ESM Jest can't load). `auth/contract/guest-identity.provider.ts`
+  declares `GuestIdentityProvider` + `GuestIdentityRegistry`; `GuestAuthService` is the
+  registry, in a small `GuestIdentityModule` (no better-auth). Public-views'
+  `PublicViewGuestIdentityProvider` registers on init. No provider → guest tokens rejected.
 
 ## Wave 3 — Layer folders + boundary lint
 

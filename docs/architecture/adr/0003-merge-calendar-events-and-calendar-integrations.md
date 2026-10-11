@@ -48,5 +48,5 @@ answered, not the model.
 ## Verification
 
 `calendar-events.integration.test.ts` and `attention-items.events-handler.integration.test.ts`
-pass unchanged; `grep -rc "@/api/calendar-integrations" apps/api/src` → 0; manual
+pass unchanged; `grep -rlE "@/api/calendar-(events|integrations)" apps/api/src apps/api/test` → empty; manual
 Google round-trip (import external, mirror native, neither echoes).

@@ -1,7 +1,5 @@
-import {
-  AttachmentPlacement,
-  AttachmentStatus,
-} from "@/api/storage/attachments/models/attachment.model";
+import { AttachmentStatus } from "@/api/storage/attachments/models/attachment.model";
+import { AttachmentPlacement } from "@/api/storage/contract/attachment-catalog.port";
 
 export interface AttachmentProps {
   id: string;

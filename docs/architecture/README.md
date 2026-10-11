@@ -4,8 +4,9 @@ How the backend is shaped today, the pragmatic-DDD shape it is moving to, and th
 order to get there. Audited against the code at `5129fc8` (2026-10-10).
 
 **Status:** Wave 0 (safety net, `kernel/` + `platform/` split, typed errors, events,
-jobs) and Wave 1 (pure core: `Actor`, due-date policy, batch status, `Timer`,
-`RecurrenceRule`) are done. **Next: [Wave 2 — ports and contracts](07-roadmap.md#wave-2--ports-and-contracts-one-context-at-a-time).**
+jobs), Wave 1 (pure core: `Actor`, due-date policy, batch status, `Timer`,
+`RecurrenceRule`) and Wave 2 (repository ports, published contracts, `tagging` +
+`scheduling` renames, auth ↔ sharing inversion) are done. **Next: [Wave 3 — layer folders + boundary lint](07-roadmap.md#wave-3--layer-folders--boundary-lint).**
 
 ---
 

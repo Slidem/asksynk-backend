@@ -4,12 +4,12 @@ import _ from "lodash";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { AttentionDueDateService } from "@/api/attention-items/attention-due-date.service";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import { AttentionItemsService } from "@/api/attention-items/attention-items.service";
+import { AttentionItemsRepository } from "@/api/attention-items/domain/ports/attention-items.repository";
 import { TaggedMessageMetadata } from "@/api/attention-items/models/attention-item.model";
 import { generateId } from "@/api/kernel/id";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
-import { AttentionItemsConsumerGroup } from "@/api/attention-items/attention-items.consumer-group";
 import {
   MessageCreated,
   MessageManagedStatusChanged,

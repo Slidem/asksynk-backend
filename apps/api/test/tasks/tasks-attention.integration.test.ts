@@ -17,7 +17,7 @@ import { NetworksModule } from "@/api/networks/networks.module";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
-import { TagsModule } from "@/api/tags/tags.module";
+import { TaggingModule } from "@/api/tagging/tagging.module";
 import { TaskResponse } from "@/api/tasks/rest/responses/task.response";
 import { TaskBatchResponse } from "@/api/tasks/rest/responses/task-batch.response";
 import { TaskSuggestionResponse } from "@/api/tasks/rest/responses/task-suggestion.response";
@@ -90,7 +90,7 @@ describe("Tasks → Attention Items (integration)", () => {
         TxModule,
         EventsModule,
         NetworksModule,
-        TagsModule,
+        TaggingModule,
         AttentionItemsModule,
         TasksModule,
         ClockModule,

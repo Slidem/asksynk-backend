@@ -11,16 +11,20 @@ import { AttachmentAccessService } from "@/api/storage/attachment-access.service
 import { Attachment } from "@/api/storage/attachments/entities/attachment.entity";
 import {
   ALLOWED_CONTENT_TYPES,
-  AttachmentActor,
-  AttachmentPlacement,
   bucketForPlacement,
   DOWNLOAD_URL_TTL_SECONDS,
   MAX_ATTACHMENT_BYTES,
-  ReadableAttachment,
   UPLOAD_URL_TTL_SECONDS,
 } from "@/api/storage/attachments/models/attachment.model";
-import { AttachmentsRepository } from "@/api/storage/attachments/repositories/attachments.repository";
+import { AttachmentActor } from "@/api/storage/contract/attachment-access.port";
+import {
+  AttachmentCatalogPort,
+  AttachmentPlacement,
+  ReadableAttachment,
+} from "@/api/storage/contract/attachment-catalog.port";
+import { AttachmentsRepository } from "@/api/storage/domain/ports/attachments.repository";
 import { ObjectStorage, UploadGrant } from "@/api/storage/object-storage";
+import { storageError } from "@/api/storage/storage.errors";
 
 export interface CreateAttachmentInput {
   placement: AttachmentPlacement;
@@ -36,14 +40,16 @@ export interface CreatedUpload {
 }
 
 @Injectable()
-export class AttachmentsService {
+export class AttachmentsService extends AttachmentCatalogPort {
   private readonly logger = new ContextLogger(AttachmentsService.name);
 
   constructor(
     private readonly repo: AttachmentsRepository,
     private readonly storage: ObjectStorage,
     private readonly access: AttachmentAccessService,
-  ) {}
+  ) {
+    super();
+  }
 
   // Not @Transactional: a single insert needs no tx, and the presign step must not
   // sit inside an open transaction.
@@ -146,9 +152,23 @@ export class AttachmentsService {
     );
   }
 
-  /** Stable public url for a `placement="public"` attachment (e.g. an avatar). */
-  publicUrlForAttachment(attachment: Attachment): string {
-    return this.storage.publicUrl(attachment.storageKey);
+  async assertUsable(
+    ids: string[],
+    rule: { ownerUserId: string; placement: AttachmentPlacement },
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    const byId = new Map((await this.repo.getByIds(ids)).map((a) => [a.id, a]));
+    for (const id of ids) {
+      const attachment = byId.get(id);
+      if (
+        !attachment ||
+        !attachment.isOwnedBy(rule.ownerUserId) ||
+        !attachment.isActive() ||
+        attachment.placement !== rule.placement
+      ) {
+        throw storageError("attachment_not_usable", { attachmentId: id });
+      }
+    }
   }
 
   /** Generic read: authorize via the placement resolver, then build a fresh url. */

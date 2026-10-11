@@ -2,9 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
 import { Clock } from "@/api/platform/clock/clock";
+import { UserSettingsRepository } from "@/api/user-settings/domain/ports/user-settings.repository";
 import { UserSettings } from "@/api/user-settings/entities/user-settings.entity";
 import { UpdateUserSettingsInput } from "@/api/user-settings/models/user-settings.model";
-import { UserSettingsRepository } from "@/api/user-settings/user-settings.repository";
 
 @Injectable()
 export class UserSettingsService {

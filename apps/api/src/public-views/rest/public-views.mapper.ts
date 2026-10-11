@@ -1,6 +1,6 @@
+import { PublicViewMetadata } from "@/api/public-views/domain/ports/public-views.repository";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import { PublicViewGuest } from "@/api/public-views/entities/public-view-guest.entity";
-import { PublicViewMetadata } from "@/api/public-views/repositories/public-views.repository";
 import { PublicViewGuestResponseDto } from "@/api/public-views/rest/responses/guest.response";
 import {
   PublicViewMetadataResponseDto,

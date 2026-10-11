@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
+import { MessagingConsumerGroup } from "@/api/messaging/messaging.consumer-group";
 import { MessagingService } from "@/api/messaging/services/messaging.service";
 import { EventHandler } from "@/api/platform/events/decorators/event-handler.decorator";
-import { MessagingConsumerGroup } from "@/api/messaging/messaging.consumer-group";
 import { AttentionMessageStatusChanged } from "@/api/platform/events/registry/events.registry";
 import { EventOf } from "@/api/platform/events/registry/events.types";
 

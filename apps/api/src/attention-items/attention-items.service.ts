@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
 import { attentionItemError } from "@/api/attention-items/attention-items.errors";
-import { AttentionItemsRepository } from "@/api/attention-items/attention-items.repository";
+import { AttentionItemsRepository } from "@/api/attention-items/domain/ports/attention-items.repository";
 import { AttentionItem } from "@/api/attention-items/entities/attention-item.entity";
 import {
   AttentionItemMetadata,

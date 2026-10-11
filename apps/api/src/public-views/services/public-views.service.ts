@@ -4,6 +4,14 @@ import { Transactional } from "@nestjs-cls/transactional";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { generateId } from "@/api/kernel/id";
+import {
+  GuestWithStats,
+  PublicViewGuestsRepository,
+} from "@/api/public-views/domain/ports/public-view-guests.repository";
+import {
+  PublicViewsRepository,
+  PublicViewWithStats,
+} from "@/api/public-views/domain/ports/public-views.repository";
 import { PublicView } from "@/api/public-views/entities/public-view.entity";
 import {
   PUBLIC_VIEW_DEFAULT_TTL_MS,
@@ -12,14 +20,6 @@ import {
   SLUG_LENGTH,
 } from "@/api/public-views/public-views.constants";
 import { publicViewsError } from "@/api/public-views/public-views.errors";
-import {
-  GuestWithStats,
-  PublicViewGuestsRepository,
-} from "@/api/public-views/repositories/public-view-guests.repository";
-import {
-  PublicViewsRepository,
-  PublicViewWithStats,
-} from "@/api/public-views/repositories/public-views.repository";
 import { generateSlug } from "@/api/public-views/utils/slug.util";
 
 @Injectable()
