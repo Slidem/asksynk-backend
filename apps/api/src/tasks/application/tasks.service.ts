@@ -74,9 +74,11 @@ export class TasksService {
   @Transactional()
   async updateTask(input: UpdateTaskInput): Promise<Task> {
     const task = await this.tasksRepository.getById(input.id);
+
     if (!task || task.isDeleted || !task.isVisibleTo(input.userId)) {
       throw tasksError("task_not_found", { taskId: input.id });
     }
+
     // The assignee owns the task — only they may edit (incl. status).
     if (!task.isAssignee(input.userId)) {
       throw tasksError("not_task_assignee", { action: "edit" });

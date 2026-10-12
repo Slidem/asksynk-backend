@@ -5,7 +5,15 @@ import { toAttentionItemView } from "@/api/attention/application/read/attention-
 import { attentionItemError } from "@/api/attention/attention.errors";
 import { AttentionItemStatus } from "@/api/attention/contract/attention-item-status.public";
 import { AttentionItem } from "@/api/attention/domain/attention-item";
-import { AttentionItemMetadata, AttentionSource, CreateAttentionItemInput, ListAttentionItemsInput, TaggedMessageMetadata, UpdateAttentionItemInput, UpsertAttentionFromSourceInput } from "@/api/attention/domain/attention-item.model";
+import {
+  AttentionItemMetadata,
+  AttentionSource,
+  CreateAttentionItemInput,
+  ListAttentionItemsInput,
+  TaggedMessageMetadata,
+  UpdateAttentionItemInput,
+  UpsertAttentionFromSourceInput,
+} from "@/api/attention/domain/attention-item.model";
 import { AttentionItemsRepository } from "@/api/attention/domain/ports/attention-items.repository";
 import { generateId } from "@/api/kernel/id";
 import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
