@@ -1,6 +1,10 @@
 import { AttentionItemStatus } from "@/api/attention/contract/attention-item-status.public";
 import { AttentionItem } from "@/api/attention/domain/attention-item";
-import { AttentionItemMetadata, CreateAttentionItemInput, ListAttentionItemsInput } from "@/api/attention/domain/attention-item.model";
+import {
+  AttentionItemMetadata,
+  CreateAttentionItemInput,
+  ListAttentionItemsInput,
+} from "@/api/attention/domain/attention-item.model";
 
 export abstract class AttentionItemsRepository {
   abstract add(input: CreateAttentionItemInput): Promise<AttentionItem>;
@@ -43,5 +47,7 @@ export abstract class AttentionItemsRepository {
   abstract findByTaskId(taskId: string): Promise<AttentionItem[]>;
   abstract findByTaskBatchId(batchId: string): Promise<AttentionItem[]>;
   abstract findBySuggestionId(suggestionId: string): Promise<AttentionItem[]>;
-  abstract findBySourceCalendarEventId(eventId: string): Promise<AttentionItem[]>;
+  abstract findBySourceCalendarEventId(
+    eventId: string,
+  ): Promise<AttentionItem[]>;
 }

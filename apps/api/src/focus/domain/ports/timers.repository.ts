@@ -22,26 +22,30 @@ export interface AppendEventInput {
 
 export abstract class TimersRepository {
   abstract ensure(userId: string): Promise<Timer>;
+
   abstract getByUserId(userId: string): Promise<Timer | null>;
+
   abstract start(userId: string, input: StartInput): Promise<Timer>;
+
   abstract pause(
     userId: string,
     remainingAtTransition: number,
     transitionedAt: Date,
   ): Promise<Timer | null>;
-  abstract resume(
-    userId: string,
-    transitionedAt: Date,
-  ): Promise<Timer | null>;
+
+  abstract resume(userId: string, transitionedAt: Date): Promise<Timer | null>;
+
   abstract stop(
     userId: string,
     remainingAtTransition: number,
     transitionedAt: Date,
   ): Promise<Timer | null>;
+
   abstract completeIfRunning(
     userId: string,
     transitionedAtGuard: Date,
     now: Date,
   ): Promise<Timer | null>;
+
   abstract appendEvent(input: AppendEventInput): Promise<void>;
 }
