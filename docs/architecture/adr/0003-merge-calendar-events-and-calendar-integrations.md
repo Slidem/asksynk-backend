@@ -11,8 +11,9 @@ The most tightly coupled pair in the codebase:
   `sync/calendar-sync.job-handlers` → `CalendarRepository` / `CalendarEventsRepository`);
   the rest are `Calendar`, `CalendarEvent`, `utcToIso`, `parseIsoWallClockInTimezone`.
 - FK `calendars.integration_id` → `calendar_integrations.id`, and
-  `calendar.repository.ts` joins `calendar_integrations` — coupling both ways.
-- `calendar-sync.service.ts` mutates the other module's entity with
+  the calendar repository (now `scheduling/infrastructure/persistence/drizzle-calendar.repository.ts`)
+  joins `calendar_integrations` — coupling both ways.
+- `scheduling/application/calendar-sync.service.ts` mutates the other module's entity with
   `applyFields(event, fields)`.
 
 ## Options
@@ -27,7 +28,7 @@ The most tightly coupled pair in the codebase:
 **C.** `scheduling` owns `calendars`, `calendar_events`, `calendar_event_exceptions`,
 `calendar_event_tags`, `calendar_integrations`, `calendar_event_links`. The real
 boundary is asksynk ↔ Google, already implemented by
-`providers/google-calendar.provider.ts` → `scheduling/infrastructure/acl/`.
+`scheduling/infrastructure/acl/google-calendar.provider.ts`.
 
 The merge is a file move with no behaviour change.
 
@@ -47,6 +48,7 @@ answered, not the model.
 
 ## Verification
 
-`calendar-events.integration.test.ts` and `attention-items.events-handler.integration.test.ts`
+`test/scheduling/calendar-events.integration.test.ts` and
+`test/attention/attention-items.events-handler.integration.test.ts`
 pass unchanged; `grep -rlE "@/api/calendar-(events|integrations)" apps/api/src apps/api/test` → empty; manual
 Google round-trip (import external, mirror native, neither echoes).

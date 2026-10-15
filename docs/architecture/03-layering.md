@@ -1,7 +1,7 @@
 # 03 — Layering
 
 Every context gets the same layers and dependency rule, over two shared tiers
-(`kernel/`, `platform/`). Enforced by lint (since Wave 3), not discipline.
+(`kernel/`, `platform/`). Enforced by lint, not discipline.
 
 ## 1. The rule
 
@@ -18,7 +18,7 @@ Every context gets the same layers and dependency rule, over two shared tiers
 | Layer             | May import                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------- |
 | `domain/`         | own `domain/` + own `contract/` types + own `<ctx>.errors.ts`, `kernel/`                 |
-| `contract/`       | `kernel/`, other `contract/`, `platform/events/registry` (`defineEvent`) + zod          |
+| `contract/`       | `kernel/`, other `contract/`, `platform/` types (`defineEvent`, `RequestHeaders`) + zod |
 | `application/`    | own `domain/` + `application/`, `kernel/`, `platform/`, **other contexts' `contract/`** |
 | `infrastructure/` | own `domain/` + `application/`, `kernel/`, `platform/`, Drizzle, SDKs                   |
 | `presentation/`   | own `application/` + `domain/` (types), `kernel/`, `platform/`, other `contract/`       |
@@ -28,7 +28,7 @@ Every context gets the same layers and dependency rule, over two shared tiers
 **No context imports another context's `domain/`, `application/`, `infrastructure/`
 or `presentation/` — only `contract/`.** `domain/` imports no `@nestjs/*`,
 `drizzle-orm`, `class-validator`, `zod`, `socket.io`, `pg-boss`. Controllers never
-touch repositories (already true).
+touch repositories.
 
 ## 2. `kernel/` vs `platform/`
 
@@ -148,14 +148,15 @@ Injection sites name the abstract type; no `@Inject()`, no `Symbol`.
 
 - **infrastructure** — maps rows ↔ aggregates; never returns a raw row upward.
 - **presentation** — thin: validate → command → use case → map. Current violations:
-  `task-suggestions.controller.ts` (status-vs-payload rule, `kind === 'batch'` rule);
-  `calendar-events.controller.ts` (wall-clock → instant conversion, also done in
-  `calendar-sync.service.ts`); `threads.controller.ts` (stitches messaging + storage
-  — read-model assembly).
+  `tasks/presentation/rest/task-suggestions.controller.ts` (status-vs-payload rule, `kind === 'batch'` rule);
+  `scheduling/presentation/rest/calendar-events.controller.ts` (wall-clock → instant
+  conversion, also done in `scheduling/application/calendar-sync.service.ts`);
+  `conversations/presentation/rest/{threads,guest-messaging}.controller.ts`
+  (stitch messages + attachment URLs — read-model assembly).
 
-## 6. `ws.gateway.ts` split (Wave 4)
+## 6. Realtime (WS)
 
-Transport stays in `websockets/` and implements one port:
+`websockets/` is transport only and implements one port:
 
 ```ts
 // platform/realtime/realtime-broadcaster.ts
@@ -192,11 +193,11 @@ Rich only where an invariant would otherwise be enforced in several places:
 
 | Aggregate             | Methods                                                                                | Replaces                      |
 | --------------------- | -------------------------------------------------------------------------------------- | ----------------------------- |
-| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | done (1.4): `timers/domain/timer.ts` |
+| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | done: `focus/domain/timer.ts` |
 | `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
-| `Invite`              | `accept`, `reject`                                                                     | `networks.service.ts` guards  |
+| `Invite`              | `accept`, `reject`                                                                     | `network/application/networks.service.ts` guards |
 | `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |
-| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `domain/task-batch-status.ts` |
+| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `tasks/domain/task-batch-status.ts` |
 | `CalendarEvent`       | `reschedule`, `addException`, `splitSeriesAt`, `detachInstance`, `applyProviderFields` | service logic + `applyFields` |
 | `CalendarIntegration` | `markError`, `revoke`, `withRefreshedCredentials`                                      | status mutated externally     |
 
@@ -207,14 +208,13 @@ Value objects only where a rule attaches: `AnswerMode` (tagging), `RecurrenceRul
 (scheduling — rejects `COUNT=`, requires `UNTIL` + `TZID=`, caps `UNTIL`),
 `AttentionSource` (attention).
 
-## 8. Enforcement (Wave 3)
+## 8. Enforcement
 
 `eslint-plugin-boundaries` (v7, `eslint.config.js`) for in-editor layer rules;
 `dependency-cruiser` (`apps/api/.dependency-cruiser.cjs`) for cross-context rules
-([07 §Guardrails](07-roadmap.md#guardrails)). Both run in `pnpm lint`; both `error`
-(the `websockets` `warn` exception was removed in Wave 4).
+([07 §Guardrails](07-roadmap.md#guardrails)). Both run in `pnpm lint`; both `error`.
 
-ESLint, as built:
+ESLint:
 
 - **Elements** (v7 patterns match folders only): `kernel`, `platform`, one per layer
   `apps/api/src/*/<layer>` capturing `context`, and `root` (`apps/api/src/*` — the

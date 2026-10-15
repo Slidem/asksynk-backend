@@ -104,7 +104,10 @@ export class Timer {
     if (this.status !== "running" && this.status !== "paused") {
       throw timersError("no_active_timer");
     }
-    return { type: "stopped", remainingSeconds: this.remainingSeconds(now) ?? 0 };
+    return {
+      type: "stopped",
+      remainingSeconds: this.remainingSeconds(now) ?? 0,
+    };
   }
 
   complete(): TimerCompleted {

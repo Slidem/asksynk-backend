@@ -33,10 +33,12 @@ otherwise.
 
 ## Catalogs
 
-12 namespaces: `core`, `attention-items`, `calendar-events`, `calendar-integrations`,
-`dead_letters` (in `platform/events/dead-letters/`), `messaging`, `networks`,
-`public-views`, `tags`, `tasks`, `timers`, `user-profile`. None yet for `auth`,
-`storage`, `user-settings`, `websockets`.
+13 namespaces (each in its context's `<ctx>.errors.ts`; names predate the context
+renames and are client-visible, so they stay): `core` (kernel), `attention-items`,
+`calendar-events`, `calendar-integrations` (scheduling), `dead_letters`
+(`platform/events/dead-letters/`), `messaging` (conversations), `networks` (network),
+`public-views` (sharing), `storage` (files), `tags` (tagging), `tasks`, `timers` (focus),
+`user-profile`. None for `auth`, `user-settings`.
 
 ## Rules
 
@@ -46,7 +48,7 @@ otherwise.
   already namespaced and registered.
 - Mark a definition `exposable: true` only if its message is safe for clients.
 - No Nest `HttpException` outside transport code. Remaining: 11 in
-  `storage/attachments/services/attachments.service.ts` (Wave 8.5); the rest (auth
+  `files/application/attachments.service.ts` (8.5); the rest (auth
   guard/decorators, param validators) are transport and fine.
 - Unique-violation (`23505`, `platform/db/pg-error-codes.ts`) must be mapped to a
   `CONFLICT` code by the repository/service that can hit it — tags currently doesn't.

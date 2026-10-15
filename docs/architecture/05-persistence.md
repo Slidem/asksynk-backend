@@ -34,7 +34,7 @@ export const calendarEvents = scheduling.table("calendar_events", {
 });
 ```
 
-Layout `apps/migrations/src/schema/<context>/`. `drizzle.config.ts` already globs
+Layout `apps/migrations/src/schema/<context>/`. `apps/migrations/drizzle.config.ts` already globs
 `./src/schema` recursively; add `schemaFilter: ["public", "identity", "tagging",
 "attention", "scheduling", "conversations", "tasks", "focus", "network", "sharing",
 "files", "platform"]`. One migration history, as today.
@@ -69,8 +69,9 @@ What replaces the cascade:
 Under schemas, a cross-context query errors instead of passing silently — including
 inside raw `sql` strings, which lint can't see. Cost: every `sql` template (33 in
 context repositories) must be audited for unqualified table names before the move.
-Heaviest: `attention-items.repository.ts`, `calendar-events.repository.ts`,
-`messaging.repository.ts`. That is why the schema move is the last wave.
+Heaviest (all in `<ctx>/infrastructure/persistence/`):
+`drizzle-attention-items.repository.ts`, `drizzle-calendar-events.repository.ts`,
+`drizzle-messaging.repository.ts`. That is why the schema move is the last wave.
 
 ## 5. Repositories vs queries
 
@@ -79,8 +80,8 @@ Heaviest: `attention-items.repository.ts`, `calendar-events.repository.ts`,
 | **Repository** | the aggregate root, never rows or partials  | `<ctx>/domain/ports/<x>.repository.ts`                            | `<ctx>/infrastructure/persistence/drizzle-<x>.repository.ts` |
 | **Query**      | flat view types; any SQL within the context | `<ctx>/domain/ports/<x>.query.ts` or `<ctx>/contract/<x>.port.ts` | `<ctx>/infrastructure/persistence/<x>.query.ts`              |
 
-View types live in `application/read/`. `messaging.repository.ts` is the clearest
-fusion of both today (`ThreadListItem`, `ThreadStats`, … next to aggregate loads).
+View types live in `application/read/`. `conversations/domain/ports/messaging.repository.ts`
+is the clearest fusion of both today (`ThreadListItem`, `ThreadStats`, … next to aggregate loads).
 CQRS in its cheapest form: two interfaces, one database.
 
 ## 6. Database views

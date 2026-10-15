@@ -5,8 +5,9 @@
 ## Context
 
 All tables live in `public`. Ten FKs cross module boundaries, and modules query
-tables they don't own — the worst in raw SQL (`attention-items.repository.ts`
-reading three calendar tables through `rrule.between`). That is Grzybek's _Shared
+tables they don't own — the worst in raw SQL (the attention repository
+reading three calendar tables through `rrule.between`; now
+`scheduling/infrastructure/persistence/calendar-occurrence.query.ts`). That is Grzybek's _Shared
 Database Data_ style: _"one little change to database structure … can break another
 module without notice."_
 
@@ -41,7 +42,7 @@ dropping the cross-context FKs (7.2) — most of the benefit, fraction of the co
 - **−** Nine FKs dropped (`calendars.integration_id` stays — both sides in
   `scheduling`). Mitigated by `tag.deleted` handlers per tagged context, the proven
   FK-less `attention_item_tags`, and an orphan-count cron.
-- **−** `drizzle.config.ts` needs `schemaFilter`.
+- **−** `apps/migrations/drizzle.config.ts` needs `schemaFilter`.
 - **=** Still one DB, one pool, one migration history. Transactions may still span
   contexts — that's a code rule, not a DB one.
 

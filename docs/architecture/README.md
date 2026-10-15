@@ -1,15 +1,10 @@
 # asksynk backend — architecture
 
-How the backend is shaped today, the pragmatic-DDD shape it is moving to, and the
-order to get there. Audited against the code at `5129fc8` (2026-10-10).
+How the backend is shaped, the pragmatic-DDD shape it is moving to, and the order to
+get there.
 
-**Status:** Wave 0 (safety net, `kernel/` + `platform/` split, typed errors, events,
-jobs), Wave 1 (pure core: `Actor`, due-date policy, batch status, `Timer`,
-`RecurrenceRule`), Wave 2 (repository ports, published contracts, `tagging` +
-`scheduling` renames, auth ↔ sharing inversion) and Wave 3 (every context layered and
-renamed, boundary lint as `error`) and Wave 4 (transport adapters: Nest 11,
-`RealtimeBroadcaster`, per-context broadcasters + WS gateways, messaging on `Actor`) are
-done. **Next: [Wave 5 — rich aggregates](07-roadmap.md#wave-5--rich-aggregates).**
+**Status:** Waves 0–4 done ([Done](07-roadmap.md#done)). **Next:
+[Wave 5 — rich aggregates](07-roadmap.md#wave-5--rich-aggregates).**
 
 ---
 
@@ -42,7 +37,7 @@ Rich aggregates only where a real state machine exists. Code stays in place unde
 | --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Persistence isolation | Postgres schema per context; no cross-schema FKs except `users`         | [ADR 0001](adr/0001-schema-per-context.md)                          |
 | Repository ports      | `abstract class` = contract + DI token; no `Symbol` tokens              | [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)        |
-| Calendar boundary     | `calendar-events` + `calendar-integrations` merge into `scheduling`     | [ADR 0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
+| Calendar boundary     | Native calendar + provider sync are one context, `scheduling`           | [ADR 0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
 | Attention shape       | Aggregate with a projected slice; typed `source_*` columns              | [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md)   |
 | Shared code           | `kernel/` (pure, domain may import) + `platform/` (framework-aware)     | [ADR 0005](adr/0005-kernel-and-platform-tiers.md)                   |
 | Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table   | [ADR 0006](adr/0006-group-ordered-event-delivery.md)                |
@@ -68,10 +63,10 @@ Rich aggregates only where a real state machine exists. Code stays in place unde
 | [01-current-state.md](01-current-state.md)   | What is solid, what is still wrong, with numbers                   |
 | [02-context-map.md](02-context-map.md)       | The target contexts and why each boundary sits where it does       |
 | [03-layering.md](03-layering.md)             | Layer template, `kernel/` vs `platform/`, Nest mechanics, lint     |
-| [04-integration.md](04-integration.md)       | How contexts talk; every current violation and its fix             |
+| [04-integration.md](04-integration.md)       | How contexts talk; the published contracts                         |
 | [05-persistence.md](05-persistence.md)       | Schema per context, FK policy, repositories vs queries             |
 | [06-attention-core.md](06-attention-core.md) | The core domain, designed for the channels that are coming         |
-| [07-roadmap.md](07-roadmap.md)               | Waves 1–8, guardrails, what to leave alone                         |
+| [07-roadmap.md](07-roadmap.md)               | Done waves, Waves 5–8, guardrails, what to leave alone             |
 | [adr/](adr/)                                 | Decisions that are expensive to reverse                            |
 | [../platform/](../platform/)                 | As-built reference: events, jobs, errors                           |
 

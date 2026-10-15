@@ -22,7 +22,7 @@ are decisions no source can make — that is the product.
 
 ## 2. Today's problems
 
-See [01 §3.3, §3.8](01-current-state.md#38-attention_items-is-a-projection-wearing-an-aggregates-clothes):
+See [01 §3.2, §3.6](01-current-state.md#36-attention_items-is-a-projection-wearing-an-aggregates-clothes):
 `type` enum naming sources (3 without producers), source ids in unindexed `metadata`
 jsonb, `upsertFromSource` hardcoding `type: "task"` for tasks and batches, three
 bespoke handlers, hand-rolled idempotency, the pinned-date invariant defended by a
@@ -173,9 +173,9 @@ work. Keep last-writer-wins and the outbound event; just route both writers thro
 
 ## 6. The tag → due-date policy
 
-Built: the pure function (`attention-items/domain/due-date.policy.ts`), called by
-`AttentionDueDateService`. Target: two ports (Wave 2) replacing its direct
-`TagRepository` / raw-SQL reads.
+The pure function `attention/domain/due-date.policy.ts`, called by
+`AttentionDueDateService`, which feeds it answer modes from `TagCatalogPort` and
+occurrences from `CalendarOccurrencePort`.
 
 ```ts
 // domain/due-date.policy.ts
@@ -245,7 +245,7 @@ fetch modes + occurrences once, `decideDueDate` per item, save + publish when
 | Gmail / Slack / WhatsApp | `channels/<provider>/` publishing `AttentionSourceUpserted` | Nothing beyond Wave 6. Don't create `channels/` speculatively                                                 |
 | Gamification             | `momentum/` consuming `attention.item.resolved`             | Publish `attention.item.resolved { userId, itemId, resolvedAt, dueDate, wasOverdue }` (6.5) so history exists |
 | Analytics                | `insights` projections from events                          | Nothing. Don't use the outbox as an event log (retention prunes it at 30 days)                                |
-| AI agents                | Another `Actor` through the same application layer          | `Actor` everywhere (Wave 1.1 onward)                                                                          |
+| AI agents                | Another `Actor` through the same application layer          | `Actor` in every application method                                                                           |
 
 ## 8. Migration
 

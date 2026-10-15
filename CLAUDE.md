@@ -25,10 +25,10 @@ Spine: _input → tagging → attention → scheduling_. A tag is a policy (answ
 - **Ports:** `abstract class` = contract + DI token (no `Symbol` tokens). Services never hit DB directly — always via repository.
 - **Errors:** one `DomainError` + per-context catalogs; HTTP status decided at edge.
 - **Events/jobs:** outbox events, one `key_strict_fifo` queue per consumer group + dead-letter table; one typed jobs API.
-- **Status (2026-10-15):** Wave 0 ✅ (test split, kernel/platform, typed errors, events, jobs), Wave 1 ✅ (`Actor`, due-date policy, batch status, `Timer`, `RecurrenceRule`), Wave 2 ✅ (repository ports, `contract/` ports, auth↔sharing inversion), Wave 3 ✅ (all contexts layered + renamed: `files`, `focus`, `network`, `sharing`, `attention`, `conversations`; boundary lint as `error`), Wave 4 ✅ (Nest 11; `RealtimeBroadcaster` port in `platform/realtime/`, per-context broadcasters + WS gateways; messaging on `Actor`; `websockets` = pure transport, no boundary warnings).
+- **Status (2026-10-15):** Waves 0–4 ✅ (see `07-roadmap.md` § Done).
 - **Next: Wave 5** — rich aggregates. Then: 6 attention core redesign, 7 schema per context, 8 cleanup.
 - **Placement:** `<ctx>/{contract,domain,application,infrastructure,presentation}/` + root `<ctx>.module.ts`, `<ctx>.errors.ts` (docs/architecture/03-layering.md §3). Job definitions in `application/jobs/`; event-payload views in `application/read/`. `pnpm lint` enforces layers (ESLint boundaries) + cross-context rules (`pnpm lint:boundaries`, dependency-cruiser).
-- **Roadmap upkeep:** mark shipped steps ✅ (table + heading), don't delete them; keep `01-current-state.md` reflecting reality.
+- **Docs upkeep:** docs describe what is + what's left, present tense; history lives in git (no "was X", before/after tables, "As built", strikethroughs). A shipped wave becomes one row in the roadmap's Done table; shipped plans in `docs/architecture/plans/` are deleted. Keep `01-current-state.md` reflecting reality.
 - New/touched application methods take `Actor`, not `userId: string`.
 
 ## Development Notes

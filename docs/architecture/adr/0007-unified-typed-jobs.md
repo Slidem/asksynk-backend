@@ -59,4 +59,4 @@ sync does HTTP outside a tx).
 `test/jobs/*.unit.test.ts` (types incl. `@ts-expect-error` cases, `defineJob`,
 `@CronJob`, registry); `test/jobs/job-scheduler.integration.test.ts` (tx rollback
 leaves no job, repeat id no-op, cancel frees id, stale crons unscheduled);
-`test/timers/timers.integration.test.ts`.
+`test/focus/timers.integration.test.ts`.

@@ -40,7 +40,7 @@ async run() {}
   No runtime validation.
 - `schedule` fails fast if the def has no registered handler (`assertRegistered`).
 
-## Defaults (`job-options.constants.ts`)
+## Defaults (`platform/jobs/job-options.constants.ts`)
 
 `retryLimit 2`, `retryDelaySeconds 0`, `retryBackoff false`, `expireInSeconds 900`,
 `deleteAfterSeconds 172800` (2 days), `pollingIntervalSeconds 2`, `concurrency 1`.
@@ -60,9 +60,9 @@ final attempt, and rethrow; a final failure is left `failed` (no DLQ).
 
 | Name                 | Kind            | Where                                                    | Notes                                                                                   |
 | -------------------- | --------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `timer.completion`   | queued, delayed | `timers/scheduling/timer-completion.job.ts`              | id `userId:transitionedAt`; scheduled on start/resume at `completesAt`, cancelled on start/pause/stop in the same tx |
-| `calendar.sync`      | queued          | `scheduling/sync/calendar-sync.jobs.ts`                  | retry 3, 30 s backoff, concurrency 4; id `calendarId:floor(epochSec/240)` (4-min dedup bucket) |
-| `calendar.sync.poll` | cron `*/1 * * * *` | `scheduling/sync/calendar-sync.job-handlers.ts`            | fans out one `calendar.sync` per sync-enabled calendar                                |
+| `timer.completion`   | queued, delayed | `focus/application/jobs/timer-completion.job.ts`          | id `userId:transitionedAt`; scheduled on start/resume at `completesAt`, cancelled on start/pause/stop in the same tx |
+| `calendar.sync`      | queued          | `scheduling/application/jobs/calendar-sync.jobs.ts`      | retry 3, 30 s backoff, concurrency 4; id `calendarId:floor(epochSec/240)` (4-min dedup bucket) |
+| `calendar.sync.poll` | cron `*/1 * * * *` | `scheduling/presentation/jobs/calendar-sync.job-handlers.ts`| fans out one `calendar.sync` per sync-enabled calendar                                |
 | `events.retention`   | cron `0 3 * * *` | `platform/events/retention/`                            | see [events](events.md#retention)                                                       |
 
 ## Handler contract

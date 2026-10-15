@@ -3,7 +3,8 @@
 Transactional outbox → pg-boss, with a durable leg (ordered per key, retried,
 dead-lettered) and a realtime leg (best-effort fan-out to every node).
 Decision record: [ADR 0006](../architecture/adr/0006-group-ordered-event-delivery.md).
-Code: `apps/api/src/platform/events/`. Requires **pg-boss ≥ 12.34.0**.
+Code: `apps/api/src/platform/events/` (bare `registry/…`, `consumer/…` paths below are
+relative to it; context paths to `apps/api/src/`). Requires **pg-boss ≥ 12.34.0**.
 
 ## Publishing
 
@@ -20,8 +21,8 @@ outbox row is at most one job per group.
 ## Defining events
 
 `defineEvent({ name, schema, delivery })` (`registry/events.registration.ts`); names
-are dotted lowercase. All 20 events live in `registry/events.registry.ts` (moves per
-context in Wave 8.1).
+are dotted lowercase. All 20 events live in `registry/events.registry.ts` (one central
+file — see Known gaps).
 
 | Delivery | Events                                                                                                                                                                                                      |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -51,12 +52,12 @@ bootstrap (`EventHandlersRegistry`); there is no registration step.
 
 | Group             | File                                                    | Ordering key                                                                                      | Handles                                                                 |
 | ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `attention-items` | `attention-items/attention-items.consumer-group.ts`     | `user:` + first of `sentToUserId`, `sentToGuestId`, `assigneeUserId`, `suggesteeUserId`, `userId`; else `user:unknown` (a bug if reached) | `task.*`, `task.batch.*`, `task.suggestion.*` (task-attention), `message.*` (message-attention), `calendar.event.*`, `tag.*` (tag-calendar-attention) — 15 events |
-| `suggestion-sync` | `tasks/suggestion-sync.consumer-group.ts`               | `assignee:<assigneeUserId>`                                                                        | `task.upserted`, `task.batch.upserted` (task-suggestions.service)        |
-| `calendar-sync`   | `scheduling/sync/calendar-sync.consumer-group.ts`       | `<userId>`                                                                                         | `calendar.event.*` (calendar-sync.event-handler)                        |
-| `messaging`       | `messaging/messaging.consumer-group.ts`                 | `<messageId>`                                                                                      | `attention.message.synced`                                              |
-| `timer-event-log` | `timers/timer-event-log.consumer-group.ts`              | `user:<userId>`                                                                                    | `timer.lifecycle`                                                       |
-| `public-views`    | `public-views/public-views.consumer-group.ts`           | `sender:<message.senderId>`                                                                        | `message.created` (guest-message-count: `public_view_guests.message_count`) |
+| `attention-items` | `attention/presentation/events/attention-items.consumer-group.ts` | `user:` + first of `sentToUserId`, `sentToGuestId`, `assigneeUserId`, `suggesteeUserId`, `userId`; else `user:unknown` (a bug if reached) | `task.*`, `task.batch.*`, `task.suggestion.*` (task-attention), `message.*` (message-attention), `calendar.event.*`, `tag.*` (tag-calendar-attention) — 15 events |
+| `suggestion-sync` | `tasks/presentation/events/suggestion-sync.consumer-group.ts` | `assignee:<assigneeUserId>`                                                                        | `task.upserted`, `task.batch.upserted` (`suggestion-sync.handler`)        |
+| `calendar-sync`   | `scheduling/presentation/events/calendar-sync.consumer-group.ts` | `<userId>`                                                                                         | `calendar.event.*` (calendar-sync.event-handler)                        |
+| `messaging`       | `conversations/presentation/events/messaging.consumer-group.ts` | `<messageId>`                                                                              | `attention.message.synced` (`attention-message.handler`)                |
+| `timer-event-log` | `focus/presentation/events/timer-event-log.consumer-group.ts` | `user:<userId>`                                                                              | `timer.lifecycle` (`timers.event-log.handler`)                          |
+| `public-views`    | `sharing/presentation/events/public-views.consumer-group.ts` | `sender:<message.senderId>`                                                                        | `message.created` (`guest-message-count.handler`: `public_view_guests.message_count`) |
 
 Realtime handlers live per context in `<ctx>/presentation/ws/*.broadcaster.ts` (7 across
 `conversations`, `attention`, `focus`, `tasks`) and emit via `RealtimeBroadcaster`.
@@ -169,6 +170,7 @@ dead letters 30 days after `updated_at`. `pending` dead letters are kept.
 | No consumer inbox / dedup        | `TODO` in the runtime; handlers must be idempotent on their own                           |
 | Key prefixes inconsistent        | `calendar-sync`, `messaging` use bare ids. Harmless (keys only matter within a queue)     |
 | Guest-recipient jobs             | `attention-items` enqueues `message.*` for guest recipients; the handler ignores them     |
-| Thread-room duplicates           | Per-recipient publish → gateway emits to the thread room N times; none if sender is alone |
+| Thread-room duplicates           | Per-recipient publish → `MessagingBroadcaster` emits to the thread room N times; none if sender is alone |
+| Central event catalogue          | All events in `registry/events.registry.ts`; split into `<ctx>/contract/<ctx>.events.ts` in 8.1 |
 | `tag.updated` is Dual            | No realtime handler exists                                                                |
 | Stale comment                    | `MessageBusService.insertJobs` claims it ensures queues; queues are ensured at bootstrap  |
