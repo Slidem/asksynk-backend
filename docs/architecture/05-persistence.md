@@ -84,6 +84,9 @@ View types live in `application/read/`. `conversations/domain/ports/messaging.re
 is the clearest fusion of both today (`ThreadListItem`, `ThreadStats`, … next to aggregate loads).
 CQRS in its cheapest form: two interfaces, one database.
 
+Aggregate repositories expose `save`, guarded by a `version` column and flushing the
+aggregate's recorded events ([ADR 0008](adr/0008-self-mutating-aggregates.md)).
+
 ## 6. Database views
 
 Within a context only, when the same non-trivial SELECT is needed in 3+ places:

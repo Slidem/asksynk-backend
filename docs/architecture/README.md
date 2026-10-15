@@ -42,6 +42,7 @@ Rich aggregates only where a real state machine exists. Code stays in place unde
 | Shared code           | `kernel/` (pure, domain may import) + `platform/` (framework-aware)     | [ADR 0005](adr/0005-kernel-and-platform-tiers.md)                   |
 | Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table   | [ADR 0006](adr/0006-group-ordered-event-delivery.md)                |
 | Background jobs       | One typed jobs API; caller-derived ids, nothing stored                  | [ADR 0007](adr/0007-unified-typed-jobs.md)                          |
+| Aggregates            | Self-mutating; `save` checks `version` and flushes recorded events      | [ADR 0008](adr/0008-self-mutating-aggregates.md)                    |
 | Domain errors         | One `DomainError` + per-context catalogs; HTTP status decided at edge  | [platform/errors](../platform/errors.md)                            |
 
 ## Deliberately not doing

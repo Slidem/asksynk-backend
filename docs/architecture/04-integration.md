@@ -102,8 +102,8 @@ and `@EventHandler` metadata, never a central import. Removes the
 1. ws/rest      conversations/presentation  → command
 2. use case     conversations/application/tag-message.usecase.ts  @Transactional()
                 ├─ (a) tagCatalog.assertOwnedBy(ownerUserIdOf(actor), tagIds)
-                ├─ message.retag(tagIds); repo.save(message)
-                └─ (b) publish(MessageUpdated)                 → outbox, same tx
+                └─ message.retag(tagIds); repo.save(message)
+                   └─ (b) MessageRetagged → MessageUpdated      → outbox, same tx
 3. COMMIT
 4. durable      tasks/conversations outbound ACL → AttentionSourceUpserted
                 attention handler → ingest use case

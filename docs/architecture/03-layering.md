@@ -71,7 +71,8 @@ apps/api/src/<context>/
     <name>.public.ts               # public value types, declared here (not re-exported)
 
   domain/
-    <aggregate>.ts                 # invariants + transitions
+    <aggregate>.ts                 # invariants + transitions (extends AggregateRoot)
+    <aggregate>.events.ts          # domain events the aggregate records
     <name>.vo.ts                   # value objects (only where a rule attaches)
     <name>.policy.ts               # pure functions
     ports/<name>.repository.ts     # abstract class
@@ -83,7 +84,8 @@ apps/api/src/<context>/
     jobs/<name>.job.ts             # defineJob — the application schedules it
 
   infrastructure/
-    persistence/drizzle-<name>.repository.ts, <name>.query.ts, <name>.mapper.ts
+    persistence/drizzle-<name>.repository.ts, <name>.query.ts, <name>.mapper.ts,
+                <aggregate>-events.mapper.ts   # domain event → outbox event, used by save
     acl/<external>.adapter.ts
 
   presentation/
@@ -189,11 +191,13 @@ export abstract class RealtimeBroadcaster {
 
 ## 7. Rich vs not
 
-Rich only where an invariant would otherwise be enforced in several places:
+Rich only where an invariant would otherwise be enforced in several places. Shape per
+[ADR 0008](adr/0008-self-mutating-aggregates.md): methods guard, mutate and record
+events; the repository's `save` checks `version` and flushes them to the outbox.
 
 | Aggregate             | Methods                                                                                | Replaces                      |
 | --------------------- | -------------------------------------------------------------------------------------- | ----------------------------- |
-| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | done: `focus/domain/timer.ts` |
+| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | decider + per-transition SQL in `DrizzleTimersRepository` |
 | `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
 | `Invite`              | `accept`, `reject`                                                                     | `network/application/networks.service.ts` guards |
 | `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |
