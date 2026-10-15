@@ -13,6 +13,7 @@ import { AttentionModule } from "@/api/attention/attention.module";
 import { AttentionItemResponse } from "@/api/attention/presentation/rest/responses/attention-item.response";
 import { MessagingService } from "@/api/conversations/application/messaging.service";
 import { ConversationsModule } from "@/api/conversations/conversations.module";
+import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
 import { FilesModule } from "@/api/files/files.module";
 import { generateId } from "@/api/kernel/id";
@@ -20,6 +21,8 @@ import { NetworkModule } from "@/api/network/network.module";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
 import { TxModule } from "@/api/platform/db/tx.module";
+import { ErrorsModule } from "@/api/platform/errors/errors.module";
+import { guestActor } from "@/api/platform/http/auth/actor.mapper";
 import { AuthGuest, AuthUser } from "@/api/platform/http/auth/auth.types";
 import { SchedulingModule } from "@/api/scheduling/scheduling.module";
 import { SharingModule } from "@/api/sharing/sharing.module";
@@ -38,7 +41,9 @@ import { tags as tagsTable } from "@/migrations/schema/tags";
 import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
 import { googleTestConfig } from "@/test/helpers/googleTestConfig";
+import { sendInput, userActorOf } from "@/test/helpers/messagingActors";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
+import { NoopRealtimeModule } from "@/test/helpers/noopRealtimeModule";
 import { pollUntil } from "@/test/helpers/pollUntil";
 import {
   makeTestUser,
@@ -103,6 +108,8 @@ describe("AttentionItemsEventHandler (integration)", () => {
         DbModule,
         TxModule,
         EventsModule,
+        NoopRealtimeModule,
+        ErrorsModule.forRoot(ERROR_CATALOGUES),
         NetworkModule,
         TaggingModule,
         SchedulingModule,
@@ -297,11 +304,9 @@ describe("AttentionItemsEventHandler (integration)", () => {
     body: string,
     tagIds: string[],
   ): Promise<string> {
-    const msg = await messagingService.sendAsUser(
-      sender.id,
-      threadId,
-      body,
-      tagIds,
+    const msg = await messagingService.send(
+      userActorOf(sender.id),
+      sendInput(threadId, body, tagIds),
     );
     return msg.id;
   }
@@ -310,7 +315,11 @@ describe("AttentionItemsEventHandler (integration)", () => {
     messageId: string,
     tagIds: string[],
   ): Promise<void> {
-    await messagingService.tagMessage(sender.id, messageId, tagIds);
+    await messagingService.tagMessage(
+      userActorOf(sender.id),
+      messageId,
+      tagIds,
+    );
   }
 
   async function getItems(): Promise<AttentionItemResponse[]> {
@@ -454,9 +463,10 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const tagId = await createTag({ type: "timeblock" });
       const tbId = await createTimeblock({ start, tagIds: [tagId] });
 
-      const msg = await messagingService.sendAsGuest(guest, "hi from guest", [
-        tagId,
-      ]);
+      const msg = await messagingService.send(
+        guestActor(guest),
+        sendInput(null, "hi from guest", [tagId]),
+      );
 
       const item = await awaitItem(
         (i) => msgMeta(i).messageId === msg.id && i.dueDate !== null,
@@ -480,12 +490,15 @@ describe("AttentionItemsEventHandler (integration)", () => {
         type: "immediately",
         responseTimeMillis: 30 * 60 * 1000,
       });
-      const msg = await messagingService.sendAsGuest(guest, "hi", [tagA]);
+      const msg = await messagingService.send(
+        guestActor(guest),
+        sendInput(null, "hi", [tagA]),
+      );
 
       const item = await awaitItem((i) => msgMeta(i).messageId === msg.id);
       expect(item.tagIds).toEqual([tagA]);
 
-      await messagingService.tagMessageAsGuest(guest, msg.id, [tagB]);
+      await messagingService.tagMessage(guestActor(guest), msg.id, [tagB]);
 
       await awaitItemState(
         item.id,
@@ -495,7 +508,10 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
     it("should reject a guest tagging with a tag the owner does not own", async () => {
       await expect(
-        messagingService.sendAsGuest(guest, "hi", [generateId()]),
+        messagingService.send(
+          guestActor(guest),
+          sendInput(null, "hi", [generateId()]),
+        ),
       ).rejects.toThrow();
     });
 
@@ -933,11 +949,9 @@ describe("AttentionItemsEventHandler (integration)", () => {
     it("sets managed_status on tagged messages and leaves untagged ones unmanaged", async () => {
       const tagId = await immediateTag();
       const taggedId = await sendTaggedMessage("tagged", [tagId]);
-      const untagged = await messagingService.sendAsUser(
-        sender.id,
-        threadId,
-        "plain",
-        [],
+      const untagged = await messagingService.send(
+        userActorOf(sender.id),
+        sendInput(threadId, "plain", []),
       );
 
       expect(await getMessageManaged(taggedId)).toEqual({
@@ -953,7 +967,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
 
       await messagingService.updateManagedStatus(
-        recipient.id,
+        userActorOf(recipient.id),
         msgId,
         "resolved",
       );
@@ -978,40 +992,46 @@ describe("AttentionItemsEventHandler (integration)", () => {
       await awaitItem((i) => msgMeta(i).messageId === msgId);
 
       await expect(
-        messagingService.updateManagedStatus(sender.id, msgId, "resolved"),
+        messagingService.updateManagedStatus(
+          userActorOf(sender.id),
+          msgId,
+          "resolved",
+        ),
       ).rejects.toThrow();
     });
 
     it("rejects managing status on an untagged (unmanaged) message", async () => {
-      const msg = await messagingService.sendAsUser(
-        sender.id,
-        threadId,
-        "plain",
-        [],
+      const msg = await messagingService.send(
+        userActorOf(sender.id),
+        sendInput(threadId, "plain", []),
       );
 
       await expect(
-        messagingService.updateManagedStatus(recipient.id, msg.id, "resolved"),
+        messagingService.updateManagedStatus(
+          userActorOf(recipient.id),
+          msg.id,
+          "resolved",
+        ),
       ).rejects.toThrow();
     });
 
     it("tracks managed_status across re-tagging (gains on tag, drops on untag)", async () => {
       const tagId = await immediateTag();
-      const msg = await messagingService.sendAsUser(
-        sender.id,
-        threadId,
-        "plain",
-        [],
+      const msg = await messagingService.send(
+        userActorOf(sender.id),
+        sendInput(threadId, "plain", []),
       );
       expect(await getMessageManaged(msg.id)).toBeNull();
 
-      await messagingService.tagMessage(sender.id, msg.id, [tagId]);
+      await messagingService.tagMessage(userActorOf(sender.id), msg.id, [
+        tagId,
+      ]);
       expect(await getMessageManaged(msg.id)).toEqual({
         type: "tagged_message",
         status: "created",
       });
 
-      await messagingService.tagMessage(sender.id, msg.id, []);
+      await messagingService.tagMessage(userActorOf(sender.id), msg.id, []);
       expect(await getMessageManaged(msg.id)).toBeNull();
     });
 
@@ -1021,7 +1041,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
 
       await messagingService.updateManagedStatus(
-        recipient.id,
+        userActorOf(recipient.id),
         msgId,
         "resolved",
       );

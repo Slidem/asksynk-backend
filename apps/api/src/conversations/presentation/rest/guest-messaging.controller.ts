@@ -14,11 +14,11 @@ import {
 } from "@/api/conversations/presentation/rest/responses/message.response";
 import { ThreadStatsResponseDto } from "@/api/conversations/presentation/rest/responses/thread.response";
 import { AttachmentCatalogPort } from "@/api/files/contract/attachment-catalog.port";
+import { Actor } from "@/api/kernel/actor/actor";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
 import { AllowGuest } from "@/api/platform/http/auth/allow-guest.decorator";
-import { AuthGuest as AuthGuestType } from "@/api/platform/http/auth/auth.types";
-import { AuthGuest } from "@/api/platform/http/auth/auth-guest.decorator";
+import { RequestActor } from "@/api/platform/http/auth/request-actor.decorator";
 
 @ApiTags("Guest Messaging")
 @ApiBearerAuth("bearer")
@@ -35,12 +35,16 @@ export class GuestMessagingController {
   @Get("messages")
   async listMessages(
     @Query() query: ListMessagesQueryDto,
-    @AuthGuest() guest: AuthGuestType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadMessageResponseDto[]> {
-    const items = await this.messagingService.listGuestThreadMessages(guest, {
-      before: query.before ? new Date(query.before) : undefined,
-      limit: query.limit,
-    });
+    const items = await this.messagingService.listMessages(
+      actor,
+      null,
+      {
+        before: query.before ? new Date(query.before) : undefined,
+        limit: query.limit,
+      },
+    );
     const attachmentsByMessage = await resolveAttachmentsByMessage(
       this.attachmentCatalog,
       items.map((i) => i.message),
@@ -57,19 +61,21 @@ export class GuestMessagingController {
   @AllowGuest()
   @Get("stats")
   async getStats(
-    @AuthGuest() guest: AuthGuestType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadStatsResponseDto> {
-    return this.messagingService.getGuestThreadStats(guest);
+    return this.messagingService.getThreadStats(actor, null);
   }
 
   /** List all tagged messages in the guest's thread (not paginated) */
   @AllowGuest()
   @Get("tagged-messages")
   async listTaggedMessages(
-    @AuthGuest() guest: AuthGuestType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadMessageResponseDto[]> {
-    const items =
-      await this.messagingService.listGuestThreadTaggedMessages(guest);
+    const items = await this.messagingService.listTaggedMessages(
+      actor,
+      null,
+    );
     const attachmentsByMessage = await resolveAttachmentsByMessage(
       this.attachmentCatalog,
       items.map((i) => i.message),
@@ -88,10 +94,11 @@ export class GuestMessagingController {
   async listReplies(
     @UuidV7Param("messageId") messageId: string,
     @Query() query: ListMessagesQueryDto,
-    @AuthGuest() guest: AuthGuestType,
+    @RequestActor() actor: Actor,
   ): Promise<MessageResponseDto[]> {
-    const replies = await this.messagingService.listGuestMessageReplies(
-      guest,
+    const replies = await this.messagingService.listReplies(
+      actor,
+      null,
       messageId,
       {
         before: query.before ? new Date(query.before) : undefined,

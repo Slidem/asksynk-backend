@@ -4,9 +4,9 @@ Each wave ships on its own and leaves the app working. Order: pure core → cont
 layers + lint → transport → aggregates → attention redesign → schemas → cleanup.
 Efforts are relative-size guesses for one developer.
 
-**Waves 0–3 are done.** Left behind: `websockets` → feature internals (Wave 4, the only
-boundary-lint warnings). `tasks` still speaks attention's status vocabulary via
-`attention/contract/attention-item-status.public.ts` until its outbound translator (6.2).
+**Waves 0–4 are done.** No boundary-lint warnings left. `tasks` still speaks attention's
+status vocabulary via `attention/contract/attention-item-status.public.ts` until its
+outbound translator (6.2).
 
 **Wave 0 is done** — jest unit/integration split, `kernel/` + `platform/`, typed
 errors, ordered events + dead letters + retention, typed jobs. Its leftovers moved:
@@ -225,20 +225,58 @@ As built:
 - Seen during the wave (pre-existing): cross-suite integration flakes (outbox claims,
   dispatcher tick after pg-boss stop, one supertest 401) — each suite passes alone.
 
-## Wave 4 — Transport adapters
+## Wave 4 — Transport adapters ✅
 
-**~2 days.** Untangles `ws.gateway.ts`.
+**~2 days.** Untangles `ws.gateway.ts`. Executed per
+[plans/wave-4-transport-adapters.md](plans/wave-4-transport-adapters.md).
 
-| #   | Step                                                                                                                               | Effort | Risk            |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------- |
-| 4.1 | `platform/realtime/realtime-broadcaster.ts`; the gateway implements it                                                             | 2h     | low             |
-| 4.2 | Move the 7 realtime `@EventHandler`s into per-context broadcasters                                                                 | 4h     | low             |
-| 4.3 | **Collapse messaging's `X`/`guestX` pairs using `Actor`**; guest capability rules move from the gateway into the application layer | 1 day  | **medium-high** |
-| 4.4 | Move the 5 `@SubscribeMessage` commands into the owning contexts, reusing REST DTOs and use cases                                  | 3h     | low             |
+| #   | Step                                                                                                                                 | Effort | Risk            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ | ------ | --------------- |
+| 4.0 | Upgrade the whole Nest stack to 11 ✅                                                                                                | 2h     | low             |
+| 4.1 | `platform/realtime/realtime-broadcaster.ts`; the gateway implements it ✅                                                            | 2h     | low             |
+| 4.2 | Move the 7 realtime `@EventHandler`s into per-context broadcasters ✅                                                                | 4h     | low             |
+| 4.3 | **Collapse messaging's `X`/`guestX` pairs using `Actor`**; guest capability rules move from the gateway into the application layer ✅ | 1 day  | **medium-high** |
+| 4.4 | Move the 5 `@SubscribeMessage` commands into the owning contexts, reusing REST DTOs and use cases ✅                                 | 3h     | low             |
 
 4.3 is the riskiest step in the plan: messaging has no direct tests. Write them first.
 Verify with a fake `RealtimeBroadcaster`, and that WS and REST reject the same invalid
 payloads identically.
+
+As built:
+
+- 4.0: Nest 11 (`common`/`core`/`platform-express`/`testing` 11.2, `swagger` 11.4, `cli`
+  11). `@All("*")` → `@All("*splat")` in `auth.controller.ts`; `main.ts` sets Express 5
+  `query parser` to `extended` (keeps `a[b]=x`).
+- 4.1: `RealtimeBroadcaster.emit(targets[], event, payload)` + `RealtimeTarget` +
+  `roomOf()` in `platform/realtime/` — one `emit` so socket.io dedupes a socket present in
+  several target rooms. `WsGateway extends RealtimeBroadcaster`; `WebsocketsModule` is
+  `@Global()` and exports only the port (`useExisting: WsGateway`). Socket auth is
+  `auth/contract/actor-authenticator.port.ts` (`ActorAuthenticator.authenticate(headers)`),
+  impl `auth/application/actor-authenticator.service.ts`; the gateway builds the header
+  bag (`handshake.auth.token` → `Bearer`). Deleted `ws-auth.service.ts`, `ws.rooms.ts`,
+  `ws.types.ts` (`Ack` → `platform/realtime/ws-ack.ts`; `USER_NOTIFICATION_EVENT` dropped).
+- 4.2: `conversations/presentation/ws/messaging.broadcaster.ts`,
+  `attention/…/ws/attention.broadcaster.ts`, `focus/…/ws/timers.broadcaster.ts`,
+  `tasks/…/ws/task-suggestions.broadcaster.ts`, each a provider in its context module.
+  Tests: `test/conversations/messaging.broadcaster.unit.test.ts`,
+  `test/focus/timers.broadcaster.unit.test.ts`.
+- 4.3: characterization suite `test/conversations/messaging.integration.test.ts` first
+  (helpers `test/helpers/messagingActors.ts`, `noopRealtimeModule.ts`). `MessagingService`
+  now exposes `send(actor, SendMessageInput)` (`application/send-message.model.ts`),
+  `tagMessage`, `updateManagedStatus`, `listMessages`, `listReplies`, `getThreadStats`,
+  `listTaggedMessages` — all on `Actor`; reads share `readableThreadId`. New exposable
+  `messaging` keys carrying the old ack strings verbatim: `thread_id_required`,
+  `guest_cannot_attach_files`, `guest_cannot_suggest_tasks`, `guest_cannot_update_status`.
+  `toAuthGuest` deleted.
+- 4.4: `conversations/presentation/ws/conversations.gateway.ts` + `dto/` (class-validator,
+  messages = old ack strings; `IsIdList` dedupes id lists). Shared WS plumbing in
+  `platform/realtime/`: `@WsCommand(event)` (= `@SubscribeMessage` + payload-only
+  `ValidationPipe` + `WsAckInterceptor`), `@WsActor()`, `WS_GATEWAY_OPTIONS`. No REST
+  equivalents exist for these commands, so no DTO sharing (the row's "reusing REST DTOs"
+  didn't apply). Tests: `test/platform/ws-ack.interceptor.unit.test.ts`,
+  `test/conversations/ws-dtos.unit.test.ts`.
+- Finish: `websockets` `warn` override and the `websockets-via-contract-only` depcruise
+  rule removed; `websockets/` imports only `auth/contract` + `platform/`.
 
 ## Wave 5 — Rich aggregates
 

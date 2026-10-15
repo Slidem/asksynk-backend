@@ -8,6 +8,7 @@ import { MessageAttentionHandler } from "@/api/attention/presentation/events/mes
 import { TagCalendarAttentionHandler } from "@/api/attention/presentation/events/tag-calendar-attention.handler";
 import { TaskAttentionHandler } from "@/api/attention/presentation/events/task-attention.handler";
 import { AttentionItemsController } from "@/api/attention/presentation/rest/attention-items.controller";
+import { AttentionBroadcaster } from "@/api/attention/presentation/ws/attention.broadcaster";
 import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
 import { SchedulingModule } from "@/api/scheduling/scheduling.module";
 import { TaggingModule } from "@/api/tagging/tagging.module";
@@ -21,6 +22,7 @@ import { TaggingModule } from "@/api/tagging/tagging.module";
     MessageAttentionHandler,
     TaskAttentionHandler,
     TagCalendarAttentionHandler,
+    AttentionBroadcaster,
   ],
   controllers: [AttentionItemsController],
 })

@@ -9,6 +9,8 @@ import { DrizzleMessagingRepository } from "@/api/conversations/infrastructure/p
 import { AttentionMessageHandler } from "@/api/conversations/presentation/events/attention-message.handler";
 import { GuestMessagingController } from "@/api/conversations/presentation/rest/guest-messaging.controller";
 import { ThreadsController } from "@/api/conversations/presentation/rest/threads.controller";
+import { ConversationsGateway } from "@/api/conversations/presentation/ws/conversations.gateway";
+import { MessagingBroadcaster } from "@/api/conversations/presentation/ws/messaging.broadcaster";
 import { FilesModule } from "@/api/files/files.module";
 import { NetworkModule } from "@/api/network/network.module";
 import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
@@ -28,11 +30,15 @@ import { TasksModule } from "@/api/tasks/tasks.module";
   providers: [
     { provide: MessagingRepository, useClass: DrizzleMessagingRepository },
     MessagingService,
-    { provide: MessageAttachmentRepository, useClass: DrizzleMessageAttachmentRepository },
+    {
+      provide: MessageAttachmentRepository,
+      useClass: DrizzleMessageAttachmentRepository,
+    },
     MessageAttachmentResolver,
     AttentionMessageHandler,
+    MessagingBroadcaster,
+    ConversationsGateway,
   ],
   controllers: [ThreadsController, GuestMessagingController],
-  exports: [MessagingService],
 })
 export class ConversationsModule {}

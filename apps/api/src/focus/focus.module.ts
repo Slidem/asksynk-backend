@@ -8,6 +8,7 @@ import { DrizzleTimersRepository } from "@/api/focus/infrastructure/persistence/
 import { TimersEventLogHandler } from "@/api/focus/presentation/events/timers.event-log.handler";
 import { TimerCompletionJobHandler } from "@/api/focus/presentation/jobs/timer-completion.job-handler";
 import { TimersController } from "@/api/focus/presentation/rest/timers.controller";
+import { TimersBroadcaster } from "@/api/focus/presentation/ws/timers.broadcaster";
 import { EventsPublisherModule } from "@/api/platform/events/publisher/events-publisher.module";
 import { JobsModule } from "@/api/platform/jobs/jobs.module";
 
@@ -19,6 +20,7 @@ import { JobsModule } from "@/api/platform/jobs/jobs.module";
     TimersService,
     TimerCompletionJobHandler,
     TimersEventLogHandler,
+    TimersBroadcaster,
   ],
   controllers: [TimersController],
 })

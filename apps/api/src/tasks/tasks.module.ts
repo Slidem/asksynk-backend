@@ -17,6 +17,7 @@ import { SuggestionSyncHandler } from "@/api/tasks/presentation/events/suggestio
 import { TaskBatchesController } from "@/api/tasks/presentation/rest/task-batches.controller";
 import { TaskSuggestionsController } from "@/api/tasks/presentation/rest/task-suggestions.controller";
 import { TasksController } from "@/api/tasks/presentation/rest/tasks.controller";
+import { TaskSuggestionsBroadcaster } from "@/api/tasks/presentation/ws/task-suggestions.broadcaster";
 
 @Module({
   imports: [NetworkModule, TaggingModule, EventsPublisherModule],
@@ -29,6 +30,7 @@ import { TasksController } from "@/api/tasks/presentation/rest/tasks.controller"
     TaskSuggestionsService,
     { provide: TaskSuggestionPort, useExisting: TaskSuggestionsService },
     SuggestionSyncHandler,
+    TaskSuggestionsBroadcaster,
   ],
   controllers: [
     TasksController,

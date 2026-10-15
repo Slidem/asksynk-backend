@@ -224,9 +224,4 @@ export default [
       ],
     },
   },
-  {
-    // websockets still reaches into feature internals until Wave 4.
-    files: ["apps/api/src/websockets/**/*.ts"],
-    rules: { "boundaries/dependencies": "warn" },
-  },
 ];

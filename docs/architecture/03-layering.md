@@ -36,8 +36,7 @@ touch repositories (already true).
 | ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Contains          | pure domain vocabulary                                                          | framework-aware shared infra                                                      |
 | Imported by       | everything, **including `domain/`**                                             | `application/`, `infrastructure/`, `presentation/` — never `domain/`              |
-| Today             | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http (incl. `http/auth/` request decorators + principal types), jobs, logger, mappers |
-| Planned additions | —                                                                               | `realtime/realtime-broadcaster.ts` (Wave 4.1)                                     |
+| Today             | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http (incl. `http/auth/` request decorators + principal types), jobs, logger, mappers, realtime (`RealtimeBroadcaster` port + WS command plumbing) |
 
 **Placement test for `kernel/` — both must be yes:** (1) it is pure, transitively;
 (2) `domain/` code actually references it. Q2 keeps `kernel/` from becoming the old
@@ -50,7 +49,7 @@ need, both halves together:
 | ----------------------------------------------------------------- | --------------------- | ----------------------------------- |
 | `TagRepository`, `AttentionItemsRepository`, …                    | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/` |
 | published ports (`CalendarOccurrencePort`, …)                     | `<ctx>/contract/`     | owning context's `infrastructure/`  |
-| `EventsPublisher`, `JobScheduler`, `Clock`, `RealtimeBroadcaster` | `platform/<area>/`    | `platform/<area>/`                  |
+| `EventsPublisher`, `JobScheduler`, `Clock`, `RealtimeBroadcaster` | `platform/<area>/`    | `platform/<area>/` (`RealtimeBroadcaster`: `websockets/ws.gateway.ts` — needs auth) |
 
 `EventsPublisher` / `JobScheduler` signatures depend on zod/platform types, and only
 the application layer calls them — aggregates _return_ what happened, the application
@@ -160,18 +159,32 @@ Transport stays in `websockets/` and implements one port:
 
 ```ts
 // platform/realtime/realtime-broadcaster.ts
+export type RealtimeTarget =
+  | { kind: "user"; id: string }
+  | { kind: "guest"; id: string }
+  | { kind: "thread"; id: string };
+
 export abstract class RealtimeBroadcaster {
-  abstract toUser(userId: string, event: string, payload: unknown): void;
-  abstract toGuest(guestId: string, event: string, payload: unknown): void;
-  abstract toThread(threadId: string, event: string, payload: unknown): void;
+  abstract emit(targets: RealtimeTarget[], event: string, payload: unknown): void;
 }
 ```
 
-Each context owns a `presentation/ws/<ctx>.broadcaster.ts` with its realtime
-`@EventHandler`s, and its own gateway for inbound commands calling the same use case
-as REST. Nest allows several `@WebSocketGateway()`s on one namespace sharing
-`socket.data`. Keep: `MessageCreated` resolves attachment URLs at emit time (signed
-URLs expire) — via the files contract.
+- **One `emit(targets[])`**, not `toUser/toGuest/toThread`: socket.io dedupes a socket
+  across rooms only within one `.to([...])`, so split calls would double-deliver.
+- `WebsocketsModule` is `@Global()` and exports only `RealtimeBroadcaster`
+  (`useExisting: WsGateway`) — contexts inject the port without importing the module
+  (→ `AuthModule`). `WsGateway` authenticates on connect via `ActorAuthenticator`
+  (`auth/contract/`), sets `socket.data.identity`, joins `user:`/`guest:` rooms.
+- Each context owns `presentation/ws/<name>.broadcaster.ts` with its realtime
+  `@EventHandler`s. `MessageCreated` resolves attachment URLs at emit time (signed URLs
+  expire) via `AttachmentCatalogPort`.
+- Inbound commands: the context's own `@WebSocketGateway(WS_GATEWAY_OPTIONS)` (several
+  gateways share one server and `socket.data`). Each handler is `@WsCommand(event)` =
+  `@SubscribeMessage` + payload-only `ValidationPipe` + `WsAckInterceptor`; the actor
+  comes from `@WsActor()` (param decorator, not a guard — guard errors bypass
+  interceptors). The interceptor maps `DomainError` → translated message, validation →
+  first message, `WsException` → its message, else `"internal_error"`, all as
+  `{ ok: false, error }`. Shared bits live in `platform/realtime/`.
 
 ## 7. Rich vs not
 
@@ -198,8 +211,8 @@ Value objects only where a rule attaches: `AnswerMode` (tagging), `RecurrenceRul
 
 `eslint-plugin-boundaries` (v7, `eslint.config.js`) for in-editor layer rules;
 `dependency-cruiser` (`apps/api/.dependency-cruiser.cjs`) for cross-context rules
-([07 §Guardrails](07-roadmap.md#guardrails)). Both run in `pnpm lint`; both `error`,
-except `websockets` (`warn` until Wave 4).
+([07 §Guardrails](07-roadmap.md#guardrails)). Both run in `pnpm lint`; both `error`
+(the `websockets` `warn` exception was removed in Wave 4).
 
 ESLint, as built:
 

@@ -32,6 +32,7 @@ import { userNetwork } from "@/migrations/schema/userNetwork";
 import { users } from "@/migrations/schema/users";
 import { googleTestConfig } from "@/test/helpers/googleTestConfig";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
+import { NoopRealtimeModule } from "@/test/helpers/noopRealtimeModule";
 import { pollUntil } from "@/test/helpers/pollUntil";
 import {
   makeTestUser,
@@ -91,6 +92,7 @@ describe("Tasks → Attention Items (integration)", () => {
         DbModule,
         TxModule,
         EventsModule,
+        NoopRealtimeModule,
         NetworkModule,
         TaggingModule,
         AttentionModule,

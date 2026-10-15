@@ -22,9 +22,11 @@ Status map: `INVALID_VALUE` 400, `FORBIDDEN` 403, `NOT_FOUND` 404, `CONFLICT` 40
 the message goes to the client only if the definition is `exposable`, otherwise
 `"A domain error occurred"`.
 
-WebSockets: the HTTP filter doesn't apply. `ws.gateway.ts` injects the translator and
-acks `{ ok: false, error: translate(e).message }` for a `DomainError`,
-`"internal_error"` otherwise.
+WebSockets: the HTTP filter doesn't apply. `@WsCommand()` handlers run
+`WsAckInterceptor` (`platform/realtime/ws-ack.interceptor.ts`), which acks
+`{ ok: false, error }`: `translate(e).message` for a `DomainError`, the first validation
+message for a `BadRequestException`, the message of a `WsException`, `"internal_error"`
+otherwise.
 
 `platform/` receives the catalogs; it never imports them, so it depends only on
 `kernel/`.

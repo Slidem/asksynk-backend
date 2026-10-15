@@ -20,7 +20,7 @@ export class AuthController {
   }
 
   @Public()
-  @All("*")
+  @All("*splat")
   async handleAuth(@Req() req: Request, @Res() res: Response) {
     return this.handler(req, res);
   }

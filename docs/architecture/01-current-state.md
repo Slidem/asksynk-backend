@@ -1,28 +1,28 @@
 # 01 — Current state
 
-Audited at `5129fc8` (2026-10-10); updated after Wave 3 (2026-10-11). Paths are relative to `apps/api/src/` unless noted.
+Audited at `5129fc8` (2026-10-10); updated after Wave 3 (2026-10-11) and Wave 4 (2026-10-15). Paths are relative to `apps/api/src/` unless noted.
 
 ## 1. Shape
 
 pnpm workspace: `apps/api` (the whole backend — HTTP, WebSockets, event consumers,
 jobs), `apps/migrations` (Drizzle schema + SQL), `scripts`. One process; no worker app.
 
-`apps/api/src`: ~21.8k LOC. `apps/api/test`: ~5.9k LOC.
+`apps/api/src`: ~22.1k LOC. `apps/api/test`: ~7.0k LOC.
 
 | Context / folder |   LOC | Notes                                                                   |
 | ---------------- | ----: | ----------------------------------------------------------------------- |
 | `scheduling`     | 4,393 | calendar + provider sync, one `SchedulingModule`                         |
-| `platform/`      | 4,018 | shared framework-aware infra (tier, not a context); incl. `http/auth/`  |
+| `platform/`      | 4,152 | shared framework-aware infra (tier, not a context); incl. `http/auth/`, `realtime/` |
 | `tasks`          | 2,433 |                                                                         |
-| `conversations`  | 2,187 | was `messaging`                                                         |
+| `conversations`  | 2,607 | was `messaging`; owns its WS gateway + broadcaster                      |
 | `attention`      | 1,755 | was `attention-items`; the core domain                                  |
 | `focus`          | 1,259 | was `timers`                                                            |
 | `sharing`        | 1,080 | was `public-views`                                                      |
 | `files`          |   928 | was `storage`                                                           |
 | `network`        |   898 | was `networks`                                                          |
 | `tagging`        |   790 |                                                                         |
-| `websockets`     |   560 | transport, not a context; `ws.gateway.ts` ~460 LOC                      |
-| `auth`           |   475 | identity (with `user-profile`, `user-settings`; merged in 8.3)          |
+| `websockets`     |   101 | transport only: auth on connect, room join, `RealtimeBroadcaster` impl  |
+| `auth`           |   539 | identity (with `user-profile`, `user-settings`; merged in 8.3)          |
 | `user-profile`   |   297 |                                                                         |
 | `events`         |   262 | dead-letter admin REST only                                             |
 | `user-settings`  |   212 |                                                                         |
@@ -45,7 +45,7 @@ contexts: `websockets`, `events`, `health`. Lint enforces it (§3.11).
   ([ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)). Published contracts:
   `TagCatalogPort`, `CalendarOccurrencePort`, `AttachmentCatalogPort` +
   `AttachmentAccessPort`, `ConnectionPolicyPort`, `PublicLinkPort`,
-  `GuestIdentityRegistry`, `TaskSuggestionPort`. **0 imports of another context's
+  `GuestIdentityRegistry`, `ActorAuthenticator`, `TaskSuggestionPort`. **0 imports of another context's
   repository.**
 - **Transactions are uniform.** `TransactionHost` + re-entrant `@Transactional()`
   everywhere. The only raw `db.transaction()` is the outbox dispatcher (by design).
@@ -60,8 +60,11 @@ contexts: `websockets`, `events`, `health`. Lint enforces it (§3.11).
   admin replay, retention. → [platform/events](../platform/events.md)
 - **Jobs.** One typed API (`defineJob`, `@JobHandler`, `@CronJob`, `JobScheduler`),
   caller-derived ids, no queue refs in domain tables. → [platform/jobs](../platform/jobs.md)
-- **WebSocket broadcasting is decoupled.** No service holds the gateway; it subscribes
-  to realtime events.
+- **Realtime is per context (Wave 4).** Each context's `presentation/ws/*.broadcaster.ts`
+  turns realtime events into `RealtimeBroadcaster.emit(targets[], …)` (port in
+  `platform/realtime/`, socket.io impl `websockets/ws.gateway.ts`, global module).
+  Inbound commands: `conversations/presentation/ws/conversations.gateway.ts`, DTO-validated,
+  errors → `{ ok: false, error }` acks via `WsAckInterceptor`.
 - **One textbook seam:** `AttachmentAccessService.register(resolver)` — `messaging`
   self-registers a resolver so `storage` never depends on it. The pattern to copy.
 - **Calendar sync design:** `calendar_event_links` with `origin: imported | mirrored`
@@ -69,9 +72,9 @@ contexts: `websockets`, `events`, `health`. Lint enforces it (§3.11).
 - **Message ↔ attention status sync**: bidirectional, loop-safe via three
   idempotency guards. Move it, don't redesign it.
 - **Test harness.** Jest `unit` (`*.unit.test.ts`, no Postgres) + `integration`
-  projects. 17 unit files, 11 integration files (attention, calendar events,
+  projects. 21 unit files, 12 integration files (attention, calendar events,
   tasks↔attention, timers, storage, jobs, dead letters, retention, guest auth,
-  guest message count).
+  guest message count, messaging).
 
 ---
 
@@ -83,13 +86,9 @@ Wave 2 removed every foreign repository import and repository export; Wave 3 pub
 `TaskSuggestionPort` and attention's status type, merged scheduling into one module, and
 moved the auth request decorators/types to `platform/http/auth/`. Every module exports
 only `contract/` classes. Contexts reach each other only through `contract/` and
-`*.module.ts` (lint `error`). What still reaches into internals — all `websockets`,
-the only boundary warnings:
-
-| Edge                            | Count | What                                                          | Fix |
-| ------------------------------- | ----: | ------------------------------------------------------------- | --- |
-| `websockets` → `conversations` |     5 | `MessagingService`, mapper, response DTO, entity, constants   | 4.x |
-| `websockets` → `auth`          |     2 | `AuthService`, `GuestAuthService`                             | 4.x |
+`*.module.ts` (lint `error`). Wave 4 removed the last offender: `websockets` now imports
+only `auth/contract/` + `platform/`; no boundary warnings remain. Exception:
+`ConversationsModule` still exports `MessagingService` (no importer left since Wave 4).
 
 `tasks` imports `AttentionItemStatus` from `attention/contract/` (legal, but tasks still
 speaks attention's vocabulary until its outbound translator, 6.2).
@@ -152,18 +151,18 @@ State machines live in services:
 See §2. Entities and the models ports need live in `domain/`; no `domain/` or
 `contract/` file imports the Drizzle schema (scheduling declares its jsonb shape types).
 
-### 3.6 `Actor` barely used
+### 3.6 `Actor` partly used
 
-`Actor` (`kernel/actor/actor.ts`) is returned by `@RequestActor()` and
-`WsAuthService.authenticateSocket`; built from `AuthUser` / `AuthGuest` in
+`Actor` (`kernel/actor/actor.ts`) is returned by `@RequestActor()`, `@WsActor()` and
+`ActorAuthenticator.authenticate`; built from `AuthUser` / `AuthGuest` in
 `platform/http/auth/actor.mapper.ts`. Takers: `ConnectionPolicyPort.resolveTargetUserId`,
-`TagsService.listTags`, `CalendarEventsService.listCalendarEvents`,
-`MessagingService.canAccessThread`. ~74 service methods still take a bare
-`userId: string`. `conversations/application/messaging.service.ts` duplicates methods in `X` / `guestX` pairs
-(`sendAsUser`/`sendAsGuest`, `getThreadStats`/`getGuestThreadStats`, …) taking
-`AuthGuest`; the gateway bridges via `toAuthGuest`.
-Guest capability rules ("guests cannot attach files / suggest tasks / update status")
-live only in `ws.gateway.ts`, so REST and WS can disagree.
+`TagsService.listTags`, `CalendarEventsService.listCalendarEvents`, and messaging's
+public surface (`send`, `tagMessage`, `updateManagedStatus`, `listMessages`,
+`listReplies`, `getThreadStats`, `listTaggedMessages`, `canAccessThread` — the `X` /
+`guestX` pairs collapsed in 4.3). Guest capability rules ("guests cannot attach files /
+suggest tasks / update status") live in `MessagingService` as `messaging` catalog errors.
+Still on a bare `userId: string`: ~70 service methods, including
+`MessagingService.listThreadsForUser` and `createOrGetUserThread`.
 
 ### 3.7 Contracts live outside their contexts
 
@@ -184,10 +183,11 @@ whatsapp_message | suggested_timeblock | suggested_task | task` — three values
 
 Design for the fix: [06-attention-core.md](06-attention-core.md).
 
-### 3.9 `ws.gateway.ts` does three jobs
+### 3.9 ~~`ws.gateway.ts` does three jobs~~ — split in Wave 4
 
-Transport + auth; 5 `@SubscribeMessage` commands (`message.send` duplicates the REST
-path); 7 realtime `@EventHandler`s spanning messaging, timers, attention, tasks.
+`websockets/ws.gateway.ts` is transport only (auth on connect, user/guest room join,
+`emit`). The 5 commands moved to `ConversationsGateway`, the 7 realtime handlers to 4
+per-context broadcasters.
 
 ### 3.10 Inverted / cyclic module deps
 
@@ -201,8 +201,8 @@ path); 7 realtime `@EventHandler`s spanning messaging, timers, attention, tasks.
 `pnpm lint` runs ESLint (`eslint-plugin-boundaries` v7 layer rules, `no-restricted-imports`
 for relative/`src/*` imports) and `pnpm lint:boundaries` (dependency-cruiser:
 cross-context, foreign repository, infrastructure/presentation direction, kernel/platform
-isolation, no Drizzle schema in domain, no barrels, no cycles). All `error`; `websockets`
-`warn` until Wave 4. `schema-ownership` waits for 7.3. → [03 §8](03-layering.md#8-enforcement-wave-3)
+isolation, no Drizzle schema in domain, no barrels, no cycles). All `error`, no
+exceptions since Wave 4. `schema-ownership` waits for 7.3. → [03 §8](03-layering.md#8-enforcement-wave-3)
 
 ---
 
@@ -225,8 +225,10 @@ duplicates) are listed in [platform/events §Known gaps](../platform/events.md#k
 
 ## 5. Untested
 
-`conversations` (only indirectly via the attention suite), `websockets`, sharing
-services beyond guest sign-in, `network`, `user-profile`, `user-settings`,
-calendar provider sync/OAuth, the auth guard's user-session path (better-auth
-is ESM Jest can't load). Covered since Wave 2: guest sign-in + `AuthGuard` guest path,
-`TagCatalogPort`, `assertUsable`, recurring/exception occurrences, guest message count.
+The socket transport end to end (`WsGateway` connect/auth/rooms; no `socket.io-client`
+— covered by manual smoke), sharing services beyond guest sign-in, `network`,
+`user-profile`, `user-settings`, calendar provider sync/OAuth, the auth guard's
+user-session path (better-auth is ESM Jest can't load). Covered since Wave 2: guest
+sign-in + `AuthGuard` guest path, `TagCatalogPort`, `assertUsable`,
+recurring/exception occurrences, guest message count. Since Wave 4: `MessagingService`
+(characterization suite), broadcasters, WS DTO ack strings, `WsAckInterceptor`.

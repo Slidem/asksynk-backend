@@ -15,14 +15,3 @@ export const guestActor = (guest: AuthGuest): Actor => ({
   displayName: guest.displayName,
   expiresAt: guest.expiresAt,
 });
-
-/** Temporary bridge for messaging's guestX methods until they take `Actor` (roadmap 4.3). */
-export const toAuthGuest = (
-  actor: Extract<Actor, { kind: "guest" }>,
-): AuthGuest => ({
-  id: actor.guestId,
-  publicViewId: actor.publicViewId,
-  ownerUserId: actor.ownerUserId,
-  displayName: actor.displayName,
-  expiresAt: actor.expiresAt,
-});

@@ -42,6 +42,32 @@ const { catalog, createError } = defineCatalog("messaging", {
     exposable: true,
     message: "Thread with id { threadId } is frozen and cannot be updated",
   },
+  guest_cannot_list_threads: {
+    category: DomainErrorCategory.FORBIDDEN,
+    exposable: true,
+    message: "Guests cannot list threads",
+  },
+  // Messages below are realtime ack strings clients match on — keep verbatim.
+  thread_id_required: {
+    category: DomainErrorCategory.INVALID_VALUE,
+    exposable: true,
+    message: "threadId required",
+  },
+  guest_cannot_attach_files: {
+    category: DomainErrorCategory.FORBIDDEN,
+    exposable: true,
+    message: "Guests cannot attach files",
+  },
+  guest_cannot_suggest_tasks: {
+    category: DomainErrorCategory.FORBIDDEN,
+    exposable: true,
+    message: "Guests cannot suggest tasks",
+  },
+  guest_cannot_update_status: {
+    category: DomainErrorCategory.FORBIDDEN,
+    exposable: true,
+    message: "forbidden",
+  },
 });
 
 export const messagingCatalog = catalog;

@@ -17,20 +17,11 @@ module.exports = {
       severity: "error",
       from: {
         path: "^src/([^/]+)/",
-        pathNot: ["\\.module\\.ts$", "^src/websockets/"],
+        pathNot: "\\.module\\.ts$",
       },
       to: {
         path: "^src/(?!kernel/|platform/)([^/]+)/(?!contract/)",
         pathNot: "^src/$1/",
-      },
-    },
-    {
-      // Same rule; websockets still reaches into feature internals until Wave 4.
-      name: "websockets-via-contract-only",
-      severity: "warn",
-      from: { path: "^src/websockets/", pathNot: "\\.module\\.ts$" },
-      to: {
-        path: "^src/(?!kernel/|platform/|websockets/)[^/]+/(?!contract/)",
       },
     },
     {

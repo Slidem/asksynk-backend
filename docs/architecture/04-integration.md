@@ -116,12 +116,13 @@ export abstract class GuestIdentityProvider {
 
 `StorageModule` stops being `@Global` and exporting its repository.
 
-### F — the WebSocket gateway inverts (Wave 4)
+### F — the WebSocket gateway inverts (Wave 4 ✅)
 
-`ws.gateway.ts` imports `MessagingService`, `AttachmentsService`,
+`ws.gateway.ts` imported `MessagingService`, `AttachmentsService`,
 `TaskSuggestionPayload`, `MANAGED_MESSAGE_STATUSES`, `MessageResponseDto`,
-`MAX_ATTACHMENTS_PER_MESSAGE`, `toAttachmentResponse`. After Wave 4 it imports no
-feature code. Design: [03 §6](03-layering.md#6-wsgatewayts-split-wave-4).
+`MAX_ATTACHMENTS_PER_MESSAGE`, `toAttachmentResponse`. Now it imports no feature code —
+only `ActorAuthenticator` (`auth/contract/`) and `platform/`. Design:
+[03 §6](03-layering.md#6-wsgatewayts-split-wave-4).
 
 ### G — stays, deliberately
 
@@ -136,8 +137,8 @@ feature code. Design: [03 §6](03-layering.md#6-wsgatewayts-split-wave-4).
 
 ## 3. `Actor`
 
-One identity shape for HTTP and WS (`@RequestActor()`, `WsAuthService`); still to
-replace the ad-hoc `AuthGuest` handling in messaging.
+One identity shape for HTTP and WS (`@RequestActor()`, `@WsActor()`, resolved on
+connect by `ActorAuthenticator`). Messaging's `AuthGuest` handling was replaced in 4.3.
 
 ```ts
 // kernel/actor/actor.ts

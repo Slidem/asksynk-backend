@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
 
+import { SendMessageInput } from "@/api/conversations/application/send-message.model";
 import { messagingError } from "@/api/conversations/conversations.errors";
 import {
   ManagedMessageStatus,
@@ -26,13 +27,9 @@ import {
   MessageManagedStatusChanged,
   MessageUpdated,
 } from "@/api/platform/events/registry/events.registry";
-import { AuthGuest } from "@/api/platform/http/auth/auth.types";
 import { PublicLinkPort } from "@/api/sharing/contract/public-link.port";
 import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
-import {
-  TaskSuggestionPayload,
-  TaskSuggestionPort,
-} from "@/api/tasks/contract/task-suggestion.port";
+import { TaskSuggestionPort } from "@/api/tasks/contract/task-suggestion.port";
 
 const MAX_MESSAGE_LIMIT = 100;
 
@@ -48,7 +45,11 @@ export class MessagingService {
     private readonly taskSuggestions: TaskSuggestionPort,
   ) {}
 
-  async listThreadsForUser(userId: string): Promise<ThreadListItem[]> {
+  async listThreads(actor: Actor): Promise<ThreadListItem[]> {
+    if (actor.kind === "guest") {
+      throw messagingError("guest_cannot_list_threads");
+    }
+    const userId = actor.userId;
     const rows = await this.messagingRepository.listThreadsForUser(userId);
 
     const otherUserIds: string[] = [];
@@ -90,76 +91,70 @@ export class MessagingService {
     });
   }
 
-  async listThreadMessages(
-    userId: string,
-    threadId: string,
+  async listMessages(
+    actor: Actor,
+    threadId: string | null,
     options: { before?: Date; limit?: number },
   ): Promise<ThreadMessageListItem[]> {
-    await this.assertUserParticipant(threadId, userId);
-    return this.messagingRepository.listMessages(threadId, this.paged(options));
+    const readableId = await this.readableThreadId(actor, threadId);
+    if (!readableId) return [];
+    return this.messagingRepository.listMessages(
+      readableId,
+      this.paged(options),
+    );
   }
 
-  async listGuestThreadMessages(
-    guest: AuthGuest,
-    options: { before?: Date; limit?: number },
-  ): Promise<ThreadMessageListItem[]> {
-    const threadId = await this.resolveGuestThreadId(guest.id);
-    if (!threadId) return [];
-    return this.messagingRepository.listMessages(threadId, this.paged(options));
-  }
-
-  async listThreadMessageReplies(
-    userId: string,
-    threadId: string,
+  async listReplies(
+    actor: Actor,
+    threadId: string | null,
     messageId: string,
     options: { before?: Date; limit?: number },
   ): Promise<Message[]> {
-    await this.assertUserParticipant(threadId, userId);
-    await this.assertReplyParent(threadId, messageId);
-    return this.messagingRepository.listReplies(messageId, this.paged(options));
-  }
-
-  async listGuestMessageReplies(
-    guest: AuthGuest,
-    messageId: string,
-    options: { before?: Date; limit?: number },
-  ): Promise<Message[]> {
-    const threadId = await this.resolveGuestThreadId(guest.id);
-    if (!threadId) {
+    const readableId = await this.readableThreadId(actor, threadId);
+    if (!readableId) {
       throw messagingError("message_not_found_for_thread", {
         messageId,
-        threadId,
+        threadId: readableId,
       });
     }
-    await this.assertReplyParent(threadId, messageId);
+    await this.assertReplyParent(readableId, messageId);
     return this.messagingRepository.listReplies(messageId, this.paged(options));
   }
 
-  async getThreadStats(userId: string, threadId: string): Promise<ThreadStats> {
-    await this.assertUserParticipant(threadId, userId);
-    return this.messagingRepository.countManagedStatuses(threadId);
+  async getThreadStats(
+    actor: Actor,
+    threadId: string | null,
+  ): Promise<ThreadStats> {
+    const readableId = await this.readableThreadId(actor, threadId);
+    if (!readableId) return { created: 0, inProgress: 0, resolved: 0 };
+    return this.messagingRepository.countManagedStatuses(readableId);
   }
 
-  async getGuestThreadStats(guest: AuthGuest): Promise<ThreadStats> {
-    const threadId = await this.resolveGuestThreadId(guest.id);
-    if (!threadId) return { created: 0, inProgress: 0, resolved: 0 };
-    return this.messagingRepository.countManagedStatuses(threadId);
-  }
-
-  async listThreadTaggedMessages(
-    userId: string,
-    threadId: string,
+  async listTaggedMessages(
+    actor: Actor,
+    threadId: string | null,
   ): Promise<ThreadMessageListItem[]> {
-    await this.assertUserParticipant(threadId, userId);
-    return this.messagingRepository.listTaggedMessages(threadId);
+    const readableId = await this.readableThreadId(actor, threadId);
+    if (!readableId) return [];
+    return this.messagingRepository.listTaggedMessages(readableId);
   }
 
-  async listGuestThreadTaggedMessages(
-    guest: AuthGuest,
-  ): Promise<ThreadMessageListItem[]> {
-    const threadId = await this.resolveGuestThreadId(guest.id);
-    if (!threadId) return [];
-    return this.messagingRepository.listTaggedMessages(threadId);
+  /**
+   * The thread `actor` may read. Users: `threadId`, if they participate. Guests: their
+   * own thread (`threadId` ignored), or null before their first message.
+   */
+  private async readableThreadId(
+    actor: Actor,
+    threadId: string | null,
+  ): Promise<string | null> {
+    if (actor.kind === "guest") {
+      return this.resolveGuestThreadId(actor.guestId);
+    }
+    if (!threadId) {
+      throw messagingError("thread_id_required");
+    }
+    await this.assertUserParticipant(threadId, actor.userId);
+    return threadId;
   }
 
   private paged(options: { before?: Date; limit?: number }) {
@@ -212,9 +207,15 @@ export class MessagingService {
 
   @Transactional()
   async createOrGetUserThread(
-    userId: string,
+    actor: Actor,
     recipientUserId: string,
   ): Promise<Thread> {
+    if (actor.kind === "guest") {
+      throw messagingError("cannot_start_thread", {
+        reason: "Guests cannot start threads",
+      });
+    }
+    const userId = actor.userId;
     if (userId === recipientUserId) {
       throw messagingError("cannot_start_thread", {
         reason: "Cannot start a thread with yourself",
@@ -251,15 +252,38 @@ export class MessagingService {
     return thread;
   }
 
+  /**
+   * Users post to a thread they participate in; guests post to their own thread
+   * (created on first message) and cannot attach files or suggest tasks.
+   */
   @Transactional()
-  async sendAsUser(
+  async send(actor: Actor, input: SendMessageInput): Promise<Message> {
+    if (actor.kind === "guest") {
+      if (input.attachmentIds.length > 0) {
+        throw messagingError("guest_cannot_attach_files");
+      }
+      if (input.taskSuggestion) {
+        throw messagingError("guest_cannot_suggest_tasks");
+      }
+      return this.sendAsGuest(actor, input);
+    }
+
+    if (!input.threadId) {
+      throw messagingError("thread_id_required");
+    }
+    return this.sendAsUser(actor.userId, input.threadId, input);
+  }
+
+  private async sendAsUser(
     senderUserId: string,
     threadId: string,
-    body: string,
-    tagIds: string[],
-    parentMessageId?: string | null,
-    attachmentIds: string[] = [],
-    taskSuggestion?: TaskSuggestionPayload | null,
+    {
+      body,
+      tagIds,
+      parentMessageId,
+      attachmentIds,
+      taskSuggestion,
+    }: SendMessageInput,
   ): Promise<Message> {
     const thread = await this.messagingRepository.getThread(threadId);
 
@@ -337,19 +361,16 @@ export class MessagingService {
     return message;
   }
 
-  @Transactional()
-  async sendAsGuest(
-    guest: AuthGuest,
-    body: string,
-    tagIds: string[],
-    parentMessageId?: string | null,
+  private async sendAsGuest(
+    guest: Extract<Actor, { kind: "guest" }>,
+    { body, tagIds, parentMessageId }: SendMessageInput,
   ): Promise<Message> {
     // Guest tags the owner's own tags — they drive the owner's attention item.
     if (tagIds.length > 0) {
       await this.tagCatalog.assertOwnedBy(guest.ownerUserId, tagIds);
     }
 
-    let thread = await this.messagingRepository.findGuestThread(guest.id);
+    let thread = await this.messagingRepository.findGuestThread(guest.guestId);
     if (!thread) {
       thread = await this.messagingRepository.insertThread({
         id: generateId(),
@@ -357,7 +378,7 @@ export class MessagingService {
       });
       await this.messagingRepository.insertParticipants([
         { threadId: thread.id, userId: guest.ownerUserId, guestId: null },
-        { threadId: thread.id, userId: null, guestId: guest.id },
+        { threadId: thread.id, userId: null, guestId: guest.guestId },
       ]);
     }
 
@@ -369,7 +390,7 @@ export class MessagingService {
       id: generateId(),
       threadId: thread.id,
       parentMessageId: parentMessageId ?? null,
-      sender: { kind: "guest", guestId: guest.id },
+      sender: { kind: "guest", guestId: guest.guestId },
       body,
       tagIds,
       managedStatus: this.initialManagedStatus(tagIds),
@@ -386,6 +407,16 @@ export class MessagingService {
 
   @Transactional()
   async tagMessage(
+    actor: Actor,
+    messageId: string,
+    tagIds: string[],
+  ): Promise<Message> {
+    return actor.kind === "guest"
+      ? this.tagMessageAsGuest(actor, messageId, tagIds)
+      : this.tagMessageAsUser(actor.userId, messageId, tagIds);
+  }
+
+  private async tagMessageAsUser(
     callerUserId: string,
     messageId: string,
     tagIds: string[],
@@ -439,9 +470,8 @@ export class MessagingService {
     return updated;
   }
 
-  @Transactional()
-  async tagMessageAsGuest(
-    guest: AuthGuest,
+  private async tagMessageAsGuest(
+    guest: Extract<Actor, { kind: "guest" }>,
     messageId: string,
     tagIds: string[],
   ): Promise<Message> {
@@ -452,7 +482,9 @@ export class MessagingService {
       });
     }
 
-    const thread = await this.messagingRepository.findGuestThread(guest.id);
+    const thread = await this.messagingRepository.findGuestThread(
+      guest.guestId,
+    );
     if (!thread || thread.id !== message.threadId) {
       throw messagingError("thread_not_found", {
         threadId: message.threadId,
@@ -463,7 +495,7 @@ export class MessagingService {
     // attention-item recipient in a guest thread.
     if (
       message.sender.kind !== "guest" ||
-      message.sender.guestId !== guest.id
+      message.sender.guestId !== guest.guestId
     ) {
       throw messagingError("cannot_tag_message", {
         reason: "Guests can only tag their own messages in a guest thread",
@@ -498,10 +530,15 @@ export class MessagingService {
    */
   @Transactional()
   async updateManagedStatus(
-    userId: string,
+    actor: Actor,
     messageId: string,
     status: ManagedMessageStatus,
   ): Promise<Message> {
+    // Guests are never recipients of a managed message.
+    if (actor.kind === "guest") {
+      throw messagingError("guest_cannot_update_status");
+    }
+    const userId = actor.userId;
     const message = await this.messagingRepository.getMessageById(messageId);
     if (!message) {
       throw messagingError("message_not_found", {

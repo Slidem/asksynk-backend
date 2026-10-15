@@ -20,10 +20,10 @@ import {
   ThreadStatsResponseDto,
 } from "@/api/conversations/presentation/rest/responses/thread.response";
 import { AttachmentCatalogPort } from "@/api/files/contract/attachment-catalog.port";
+import { Actor } from "@/api/kernel/actor/actor";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
-import { AuthUser as AuthUserType } from "@/api/platform/http/auth/auth.types";
-import { AuthUser } from "@/api/platform/http/auth/auth-user.decorator";
+import { RequestActor } from "@/api/platform/http/auth/request-actor.decorator";
 
 @ApiTags("Threads")
 @ApiBearerAuth("bearer")
@@ -38,9 +38,9 @@ export class ThreadsController {
   /** List the current user's threads */
   @Get()
   async list(
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadListItemResponseDto[]> {
-    const items = await this.messagingService.listThreadsForUser(user.id);
+    const items = await this.messagingService.listThreads(actor);
     return items.map(toThreadListItemResponseDto);
   }
 
@@ -48,10 +48,10 @@ export class ThreadsController {
   @Post()
   async createOrGet(
     @Body() dto: CreateThreadRequestDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<CreateThreadResponseDto> {
     const thread = await this.messagingService.createOrGetUserThread(
-      user.id,
+      actor,
       dto.recipientUserId,
     );
     return { threadId: thread.id };
@@ -61,19 +61,19 @@ export class ThreadsController {
   @Get(":id/stats")
   async getStats(
     @UuidV7Param("id") threadId: string,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadStatsResponseDto> {
-    return this.messagingService.getThreadStats(user.id, threadId);
+    return this.messagingService.getThreadStats(actor, threadId);
   }
 
   /** List all tagged messages in a thread (not paginated) */
   @Get(":id/tagged-messages")
   async listTaggedMessages(
     @UuidV7Param("id") threadId: string,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadMessageResponseDto[]> {
-    const items = await this.messagingService.listThreadTaggedMessages(
-      user.id,
+    const items = await this.messagingService.listTaggedMessages(
+      actor,
       threadId,
     );
     const attachmentsByMessage = await resolveAttachmentsByMessage(
@@ -93,16 +93,12 @@ export class ThreadsController {
   async listMessages(
     @UuidV7Param("id") threadId: string,
     @Query() query: ListMessagesQueryDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<ThreadMessageResponseDto[]> {
-    const items = await this.messagingService.listThreadMessages(
-      user.id,
-      threadId,
-      {
-        before: query.before ? new Date(query.before) : undefined,
-        limit: query.limit,
-      },
-    );
+    const items = await this.messagingService.listMessages(actor, threadId, {
+      before: query.before ? new Date(query.before) : undefined,
+      limit: query.limit,
+    });
 
     const attachmentsByMessage = await resolveAttachmentsByMessage(
       this.attachmentCatalog,
@@ -123,10 +119,10 @@ export class ThreadsController {
     @UuidV7Param("id") threadId: string,
     @UuidV7Param("messageId") messageId: string,
     @Query() query: ListMessagesQueryDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<MessageResponseDto[]> {
-    const replies = await this.messagingService.listThreadMessageReplies(
-      user.id,
+    const replies = await this.messagingService.listReplies(
+      actor,
       threadId,
       messageId,
       {

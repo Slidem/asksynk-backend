@@ -58,7 +58,8 @@ bootstrap (`EventHandlersRegistry`); there is no registration step.
 | `timer-event-log` | `timers/timer-event-log.consumer-group.ts`              | `user:<userId>`                                                                                    | `timer.lifecycle`                                                       |
 | `public-views`    | `public-views/public-views.consumer-group.ts`           | `sender:<message.senderId>`                                                                        | `message.created` (guest-message-count: `public_view_guests.message_count`) |
 
-Realtime handlers all live in `websockets/ws.gateway.ts` (7; moves per context in Wave 4).
+Realtime handlers live per context in `<ctx>/presentation/ws/*.broadcaster.ts` (7 across
+`conversations`, `attention`, `focus`, `tasks`) and emit via `RealtimeBroadcaster`.
 
 ### Rules when adding an event or handler
 

@@ -21,6 +21,7 @@ import { AuthUser } from "@/api/platform/http/auth/auth.types";
 import { users } from "@/migrations/schema/users";
 import { userTimerEvents } from "@/migrations/schema/userTimerEvents";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
+import { NoopRealtimeModule } from "@/test/helpers/noopRealtimeModule";
 import { pollUntil } from "@/test/helpers/pollUntil";
 import {
   makeTestUser,
@@ -73,6 +74,7 @@ describe("Timers (integration)", () => {
         DbModule,
         TxModule,
         EventsModule,
+        NoopRealtimeModule,
         FocusModule,
         ErrorsModule.forRoot(ERROR_CATALOGUES),
       ],
