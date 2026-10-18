@@ -22,6 +22,11 @@ const { catalog, createError } = defineCatalog("timers", {
     exposable: true,
     message: "No active timer",
   },
+  guest_not_allowed: {
+    category: DomainErrorCategory.FORBIDDEN,
+    exposable: true,
+    message: "Guests can't use timers",
+  },
   invalid_session_input: {
     category: DomainErrorCategory.INVALID_VALUE,
     exposable: true,

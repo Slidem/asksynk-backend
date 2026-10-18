@@ -12,10 +12,10 @@ import {
   toTimerResponse,
   toTimerSettingsResponse,
 } from "@/api/focus/presentation/rest/timers.mapper";
+import { Actor } from "@/api/kernel/actor/actor";
 import { Clock } from "@/api/platform/clock/clock";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
-import { AuthUser as AuthUserType } from "@/api/platform/http/auth/auth.types";
-import { AuthUser } from "@/api/platform/http/auth/auth-user.decorator";
+import { RequestActor } from "@/api/platform/http/auth/request-actor.decorator";
 
 @ApiTags("Timers")
 @ApiBearerAuth("bearer")
@@ -29,8 +29,8 @@ export class TimersController {
 
   /** Get the current user's timer */
   @Get()
-  async getCurrent(@AuthUser() user: AuthUserType): Promise<TimerResponse> {
-    const timer = await this.timersService.getCurrent(user.id);
+  async getCurrent(@RequestActor() actor: Actor): Promise<TimerResponse> {
+    const timer = await this.timersService.getCurrent(actor);
     return toTimerResponse(timer, this.clock.now());
   }
 
@@ -38,22 +38,23 @@ export class TimersController {
   @Patch()
   async transition(
     @Body() body: PatchTimerDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<TimerResponse> {
-    const timer = await this.timersService.applyTransition(user.id, {
+    const timer = await this.timersService.applyTransition(actor, {
       status: body.status,
       sessionType: body.sessionType,
       durationSeconds: body.durationSeconds,
     });
+
     return toTimerResponse(timer, this.clock.now());
   }
 
   /** Get the current user's timer settings */
   @Get("settings")
   async getSettings(
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<TimerSettingsResponse> {
-    const settings = await this.timersService.getSettings(user.id);
+    const settings = await this.timersService.getSettings(actor);
     return toTimerSettingsResponse(settings);
   }
 
@@ -61,9 +62,9 @@ export class TimersController {
   @Put("settings")
   async updateSettings(
     @Body() body: UpdateTimerSettingsDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<TimerSettingsResponse> {
-    const settings = await this.timersService.updateSettings(user.id, {
+    const settings = await this.timersService.updateSettings(actor, {
       focusDurationSeconds: body.focusDurationSeconds,
       shortBreakDurationSeconds: body.shortBreakDurationSeconds,
       longBreakDurationSeconds: body.longBreakDurationSeconds,
@@ -75,9 +76,9 @@ export class TimersController {
   /** Get a break suggestion based on completed focus sessions */
   @Get("suggestion")
   async getSuggestion(
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<BreakSuggestionResponse> {
-    const suggestion = await this.timersService.getSuggestion(user.id);
+    const suggestion = await this.timersService.getSuggestion(actor);
     return toBreakSuggestionResponse(suggestion);
   }
 }

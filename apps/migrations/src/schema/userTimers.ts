@@ -42,6 +42,7 @@ export const userTimers = pgTable(
     completedFocusSessions: integer("completed_focus_sessions")
       .notNull()
       .default(0),
+    version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

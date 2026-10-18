@@ -12,9 +12,10 @@ export const TIMER_SESSION_TYPES = [
   "short_break",
   "long_break",
 ] as const;
+
 export type TimerSessionType = (typeof TIMER_SESSION_TYPES)[number];
 
-export type TimerEventType =
+export type TimerTransition =
   | "started"
   | "paused"
   | "resumed"

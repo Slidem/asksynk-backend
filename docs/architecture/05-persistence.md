@@ -13,7 +13,7 @@ Repositories return aggregates; queries return views.
 | `scheduling`    | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
 | `conversations` | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
 | `tasks`         | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
-| `focus`         | `user_timers`, `user_timer_settings`, `user_timer_events`                                                                           |
+| `focus`         | `user_timers`, `user_timer_settings`, `user_timer_log`                                                                              |
 | `network`       | `user_invites`, `user_network`                                                                                                      |
 | `sharing`       | `public_views`, `public_view_guests`                                                                                                |
 | `files`         | `attachments`                                                                                                                       |

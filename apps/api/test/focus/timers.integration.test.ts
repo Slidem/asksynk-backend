@@ -4,22 +4,26 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { Test, TestingModule } from "@nestjs/testing";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import * as dotenv from "dotenv";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import * as path from "path";
 import request from "supertest";
 
 import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
+import { TimersRepository } from "@/api/focus/domain/ports/timers.repository";
 import { FocusModule } from "@/api/focus/focus.module";
 import { Clock } from "@/api/platform/clock/clock";
 import { ClockModule } from "@/api/platform/clock/clock.module";
 import { DB_CLIENT_PROVIDER, DbModule } from "@/api/platform/db/db.module";
-import { TxModule } from "@/api/platform/db/tx.module";
+import { TxAdapter, TxModule } from "@/api/platform/db/tx.module";
 import { ErrorsModule } from "@/api/platform/errors/errors.module";
 import { AuthUser } from "@/api/platform/http/auth/auth.types";
+import { eventsOutbox } from "@/migrations/schema/outbox";
 import { users } from "@/migrations/schema/users";
-import { userTimerEvents } from "@/migrations/schema/userTimerEvents";
+import { userTimerLog } from "@/migrations/schema/userTimerLog";
+import { userTimers } from "@/migrations/schema/userTimers";
 import { MockAuthGuard } from "@/test/helpers/mockAuthGuard";
 import { NoopRealtimeModule } from "@/test/helpers/noopRealtimeModule";
 import { pollUntil } from "@/test/helpers/pollUntil";
@@ -59,6 +63,8 @@ interface TimerResponse {
 describe("Timers (integration)", () => {
   let app: INestApplication;
   let db: ReturnType<typeof import("drizzle-orm/node-postgres").drizzle>;
+  let txHost: TransactionHost<TxAdapter>;
+  let timersRepo: TimersRepository;
   const clock = new FakeClock();
   // Every user created across the suite; deleted together in afterAll.
   const createdUserIds: string[] = [];
@@ -89,6 +95,8 @@ describe("Timers (integration)", () => {
     await app.init();
 
     db = module.get(DB_CLIENT_PROVIDER);
+    txHost = module.get(TransactionHost);
+    timersRepo = module.get(TimersRepository);
   });
 
   afterAll(async () => {
@@ -169,17 +177,17 @@ describe("Timers (integration)", () => {
     async function eventCount(eventType: string): Promise<number> {
       const rows = await db
         .select()
-        .from(userTimerEvents)
+        .from(userTimerLog)
         .where(
           and(
-            eq(userTimerEvents.userId, user.id),
-            eq(userTimerEvents.eventType, eventType as never),
+            eq(userTimerLog.userId, user.id),
+            eq(userTimerLog.transition, eventType as never),
           ),
         );
       return rows.length;
     }
 
-    // Event-log rows are persisted asynchronously by a durable consumer.
+    // Timer-log rows are persisted asynchronously by a durable consumer.
     async function awaitEventCount(
       eventType: string,
       expected: number,
@@ -481,5 +489,53 @@ describe("Timers (integration)", () => {
     const timer = await getTimer();
     expect(timer.status).toBe("running");
     expect(timer.remainingSeconds).toBe(1500);
+  });
+
+  it("rejects saving a stale version with concurrency_conflict", async () => {
+    const { user } = await createUserCtx();
+    const now = clock.now();
+
+    await expect(
+      txHost.withTransaction(async () => {
+        const first = await timersRepo.ensure(user.id);
+        const stale = await timersRepo.ensure(user.id);
+        first.start({ sessionType: "focus", durationSeconds: 60 }, now);
+        await timersRepo.save(first);
+        stale.start({ sessionType: "short_break", durationSeconds: 60 }, now);
+        await timersRepo.save(stale);
+      }),
+    ).rejects.toMatchObject({ code: "core.concurrency_conflict" });
+  });
+
+  it("rolls back state and outbox events together", async () => {
+    const { user } = await createUserCtx();
+    const now = clock.now();
+    await txHost.withTransaction(() => timersRepo.ensure(user.id));
+
+    await expect(
+      txHost.withTransaction(async () => {
+        const timer = await timersRepo.ensure(user.id);
+        timer.start({ sessionType: "focus", durationSeconds: 60 }, now);
+        await timersRepo.save(timer);
+        throw new Error("rollback");
+      }),
+    ).rejects.toThrow("rollback");
+
+    const [row] = await db
+      .select()
+      .from(userTimers)
+      .where(eq(userTimers.userId, user.id));
+    expect(row).toMatchObject({ status: "idle", version: 1 });
+
+    const outboxRows = await db
+      .select({ id: eventsOutbox.id })
+      .from(eventsOutbox)
+      .where(
+        and(
+          eq(eventsOutbox.eventType, "timer.lifecycle"),
+          sql`${eventsOutbox.payload}->>'userId' = ${user.id}`,
+        ),
+      );
+    expect(outboxRows).toHaveLength(0);
   });
 });

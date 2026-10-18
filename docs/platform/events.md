@@ -56,7 +56,7 @@ bootstrap (`EventHandlersRegistry`); there is no registration step.
 | `suggestion-sync` | `tasks/presentation/events/suggestion-sync.consumer-group.ts` | `assignee:<assigneeUserId>`                                                                        | `task.upserted`, `task.batch.upserted` (`suggestion-sync.handler`)        |
 | `calendar-sync`   | `scheduling/presentation/events/calendar-sync.consumer-group.ts` | `<userId>`                                                                                         | `calendar.event.*` (calendar-sync.event-handler)                        |
 | `messaging`       | `conversations/presentation/events/messaging.consumer-group.ts` | `<messageId>`                                                                              | `attention.message.synced` (`attention-message.handler`)                |
-| `timer-event-log` | `focus/presentation/events/timer-event-log.consumer-group.ts` | `user:<userId>`                                                                              | `timer.lifecycle` (`timers.event-log.handler`)                          |
+| `timer-log`       | `focus/presentation/events/timer-log.consumer-group.ts`       | `user:<userId>`                                                                              | `timer.lifecycle` (`timer-log.handler`)                          |
 | `public-views`    | `sharing/presentation/events/public-views.consumer-group.ts` | `sender:<message.senderId>`                                                                        | `message.created` (`guest-message-count.handler`: `public_view_guests.message_count`) |
 
 Realtime handlers live per context in `<ctx>/presentation/ws/*.broadcaster.ts` (7 across

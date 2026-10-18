@@ -1,30 +1,28 @@
 import { Injectable } from "@nestjs/common";
-import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { Transactional, TransactionHost } from "@nestjs-cls/transactional";
+import { and, eq, sql } from "drizzle-orm";
 
-import {
-  AppendEventInput,
-  StartInput,
-  TimersRepository,
-} from "@/api/focus/domain/ports/timers.repository";
+import { TimersRepository } from "@/api/focus/domain/ports/timers.repository";
 import { Timer } from "@/api/focus/domain/timer";
-import {
-  TimerSessionType,
-  TimerStatus,
-} from "@/api/focus/domain/timer.model";
+import { TimerSessionType, TimerStatus } from "@/api/focus/domain/timer.model";
+import { toTimerLifecyclePayload } from "@/api/focus/infrastructure/persistence/timer-events.mapper";
+import { concurrencyConflictError } from "@/api/kernel/errors/kernel.errors";
 import { TxAdapter } from "@/api/platform/db/tx.module";
-import { userTimerEvents } from "@/migrations/schema/userTimerEvents";
+import { EventsPublisher } from "@/api/platform/events/publisher/events-publisher";
+import { TimerLifecycle } from "@/api/platform/events/registry/events.registry";
 import { userTimers } from "@/migrations/schema/userTimers";
 
 type TimerRow = typeof userTimers.$inferSelect;
 
 @Injectable()
 export class DrizzleTimersRepository extends TimersRepository {
-  constructor(private readonly txHost: TransactionHost<TxAdapter>) {
+  constructor(
+    private readonly txHost: TransactionHost<TxAdapter>,
+    private readonly eventsPublisher: EventsPublisher,
+  ) {
     super();
   }
 
-  /** Lazily create the user's idle timer row if missing, then return it. */
   async ensure(userId: string): Promise<Timer> {
     await this.txHost.tx
       .insert(userTimers)
@@ -44,144 +42,55 @@ export class DrizzleTimersRepository extends TimersRepository {
     return row ? this.mapRow(row) : null;
   }
 
-  /**
-   * Start a fresh session. Unconditional — overrides whatever state the timer
-   * is in (the caller completes a running session first when switching).
-   */
-  async start(userId: string, input: StartInput): Promise<Timer> {
+  /** No insert path: rows only come from `ensure`. */
+  @Transactional()
+  async save(timer: Timer): Promise<void> {
     const [row] = await this.txHost.tx
       .update(userTimers)
       .set({
-        status: "running",
-        sessionType: input.sessionType,
-        sessionDurationSeconds: input.durationSeconds,
-        remainingAtTransition: input.durationSeconds,
-        transitionedAt: input.transitionedAt,
-        ...(input.resetFocusCounter ? { completedFocusSessions: 0 } : {}),
-        updatedAt: input.transitionedAt,
-      })
-      .where(eq(userTimers.userId, userId))
-      .returning();
-    return this.mapRow(row);
-  }
-
-  /** Pause a running session, freezing the remaining time. */
-  async pause(
-    userId: string,
-    remainingAtTransition: number,
-    transitionedAt: Date,
-  ): Promise<Timer | null> {
-    const [row] = await this.txHost.tx
-      .update(userTimers)
-      .set({
-        status: "paused",
-        remainingAtTransition,
-        transitionedAt,
-        updatedAt: transitionedAt,
+        status: timer.status,
+        sessionType: timer.sessionType,
+        sessionDurationSeconds: timer.sessionDurationSeconds,
+        transitionedAt: timer.transitionedAt,
+        remainingAtTransition: timer.remainingAtTransition,
+        completedFocusSessions: timer.completedFocusSessions,
+        updatedAt: timer.updatedAt,
+        version: sql`${userTimers.version} + 1`,
       })
       .where(
-        and(eq(userTimers.userId, userId), eq(userTimers.status, "running")),
+        and(eq(userTimers.id, timer.id), eq(userTimers.version, timer.version)),
       )
-      .returning();
-    return row ? this.mapRow(row) : null;
-  }
+      .returning({ id: userTimers.id });
 
-  /** Resume a paused session. Remaining is unchanged. */
-  async resume(
-    userId: string,
-    transitionedAt: Date,
-  ): Promise<Timer | null> {
-    const [row] = await this.txHost.tx
-      .update(userTimers)
-      .set({
-        status: "running",
-        transitionedAt,
-        updatedAt: transitionedAt,
-      })
-      .where(
-        and(eq(userTimers.userId, userId), eq(userTimers.status, "paused")),
-      )
-      .returning();
-    return row ? this.mapRow(row) : null;
-  }
+    if (!row) {
+      throw concurrencyConflictError();
+    }
 
-  /** Stop/abandon the current session. */
-  async stop(
-    userId: string,
-    remainingAtTransition: number,
-    transitionedAt: Date,
-  ): Promise<Timer | null> {
-    const [row] = await this.txHost.tx
-      .update(userTimers)
-      .set({
-        status: "stopped",
-        remainingAtTransition,
-        transitionedAt,
-        updatedAt: transitionedAt,
-      })
-      .where(
-        and(
-          eq(userTimers.userId, userId),
-          inArray(userTimers.status, ["running", "paused"]),
-        ),
-      )
-      .returning();
-    return row ? this.mapRow(row) : null;
-  }
+    timer.markSaved();
 
-  /**
-   * Idempotent completion. Only completes a still-running session whose
-   * transition matches the guard (so stale/paused/restarted timers are
-   * untouched). Increments the focus counter for completed focus sessions.
-   * Returns the updated timer, or null if nothing was completed.
-   */
-  async completeIfRunning(
-    userId: string,
-    transitionedAtGuard: Date,
-    now: Date,
-  ): Promise<Timer | null> {
-    const [row] = await this.txHost.tx
-      .update(userTimers)
-      .set({
-        status: "completed",
-        remainingAtTransition: 0,
-        completedFocusSessions: sql`${userTimers.completedFocusSessions} + CASE WHEN ${userTimers.sessionType} = 'focus' THEN 1 ELSE 0 END`,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(userTimers.userId, userId),
-          eq(userTimers.status, "running"),
-          eq(userTimers.transitionedAt, transitionedAtGuard),
-        ),
-      )
-      .returning();
-    return row ? this.mapRow(row) : null;
-  }
-
-  async appendEvent(input: AppendEventInput): Promise<void> {
-    await this.txHost.tx.insert(userTimerEvents).values({
-      userId: input.userId,
-      eventType: input.eventType,
-      sessionType: input.sessionType,
-      sessionDurationSeconds: input.sessionDurationSeconds,
-      remainingSeconds: input.remainingSeconds,
-      occurredAt: input.occurredAt,
-    });
+    for (const event of timer.pullEvents()) {
+      await this.eventsPublisher.publish(
+        TimerLifecycle,
+        toTimerLifecyclePayload(event),
+      );
+    }
   }
 
   private mapRow(row: TimerRow): Timer {
-    return Timer.create({
-      id: row.id,
-      userId: row.userId,
-      status: row.status as TimerStatus,
-      sessionType: row.sessionType as TimerSessionType | null,
-      sessionDurationSeconds: row.sessionDurationSeconds,
-      transitionedAt: row.transitionedAt,
-      remainingAtTransition: row.remainingAtTransition,
-      completedFocusSessions: row.completedFocusSessions,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
+    return Timer.rehydrate(
+      {
+        id: row.id,
+        userId: row.userId,
+        status: row.status as TimerStatus,
+        sessionType: row.sessionType as TimerSessionType | null,
+        sessionDurationSeconds: row.sessionDurationSeconds,
+        transitionedAt: row.transitionedAt,
+        remainingAtTransition: row.remainingAtTransition,
+        completedFocusSessions: row.completedFocusSessions,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      },
+      row.version,
+    );
   }
 }

@@ -12,7 +12,7 @@ import {
 import { users } from "@/migrations/schema/users";
 import { timerSessionType } from "@/migrations/schema/userTimers";
 
-export const timerEventType = pgEnum("timer_event_type", [
+export const timerTransition = pgEnum("timer_transition", [
   "started",
   "paused",
   "resumed",
@@ -20,8 +20,8 @@ export const timerEventType = pgEnum("timer_event_type", [
   "completed",
 ]);
 
-export const userTimerEvents = pgTable(
-  "user_timer_events",
+export const userTimerLog = pgTable(
+  "user_timer_log",
   {
     id: uuid("id")
       .primaryKey()
@@ -29,7 +29,7 @@ export const userTimerEvents = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    eventType: timerEventType("event_type").notNull(),
+    transition: timerTransition("transition").notNull(),
     sessionType: timerSessionType("session_type").notNull(),
     sessionDurationSeconds: integer("session_duration_seconds").notNull(),
     remainingSeconds: integer("remaining_seconds").notNull(),
@@ -40,7 +40,5 @@ export const userTimerEvents = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [
-    index("idx_user_timer_events_user_occurred").on(t.userId, t.occurredAt),
-  ],
+  (t) => [index("idx_user_timer_log_user_occurred").on(t.userId, t.occurredAt)],
 );

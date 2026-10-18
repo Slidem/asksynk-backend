@@ -1,6 +1,6 @@
 # ADR 0008 — Self-mutating aggregates; `save` checks version and flushes events
 
-**Status:** Accepted (2026-10-15) · not built (Wave 5)
+**Status:** Accepted (2026-10-15) · built for `Timer`; other aggregates in Wave 5
 **Reference:** [03 §7](../03-layering.md#7-rich-vs-not), [05 §5](../05-persistence.md#5-repositories-vs-queries)
 
 ## Context

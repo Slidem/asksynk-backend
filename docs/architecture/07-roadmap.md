@@ -24,12 +24,9 @@ Efforts are relative-size guesses for one developer. Shipped waves keep one row 
 
 **4–6 days.** Pattern per [ADR 0008](adr/0008-self-mutating-aggregates.md).
 
-1. **Base + reference:** `AggregateRoot` in `kernel/`, `core.concurrency_conflict`;
-   rebuild `Timer` as a self-mutating aggregate (`version` column, `TimerTransitioned` event,
-   `save` + events mapper replacing the five per-transition repo methods; job
-   schedule/cancel stays in the service; `user_timer_events` → `user_timer_log`).
-2. Then by value: `TaskSuggestion` → `Invite` → `Task`/`TaskBatch` → `AttentionItem` →
-   `CalendarEvent` → `CalendarIntegration`.
+`AggregateRoot` (`kernel/domain/`) and the `Timer` reference are done
+([plan](plans/wave-5-rich-aggregates.md#done)). Left, by value: `TaskSuggestion` →
+`Invite` → `Task`/`TaskBatch` → `AttentionItem` → `CalendarEvent` → `CalendarIntegration`.
 
 Each: write the spec, move the rules from the service into the aggregate, delete the
 procedural guard. Methods per [03 §7](03-layering.md#7-rich-vs-not).

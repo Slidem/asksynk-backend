@@ -119,9 +119,10 @@ due date must not move" invariant is still a `.filter()` inside `recomputeForIte
 ### 3.3 The domain model is anemic
 
 21 entity classes; most have a bare `static create()` and only predicates/getters
-(`belongsTo`, `isDeleted`, `isPending`…). `Timer` (`focus/domain/timer.ts`) guards its
-transitions but doesn't apply them: it returns a decision and `DrizzleTimersRepository`
-mutates state with one conditional `UPDATE` per transition; `RecurrenceRule` (`scheduling/domain/recurrence-rule.vo.ts`) is
+(`belongsTo`, `isDeleted`, `isPending`…). Only `Timer` (`focus/domain/timer.ts`) is a
+self-mutating aggregate ([ADR 0008](adr/0008-self-mutating-aggregates.md)): it applies its
+transitions and records `TimerTransitioned`; `save` checks `version` and flushes the
+events. `RecurrenceRule` (`scheduling/domain/recurrence-rule.vo.ts`) is
 the one value object. A few encode a small rule: `CalendarIntegration.accessTokenExpired`,
 `PublicView.isLive`, `Invite.isForEmail`.
 

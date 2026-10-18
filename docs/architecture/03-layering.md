@@ -197,7 +197,7 @@ events; the repository's `save` checks `version` and flushes them to the outbox.
 
 | Aggregate             | Methods                                                                                | Replaces                      |
 | --------------------- | -------------------------------------------------------------------------------------- | ----------------------------- |
-| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | decider + per-transition SQL in `DrizzleTimersRepository` |
+| `Timer`               | `start`, `pause`, `resume`, `stop`, `complete`                                         | done: `focus/domain/timer.ts` |
 | `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
 | `Invite`              | `accept`, `reject`                                                                     | `network/application/networks.service.ts` guards |
 | `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |
