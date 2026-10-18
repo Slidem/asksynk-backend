@@ -1,4 +1,5 @@
-import { IsInt, Max, Min } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+import { IsInt, Max, Min, ValidateIf } from "class-validator";
 
 export class UpdateTimerSettingsDto {
   @IsInt()
@@ -20,4 +21,12 @@ export class UpdateTimerSettingsDto {
   @Min(1)
   @Max(50)
   longBreakInterval!: number;
+
+  /** Idle time after which the open session resets; `null` disables it. */
+  @ApiProperty({ type: Number, nullable: true, minimum: 3600, maximum: 86400 })
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(3600)
+  @Max(86400)
+  inactivityTimeoutSeconds!: number | null;
 }

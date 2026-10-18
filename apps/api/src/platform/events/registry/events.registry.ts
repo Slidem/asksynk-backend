@@ -135,17 +135,45 @@ export const CalendarEventDeleted = defineEvent({
   delivery: DeliveryMode.Durable,
 });
 
+const focusSessionEndReasonSchema = z.enum([
+  "manual_reset",
+  "inactivity",
+  "settings_changed",
+]);
+
 export const TimerLifecycle = defineEvent({
   name: "timer.lifecycle",
   schema: z.object({
     userId: z.string(),
-    eventType: z.enum(["started", "paused", "resumed", "stopped", "completed"]),
-    sessionType: z.enum(["focus", "short_break", "long_break"]),
-    sessionDurationSeconds: z.number(),
+    sessionId: z.string(),
+    eventType: z.enum([
+      "started",
+      "paused",
+      "resumed",
+      "stopped",
+      "completed",
+      "skipped",
+    ]),
+    mode: z.enum(["focus", "short_break", "long_break"]),
+    durationSeconds: z.number(),
     remainingSeconds: z.number(),
+    // Set when a reset abandoned the block; null = the user's own action.
+    reason: focusSessionEndReasonSchema.nullable(),
     occurredAt: z.string(),
   }),
   delivery: DeliveryMode.Dual,
+});
+
+// Only a WS push consumes it; no durable consumer group.
+export const TimerSessionEnded = defineEvent({
+  name: "timer.session_ended",
+  schema: z.object({
+    userId: z.string(),
+    sessionId: z.string(),
+    reason: focusSessionEndReasonSchema,
+    finishedAt: z.string(),
+  }),
+  delivery: DeliveryMode.Realtime,
 });
 
 // Tasks emit durable domain events; the attention-items consumer group mirrors

@@ -2,35 +2,21 @@ import { DomainErrorCategory } from "@/api/kernel/errors/domain-errors";
 import { defineCatalog } from "@/api/kernel/errors/error-catalog";
 
 const { catalog, createError } = defineCatalog("timers", {
-  unsupported_status: {
-    category: DomainErrorCategory.INVALID_VALUE,
-    exposable: true,
-    message: "Unsupported timer status: { status }",
-  },
-  timer_not_paused: {
+  invalid_transition: {
     category: DomainErrorCategory.CONFLICT,
     exposable: true,
-    message: "Timer is not paused",
-  },
-  timer_not_running: {
-    category: DomainErrorCategory.CONFLICT,
-    exposable: true,
-    message: "Timer is not running",
-  },
-  no_active_timer: {
-    category: DomainErrorCategory.CONFLICT,
-    exposable: true,
-    message: "No active timer",
+    message:
+      "Timer can't { action } while { status } (current mode: { currentMode })",
   },
   guest_not_allowed: {
     category: DomainErrorCategory.FORBIDDEN,
     exposable: true,
     message: "Guests can't use timers",
   },
-  invalid_session_input: {
+  invalid_command_input: {
     category: DomainErrorCategory.INVALID_VALUE,
     exposable: true,
-    message: "Invalid timer session input; reason: { reason }",
+    message: "Invalid timer command; reason: { reason }",
   },
 });
 

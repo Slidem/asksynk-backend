@@ -9,6 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { focusSessions } from "@/migrations/schema/focusSessions";
 import { users } from "@/migrations/schema/users";
 
 export const timerStatus = pgEnum("timer_status", [
@@ -16,10 +17,9 @@ export const timerStatus = pgEnum("timer_status", [
   "running",
   "paused",
   "completed",
-  "stopped",
 ]);
 
-export const timerSessionType = pgEnum("timer_session_type", [
+export const timerMode = pgEnum("timer_mode", [
   "focus",
   "short_break",
   "long_break",
@@ -35,13 +35,15 @@ export const userTimers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     status: timerStatus("status").notNull().default("idle"),
-    sessionType: timerSessionType("session_type"),
-    sessionDurationSeconds: integer("session_duration_seconds"),
+    mode: timerMode("mode"),
     transitionedAt: timestamp("transitioned_at", { withTimezone: true }),
     remainingAtTransition: integer("remaining_at_transition"),
-    completedFocusSessions: integer("completed_focus_sessions")
-      .notNull()
-      .default(0),
+    currentSessionId: uuid("current_session_id").references(
+      () => focusSessions.id,
+      { onDelete: "set null" },
+    ),
+    focusBlocksUntilLongBreak: integer("focus_blocks_until_long_break"),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -29,6 +29,10 @@ export const userTimerSettings = pgTable(
       .notNull()
       .default(900),
     longBreakInterval: integer("long_break_interval").notNull().default(4),
+    // null = never auto-reset an idle session.
+    inactivityTimeoutSeconds: integer("inactivity_timeout_seconds").default(
+      3600,
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

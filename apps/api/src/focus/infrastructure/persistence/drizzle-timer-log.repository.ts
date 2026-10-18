@@ -17,10 +17,12 @@ export class DrizzleTimerLogRepository extends TimerLogRepository {
   async append(entry: TimerLogEntry): Promise<void> {
     await this.txHost.tx.insert(userTimerLog).values({
       userId: entry.userId,
+      sessionId: entry.sessionId,
       transition: entry.transition,
-      sessionType: entry.sessionType,
-      sessionDurationSeconds: entry.sessionDurationSeconds,
+      mode: entry.mode,
+      durationSeconds: entry.durationSeconds,
       remainingSeconds: entry.remainingSeconds,
+      reason: entry.reason,
       occurredAt: entry.occurredAt,
     });
   }

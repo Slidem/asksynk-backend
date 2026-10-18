@@ -120,9 +120,10 @@ due date must not move" invariant is still a `.filter()` inside `recomputeForIte
 
 21 entity classes; most have a bare `static create()` and only predicates/getters
 (`belongsTo`, `isDeleted`, `isPending`…). Only `Timer` (`focus/domain/timer.ts`) is a
-self-mutating aggregate ([ADR 0008](adr/0008-self-mutating-aggregates.md)): it applies its
-transitions and records `TimerTransitioned`; `save` checks `version` and flushes the
-events. `RecurrenceRule` (`scheduling/domain/recurrence-rule.vo.ts`) is
+self-mutating aggregate ([ADR 0008](adr/0008-self-mutating-aggregates.md)): it owns the open
+`FocusSession`, checks every change against the static `TIMER_TRANSITION_RULES` table
+(also served by `GET /timers/transitions`), and records `TimerTransitioned` /
+`FocusSessionEnded`; `save` checks `version`, writes the sessions and flushes the events. `RecurrenceRule` (`scheduling/domain/recurrence-rule.vo.ts`) is
 the one value object. A few encode a small rule: `CalendarIntegration.accessTokenExpired`,
 `PublicView.isLive`, `Invite.isForEmail`.
 

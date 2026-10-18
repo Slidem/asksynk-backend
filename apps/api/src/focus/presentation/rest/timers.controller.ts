@@ -1,16 +1,16 @@
-import { Body, Controller, Get, Patch, Put } from "@nestjs/common";
+import { Body, Controller, Get, Header, Patch, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { TimersService } from "@/api/focus/application/timers.service";
-import { PatchTimerDto } from "@/api/focus/presentation/rest/dto/patch-timer.dto";
+import { TimerCommandDto } from "@/api/focus/presentation/rest/dto/timer-command.dto";
 import { UpdateTimerSettingsDto } from "@/api/focus/presentation/rest/dto/update-timer-settings.dto";
-import { BreakSuggestionResponse } from "@/api/focus/presentation/rest/responses/break-suggestion.response";
 import { TimerResponse } from "@/api/focus/presentation/rest/responses/timer.response";
 import { TimerSettingsResponse } from "@/api/focus/presentation/rest/responses/timer-settings.response";
+import { TimerTransitionsResponse } from "@/api/focus/presentation/rest/responses/timer-transitions.response";
 import {
-  toBreakSuggestionResponse,
   toTimerResponse,
   toTimerSettingsResponse,
+  toTimerTransitionsResponse,
 } from "@/api/focus/presentation/rest/timers.mapper";
 import { Actor } from "@/api/kernel/actor/actor";
 import { Clock } from "@/api/platform/clock/clock";
@@ -34,19 +34,24 @@ export class TimersController {
     return toTimerResponse(timer, this.clock.now());
   }
 
-  /** Start, pause, resume, or stop the current user's timer */
+  /** Control the current user's timer: start (with a mode), pause, resume, stop, or reset the session */
   @Patch()
-  async transition(
-    @Body() body: PatchTimerDto,
+  async command(
+    @Body() body: TimerCommandDto,
     @RequestActor() actor: Actor,
   ): Promise<TimerResponse> {
-    const timer = await this.timersService.applyTransition(actor, {
-      status: body.status,
-      sessionType: body.sessionType,
-      durationSeconds: body.durationSeconds,
+    const timer = await this.timersService.command(actor, {
+      command: body.command,
+      mode: body.mode,
     });
-
     return toTimerResponse(timer, this.clock.now());
+  }
+
+  /** Get the timer state machine: every allowed transition, the same for all users and states */
+  @Get("transitions")
+  @Header("Cache-Control", "private, max-age=3600")
+  getTransitions(@RequestActor() actor: Actor): TimerTransitionsResponse {
+    return toTimerTransitionsResponse(this.timersService.getTransitions(actor));
   }
 
   /** Get the current user's timer settings */
@@ -58,7 +63,7 @@ export class TimersController {
     return toTimerSettingsResponse(settings);
   }
 
-  /** Replace the current user's timer settings */
+  /** Replace the current user's timer settings; ends the open session if durations or the interval change */
   @Put("settings")
   async updateSettings(
     @Body() body: UpdateTimerSettingsDto,
@@ -69,16 +74,8 @@ export class TimersController {
       shortBreakDurationSeconds: body.shortBreakDurationSeconds,
       longBreakDurationSeconds: body.longBreakDurationSeconds,
       longBreakInterval: body.longBreakInterval,
+      inactivityTimeoutSeconds: body.inactivityTimeoutSeconds,
     });
     return toTimerSettingsResponse(settings);
-  }
-
-  /** Get a break suggestion based on completed focus sessions */
-  @Get("suggestion")
-  async getSuggestion(
-    @RequestActor() actor: Actor,
-  ): Promise<BreakSuggestionResponse> {
-    const suggestion = await this.timersService.getSuggestion(actor);
-    return toBreakSuggestionResponse(suggestion);
   }
 }

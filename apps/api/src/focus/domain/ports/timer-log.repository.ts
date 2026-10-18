@@ -1,14 +1,17 @@
 import {
-  TimerSessionType,
+  SessionEndReason,
+  TimerMode,
   TimerTransition,
 } from "@/api/focus/domain/timer.model";
 
 export interface TimerLogEntry {
   userId: string;
+  sessionId: string;
   transition: TimerTransition;
-  sessionType: TimerSessionType;
-  sessionDurationSeconds: number;
+  mode: TimerMode;
+  durationSeconds: number;
   remainingSeconds: number;
+  reason: SessionEndReason | null;
   occurredAt: Date;
 }
 

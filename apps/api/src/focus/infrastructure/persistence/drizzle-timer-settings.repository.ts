@@ -57,6 +57,7 @@ export class DrizzleTimerSettingsRepository extends TimerSettingsRepository {
       shortBreakDurationSeconds: row.shortBreakDurationSeconds,
       longBreakDurationSeconds: row.longBreakDurationSeconds,
       longBreakInterval: row.longBreakInterval,
+      inactivityTimeoutSeconds: row.inactivityTimeoutSeconds,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });

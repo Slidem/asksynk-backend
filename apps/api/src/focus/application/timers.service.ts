@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
+import { ContextLogger } from "nestjs-context-logger";
 
 import {
   TimerCompletionJob,
@@ -8,12 +9,15 @@ import {
 } from "@/api/focus/application/jobs/timer-completion.job";
 import { TimerSettingsRepository } from "@/api/focus/domain/ports/timer-settings.repository";
 import { TimersRepository } from "@/api/focus/domain/ports/timers.repository";
-import { assertValidTransitionInput, Timer } from "@/api/focus/domain/timer";
+import { Timer } from "@/api/focus/domain/timer";
 import {
-  BreakSuggestion,
-  TransitionTimerInput,
+  TimerCommandInput,
   UpdateTimerSettingsInput,
 } from "@/api/focus/domain/timer.model";
+import {
+  TIMER_TRANSITION_RULES,
+  TimerTransitionRule,
+} from "@/api/focus/domain/timer-transitions";
 import { UserTimerSettings } from "@/api/focus/domain/user-timer-settings";
 import { timersError } from "@/api/focus/focus.errors";
 import { Actor } from "@/api/kernel/actor/actor";
@@ -23,6 +27,8 @@ import { JobScheduler } from "@/api/platform/jobs/job-scheduler";
 
 @Injectable()
 export class TimersService {
+  private readonly logger = new ContextLogger(TimersService.name);
+
   constructor(
     private readonly timersRepo: TimersRepository,
     private readonly settingsRepo: TimerSettingsRepository,
@@ -30,75 +36,53 @@ export class TimersService {
     private readonly clock: Clock,
   ) {}
 
-  /** Current timer; lazily creates the idle row and completes an overdue running one. */
+  /** Current timer; lazily creates the idle row and settles due triggers (timeout, inactivity). */
   @Transactional()
   async getCurrent(actor: Actor): Promise<Timer> {
     const now = this.clock.now();
     const userId = this.ownUserId(actor);
+    const settings = await this.settingsRepo.ensure(userId);
     const timer = await this.timersRepo.ensure(userId);
-    if (!timer.isDue(now)) {
+    const pendingJobId = this.pendingCompletionJobId(timer);
+
+    if (!timer.settle(now, settings.inactivityTimeoutSeconds)) {
       return timer;
     }
-
-    timer.complete(now);
 
     try {
       await this.timersRepo.save(timer);
-      return timer;
     } catch (e) {
-      // Lost the race to the completion job or a PATCH: their state wins.
+      // Lost the race to the completion job, the sweep or a PATCH: their state wins.
       if (!isConcurrencyConflict(e)) throw e;
       return this.timersRepo.ensure(userId);
     }
+    await this.syncCompletionJob(timer, pendingJobId);
+    return timer;
   }
 
   /**
-   * Single state-transition entry point for PATCH /timers. One tx: state, outbox
-   * events, old-job cancel and new-job schedule commit (or roll back) together.
+   * Single entry point for `PATCH /timers`. One tx: state, sessions, outbox events,
+   * old-job cancel and new-job schedule commit (or roll back) together.
    */
   @Transactional()
-  async applyTransition(
-    actor: Actor,
-    input: TransitionTimerInput,
-  ): Promise<Timer> {
-    assertValidTransitionInput(input);
+  async command(actor: Actor, input: TimerCommandInput): Promise<Timer> {
     const now = this.clock.now();
-    const timer = await this.timersRepo.ensure(this.ownUserId(actor));
-
-    switch (input.status) {
-      case "running":
-        if (input.sessionType != null && input.durationSeconds != null) {
-          timer.start(
-            {
-              sessionType: input.sessionType,
-              durationSeconds: input.durationSeconds,
-            },
-            now,
-          );
-        } else {
-          timer.resume(now);
-        }
-        break;
-      case "paused":
-        timer.pause(now);
-        break;
-      case "stopped":
-        timer.stop(now);
-        break;
-      default:
-        throw timersError("unsupported_status", { status: input.status });
-    }
-
-    await this.timersRepo.save(timer);
-
+    const userId = this.ownUserId(actor);
+    const settings = await this.settingsRepo.ensure(userId);
+    const timer = await this.timersRepo.ensure(userId);
     const pendingJobId = this.pendingCompletionJobId(timer);
 
-    if (pendingJobId) {
-      await this.jobs.cancel(TimerCompletionJob, pendingJobId);
-    }
+    timer.execute(input, settings, now);
 
-    await this.scheduleCompletion(timer);
+    await this.timersRepo.save(timer);
+    await this.syncCompletionJob(timer, pendingJobId);
     return timer;
+  }
+
+  /** The static state machine; the same for every user and timer. */
+  getTransitions(actor: Actor): readonly TimerTransitionRule[] {
+    this.ownUserId(actor);
+    return TIMER_TRANSITION_RULES;
   }
 
   @Transactional()
@@ -106,32 +90,28 @@ export class TimersService {
     return this.settingsRepo.ensure(this.ownUserId(actor));
   }
 
+  /** Saves settings; ends the open session if its durations or interval changed. */
   @Transactional()
   async updateSettings(
     actor: Actor,
     input: UpdateTimerSettingsInput,
   ): Promise<UserTimerSettings> {
-    return this.settingsRepo.update(
-      this.ownUserId(actor),
-      input,
-      this.clock.now(),
-    );
-  }
-
-  @Transactional()
-  async getSuggestion(actor: Actor): Promise<BreakSuggestion> {
+    const now = this.clock.now();
     const userId = this.ownUserId(actor);
-    const timer = await this.timersRepo.ensure(userId);
-    const settings = await this.settingsRepo.ensure(userId);
-    const suggestedSessionType =
-      timer.completedFocusSessions >= settings.longBreakInterval
-        ? "long_break"
-        : "short_break";
-    return {
-      suggestedSessionType,
-      completedFocusSessions: timer.completedFocusSessions,
-      longBreakInterval: settings.longBreakInterval,
-    };
+    const settings = await this.settingsRepo.update(userId, input, now);
+    const timer = await this.timersRepo.getByUserId(userId);
+    if (!timer) {
+      return settings;
+    }
+
+    const pendingJobId = this.pendingCompletionJobId(timer);
+    const settled = timer.settle(now, settings.inactivityTimeoutSeconds);
+    const sessionEnded = timer.applySettingsChange(settings, now);
+    if (settled || sessionEnded) {
+      await this.timersRepo.save(timer);
+      await this.syncCompletionJob(timer, pendingJobId);
+    }
+    return settings;
   }
 
   /** Invoked by the scheduled completion job. Stale job → no-op; a conflict throws and the job retries. */
@@ -147,11 +127,62 @@ export class TimersService {
     await this.timersRepo.save(timer);
   }
 
+  /**
+   * Sweep: ends sessions left idle past the user's inactivity timeout. One tx per
+   * user; a conflict means the user touched the timer meanwhile, so it's skipped.
+   */
+  async resetInactiveSessions(): Promise<void> {
+    const now = this.clock.now();
+    const userIds = await this.findInactiveUserIds(now);
+
+    for (const userId of userIds) {
+      try {
+        await this.settleTimer(userId, now);
+      } catch (e) {
+        if (isConcurrencyConflict(e)) continue;
+        // Keep sweeping the others; this user is retried on the next run.
+        this.logger.error("Inactive session reset failed", { userId, error: e });
+      }
+    }
+  }
+
+  @Transactional()
+  private async findInactiveUserIds(now: Date): Promise<string[]> {
+    return this.timersRepo.findInactiveUserIds(now);
+  }
+
+  @Transactional()
+  private async settleTimer(userId: string, now: Date): Promise<void> {
+    const settings = await this.settingsRepo.ensure(userId);
+    const timer = await this.timersRepo.getByUserId(userId);
+    if (!timer) return;
+
+    const pendingJobId = this.pendingCompletionJobId(timer);
+    if (!timer.settle(now, settings.inactivityTimeoutSeconds)) return;
+
+    await this.timersRepo.save(timer);
+    await this.syncCompletionJob(timer, pendingJobId);
+  }
+
   private ownUserId(actor: Actor): string {
     if (actor.kind === "guest") {
       throw timersError("guest_not_allowed");
     }
     return actor.userId;
+  }
+
+  /** Cancels the job of a run span that ended; schedules the current span's (idempotent id). */
+  private async syncCompletionJob(
+    timer: Timer,
+    previousJobId: string | null,
+  ): Promise<void> {
+    if (
+      previousJobId &&
+      previousJobId !== this.pendingCompletionJobId(timer)
+    ) {
+      await this.jobs.cancel(TimerCompletionJob, previousJobId);
+    }
+    await this.scheduleCompletion(timer);
   }
 
   /** Idempotent (deterministic job id). No-op unless running. */

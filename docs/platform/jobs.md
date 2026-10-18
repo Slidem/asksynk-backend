@@ -60,7 +60,8 @@ final attempt, and rethrow; a final failure is left `failed` (no DLQ).
 
 | Name                 | Kind            | Where                                                    | Notes                                                                                   |
 | -------------------- | --------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `timer.completion`   | queued, delayed | `focus/application/jobs/timer-completion.job.ts`          | id `userId:transitionedAt`; scheduled on start/resume at `completesAt`, cancelled on start/pause/stop in the same tx |
+| `timer.completion`   | queued, delayed | `focus/application/jobs/timer-completion.job.ts`          | id `userId:transitionedAt`; scheduled when a block starts/resumes at `completesAt`, cancelled in the same tx when that run span ends (pause, skip, stop, reset) |
+| `focus.sessions.inactivity` | cron `*/5 * * * *` | `focus/presentation/jobs/focus-sessions-inactivity.job-handler.ts` | ends sessions idle past the user's `inactivity_timeout_seconds`; one tx per user, conflicts skipped |
 | `calendar.sync`      | queued          | `scheduling/application/jobs/calendar-sync.jobs.ts`      | retry 3, 30 s backoff, concurrency 4; id `calendarId:floor(epochSec/240)` (4-min dedup bucket) |
 | `calendar.sync.poll` | cron `*/1 * * * *` | `scheduling/presentation/jobs/calendar-sync.job-handlers.ts`| fans out one `calendar.sync` per sync-enabled calendar                                |
 | `events.retention`   | cron `0 3 * * *` | `platform/events/retention/`                            | see [events](events.md#retention)                                                       |

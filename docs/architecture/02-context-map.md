@@ -41,7 +41,7 @@ state machine exists (`Timer`, `TaskSuggestion`, `Invite`); **generic** stays th
 | **tasks**         | `tasks`                                     | Supporting | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
 | **network**       | `network`                                  | Supporting | `user_invites`, `user_network`                                                                                                      |
 | **sharing**       | `sharing`                                  | Supporting | `public_views`, `public_view_guests`                                                                                                |
-| **focus**         | `focus`                                    | Supporting | `user_timers`, `user_timer_settings`, `user_timer_log`                                                                           |
+| **focus**         | `focus`                                    | Supporting | `user_timers`, `focus_sessions`, `user_timer_settings`, `user_timer_log`                                                                           |
 | **files**         | `files`                                    | Generic    | `attachments`                                                                                                                       |
 | **identity**      | `auth` + `user-profile` + `user-settings`   | Generic    | `users`, `user_settings`, `sessions`, `accounts`, `verifications`                                                                   |
 | _(platform)_      | `platform/`                                 | —          | `events_outbox`, `events_dead_letters`                                                                                              |
@@ -127,8 +127,10 @@ still `storage`.
 
 ### 3.8 **focus**
 
-"Timer" is the mechanism, "focus" the concept. Owns a real five-state machine — the
-rich `Timer` aggregate. Completion is behind `JobScheduler`; no job ref stored.
+"Timer" is the mechanism, "focus" the concept. Owns a real state machine — the rich
+`Timer` aggregate, driven by commands (`start/pause/resume/stop/reset`) and triggers
+(timeout, inactivity, settings change) — and the focus sessions it groups blocks into.
+Completion is behind `JobScheduler`; no job ref stored.
 
 ## 4. Relationships
 

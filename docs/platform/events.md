@@ -21,14 +21,14 @@ outbox row is at most one job per group.
 ## Defining events
 
 `defineEvent({ name, schema, delivery })` (`registry/events.registration.ts`); names
-are dotted lowercase. All 20 events live in `registry/events.registry.ts` (one central
+are dotted lowercase. All 21 events live in `registry/events.registry.ts` (one central
 file — see Known gaps).
 
 | Delivery | Events                                                                                                                                                                                                      |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dual     | `tag.updated`, `message.created`, `message.updated`, `message.status.changed`, `timer.lifecycle`                                                                                                             |
 | Durable  | `tag.deleted`, `attention.message.synced`, `calendar.event.{created,updated,deleted}`, `task.{upserted,deleted}`, `task.batch.{upserted,deleted}`, `task.suggestion.{created,resolved,updated}` |
-| Realtime | `attention.upserted`, `attention.removed`, `task.suggestion.broadcast`                                                                                                                                       |
+| Realtime | `attention.upserted`, `attention.removed`, `task.suggestion.broadcast`, `timer.session_ended`                                                                                                                                       |
 
 ## Handling events
 
@@ -174,3 +174,4 @@ dead letters 30 days after `updated_at`. `pending` dead letters are kept.
 | Central event catalogue          | All events in `registry/events.registry.ts`; split into `<ctx>/contract/<ctx>.events.ts` in 8.1 |
 | `tag.updated` is Dual            | No realtime handler exists                                                                |
 | Stale comment                    | `MessageBusService.insertJobs` claims it ensures queues; queues are ensured at bootstrap  |
+| No origin device                 | Events and WS pushes carry no triggering device id, so the device that caused a change also receives its push. Normalize event/WS payloads with an origin device id and skip that device |

@@ -8,6 +8,7 @@ import { DrizzleTimerLogRepository } from "@/api/focus/infrastructure/persistenc
 import { DrizzleTimerSettingsRepository } from "@/api/focus/infrastructure/persistence/drizzle-timer-settings.repository";
 import { DrizzleTimersRepository } from "@/api/focus/infrastructure/persistence/drizzle-timers.repository";
 import { TimerLogHandler } from "@/api/focus/presentation/events/timer-log.handler";
+import { FocusSessionsInactivityJobHandler } from "@/api/focus/presentation/jobs/focus-sessions-inactivity.job-handler";
 import { TimerCompletionJobHandler } from "@/api/focus/presentation/jobs/timer-completion.job-handler";
 import { TimersController } from "@/api/focus/presentation/rest/timers.controller";
 import { TimersBroadcaster } from "@/api/focus/presentation/ws/timers.broadcaster";
@@ -22,6 +23,7 @@ import { JobsModule } from "@/api/platform/jobs/jobs.module";
     { provide: TimerSettingsRepository, useClass: DrizzleTimerSettingsRepository },
     TimersService,
     TimerCompletionJobHandler,
+    FocusSessionsInactivityJobHandler,
     TimerLogHandler,
     TimersBroadcaster,
   ],

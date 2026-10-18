@@ -9,10 +9,12 @@ const lifecycle = (
   eventType: EventOf<typeof TimerLifecycle>["eventType"],
 ): EventOf<typeof TimerLifecycle> => ({
   userId: "u1",
+  sessionId: "s1",
   eventType,
-  sessionType: "focus",
-  sessionDurationSeconds: 1500,
+  mode: "focus",
+  durationSeconds: 1500,
   remainingSeconds: 0,
+  reason: null,
   occurredAt: "2026-01-01T00:00:00.000Z",
 });
 
@@ -38,11 +40,27 @@ describe("TimersBroadcaster", () => {
     );
   });
 
-  it.each(["started", "paused", "resumed", "stopped"] as const)(
+  it.each(["started", "paused", "resumed", "stopped", "skipped"] as const)(
     "ignores %s",
     async (eventType) => {
       await broadcaster.onTimerLifecycle(lifecycle(eventType));
       expect(emit).not.toHaveBeenCalled();
     },
   );
+
+  it("pushes timer.session_ended to the user", async () => {
+    const payload = {
+      userId: "u1",
+      sessionId: "s1",
+      reason: "inactivity" as const,
+      finishedAt: "2026-01-01T00:00:00.000Z",
+    };
+    await broadcaster.onTimerSessionEnded(payload);
+
+    expect(emit).toHaveBeenCalledWith(
+      [{ kind: "user", id: "u1" }],
+      "timer.session_ended",
+      payload,
+    );
+  });
 });

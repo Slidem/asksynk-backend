@@ -19,10 +19,12 @@ export class TimerLogHandler {
   ): Promise<void> {
     await this.timerLog.append({
       userId: payload.userId,
+      sessionId: payload.sessionId,
       transition: payload.eventType,
-      sessionType: payload.sessionType,
-      sessionDurationSeconds: payload.sessionDurationSeconds,
+      mode: payload.mode,
+      durationSeconds: payload.durationSeconds,
       remainingSeconds: payload.remainingSeconds,
+      reason: payload.reason,
       occurredAt: new Date(payload.occurredAt),
     });
   }

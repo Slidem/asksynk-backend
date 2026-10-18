@@ -77,7 +77,8 @@ more friction than expected, stopping after 7.2 keeps most of the benefit.
 - `isValidId` throws on malformed input → 500; accepts any UUID version (`kernel/id.ts`).
 - Duplicate tag name → unmapped `23505` → 500; make uniqueness `lower(name)` (dedupe first).
 - Events: key-prefix consistency, ignored guest-recipient jobs, thread-room duplicate
-  emits, consumer inbox ([platform/events](../platform/events.md#known-gaps)).
+  emits, consumer inbox, origin device id on events/WS
+  ([platform/events](../platform/events.md#known-gaps)).
 - `AuthGuard` provided twice (`auth.module`, `auth-guard.module`); `packages/*` in `pnpm-workspace.yaml`.
 
 ---
