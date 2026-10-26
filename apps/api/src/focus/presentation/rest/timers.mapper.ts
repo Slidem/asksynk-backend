@@ -7,7 +7,7 @@ import {
   TIMER_TRIGGER_ORDER,
   TIMER_TRIGGERS,
 } from "@/api/focus/domain/timer.model";
-import { TimerTransitionRule } from "@/api/focus/domain/timer-transitions";
+import { TimerTransitionRule } from "@/api/focus/domain/timer-transition-rules";
 import { UserTimerSettings } from "@/api/focus/domain/user-timer-settings";
 import {
   FocusSessionResponse,

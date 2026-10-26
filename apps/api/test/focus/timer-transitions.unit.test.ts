@@ -1,3 +1,10 @@
+import { TimerState } from "src/focus/domain/timer.model";
+import {
+  findCommandRule,
+  TIMER_TRANSITION_RULES,
+  TimerTransitionRule,
+} from "src/focus/domain/timer-transition-rules";
+
 import {
   AllowedCommand,
   TIMER_COMMANDS,
@@ -7,12 +14,6 @@ import {
   TimerMode,
   TimerStatus,
 } from "@/api/focus/domain/timer.model";
-import {
-  findCommandRule,
-  TIMER_TRANSITION_RULES,
-  TimerState,
-  TimerTransitionRule,
-} from "@/api/focus/domain/timer-transitions";
 import {
   at,
   errorCode,
@@ -121,19 +122,18 @@ describe("TIMER_TRANSITION_RULES (contract: exposed rules = enforced rules)", ()
       );
     });
 
-    it.each(cases)(
-      "$name",
-      ({ rule, state, command, mode }) => {
-        const t = timerIn(state);
-        const before = { sessionId: t.session?.id ?? null };
-        run(t, command, mode, at(10));
-        expectEffects(rule, before, t);
-      },
-    );
+    it.each(cases)("$name", ({ rule, state, command, mode }) => {
+      const t = timerIn(state);
+      const before = { sessionId: t.session?.id ?? null };
+      run(t, command, mode, at(10));
+      expectEffects(rule, before, t);
+    });
   });
 
   describe("every trigger rule applies with its promised effects", () => {
-    const triggerRules = TIMER_TRANSITION_RULES.filter((r) => "trigger" in r.on);
+    const triggerRules = TIMER_TRANSITION_RULES.filter(
+      (r) => "trigger" in r.on,
+    );
 
     const cases = triggerRules.flatMap((rule) => {
       const trigger = (rule.on as { trigger: string }).trigger;
@@ -145,32 +145,38 @@ describe("TIMER_TRANSITION_RULES (contract: exposed rules = enforced rules)", ()
       }));
     });
 
-    it.each(cases)(
-      "$name",
-      ({ rule, state, trigger }) => {
-        const t = timerIn(state);
-        const before = { sessionId: t.session?.id ?? null };
+    it.each(cases)("$name", ({ rule, state, trigger }) => {
+      const t = timerIn(state);
+      const before = { sessionId: t.session?.id ?? null };
 
-        if (trigger === "timeout") {
-          expect(t.settle(at(600), null)).toBe(true);
-        } else if (trigger === "inactivity") {
-          expect(
-            t.settle(at(SETTINGS.inactivityTimeoutSeconds! + 1), SETTINGS.inactivityTimeoutSeconds),
-          ).toBe(true);
-        } else {
-          expect(
-            t.applySettingsChange({ ...SETTINGS, longBreakInterval: 2 }, at(10)),
-          ).toBe(true);
-        }
-        expectEffects(rule, before, t);
-      },
-    );
+      if (trigger === "timeout") {
+        expect(t.settle(at(600), null)).toBe(true);
+      } else if (trigger === "inactivity") {
+        expect(
+          t.settle(
+            at(SETTINGS.inactivityTimeoutSeconds! + 1),
+            SETTINGS.inactivityTimeoutSeconds,
+          ),
+        ).toBe(true);
+      } else {
+        expect(
+          t.applySettingsChange({ ...SETTINGS, longBreakInterval: 2 }, at(10)),
+        ).toBe(true);
+      }
+      expectEffects(rule, before, t);
+    });
   });
 
   describe("everything not in the table is rejected, and allowedCommands matches", () => {
-    const isListed = (allowed: AllowedCommand[], command: TimerCommand, mode?: TimerMode) =>
+    const isListed = (
+      allowed: AllowedCommand[],
+      command: TimerCommand,
+      mode?: TimerMode,
+    ) =>
       allowed.some(
-        (a) => a.command === command && (mode === undefined || a.modes?.includes(mode)),
+        (a) =>
+          a.command === command &&
+          (mode === undefined || a.modes?.includes(mode)),
       );
 
     const cases = STATES.flatMap((state) =>
@@ -211,7 +217,8 @@ describe("TIMER_TRANSITION_RULES (contract: exposed rules = enforced rules)", ()
               "command" in r.on &&
               r.on.command === command &&
               statesFor(r).includes(state) &&
-              (r.on.modes === undefined || (mode !== undefined && r.on.modes.includes(mode))),
+              (r.on.modes === undefined ||
+                (mode !== undefined && r.on.modes.includes(mode))),
           );
           expect(matches.length).toBeLessThanOrEqual(1);
         }

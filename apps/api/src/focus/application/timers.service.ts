@@ -17,7 +17,7 @@ import {
 import {
   TIMER_TRANSITION_RULES,
   TimerTransitionRule,
-} from "@/api/focus/domain/timer-transitions";
+} from "@/api/focus/domain/timer-transition-rules";
 import { UserTimerSettings } from "@/api/focus/domain/user-timer-settings";
 import { timersError } from "@/api/focus/focus.errors";
 import { Actor } from "@/api/kernel/actor/actor";
@@ -141,7 +141,10 @@ export class TimersService {
       } catch (e) {
         if (isConcurrencyConflict(e)) continue;
         // Keep sweeping the others; this user is retried on the next run.
-        this.logger.error("Inactive session reset failed", { userId, error: e });
+        this.logger.error("Inactive session reset failed", {
+          userId,
+          error: e,
+        });
       }
     }
   }
@@ -176,10 +179,7 @@ export class TimersService {
     timer: Timer,
     previousJobId: string | null,
   ): Promise<void> {
-    if (
-      previousJobId &&
-      previousJobId !== this.pendingCompletionJobId(timer)
-    ) {
+    if (previousJobId && previousJobId !== this.pendingCompletionJobId(timer)) {
       await this.jobs.cancel(TimerCompletionJob, previousJobId);
     }
     await this.scheduleCompletion(timer);

@@ -52,7 +52,10 @@ export class DrizzleTimersRepository extends TimersRepository {
     const [row] = await this.txHost.tx
       .select({ timer: userTimers, session: focusSessions })
       .from(userTimers)
-      .leftJoin(focusSessions, eq(focusSessions.id, userTimers.currentSessionId))
+      .leftJoin(
+        focusSessions,
+        eq(focusSessions.id, userTimers.currentSessionId),
+      )
       .where(eq(userTimers.userId, userId));
     return row ? this.mapRow(row.timer, row.session) : null;
   }

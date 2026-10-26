@@ -1,13 +1,22 @@
-export const TIMER_STATUSES = ["idle", "running", "paused", "completed"] as const;
+export const TIMER_STATUSES = [
+  "idle",
+  "running",
+  "paused",
+  "completed",
+] as const;
+
 export type TimerStatus = (typeof TIMER_STATUSES)[number];
 
 export const TIMER_MODES = ["focus", "short_break", "long_break"] as const;
+
 export type TimerMode = (typeof TIMER_MODES)[number];
 
+export const FOCUS_MODES = ["focus"] as const;
+
 export const BREAK_MODES = ["short_break", "long_break"] as const;
+
 export type BreakMode = (typeof BREAK_MODES)[number];
 
-/** What a client can ask the timer to do (`PATCH /timers`). */
 export const TIMER_COMMANDS = [
   "start",
   "pause",
@@ -15,6 +24,7 @@ export const TIMER_COMMANDS = [
   "stop",
   "reset",
 ] as const;
+
 export type TimerCommand = (typeof TIMER_COMMANDS)[number];
 
 /** What changes the timer without a command. */
@@ -23,6 +33,7 @@ export const TIMER_TRIGGERS = [
   "inactivity",
   "settings_changed",
 ] as const;
+
 export type TimerTrigger = (typeof TIMER_TRIGGERS)[number];
 
 /** Triggers the server applies, in this order, before any command. */
@@ -37,6 +48,7 @@ export const TIMER_TRANSITIONS = [
   "completed",
   "skipped",
 ] as const;
+
 export type TimerTransition = (typeof TIMER_TRANSITIONS)[number];
 
 export const SESSION_END_REASONS = [
@@ -44,6 +56,7 @@ export const SESSION_END_REASONS = [
   "inactivity",
   "settings_changed",
 ] as const;
+
 export type SessionEndReason = (typeof SESSION_END_REASONS)[number];
 
 /** The settings a session runs with; snapshotted when the session starts. */
@@ -56,13 +69,11 @@ export interface TimerSettingsSnapshot {
 
 export interface TimerCommandInput {
   command: TimerCommand;
-  // Required for "start", rejected otherwise.
   mode?: TimerMode;
 }
 
 export interface AllowedCommand {
   command: TimerCommand;
-  // Present for "start": the modes it accepts from the current state.
   modes?: TimerMode[];
 }
 
@@ -72,16 +83,11 @@ export interface TimerSettingsValues extends TimerSettingsSnapshot {
   inactivityTimeoutSeconds: number | null;
 }
 
-export type UpdateTimerSettingsInput = TimerSettingsValues;
+export type UpdateTimerSettingsInput =
+  TimerSettingsValues; /** What a rule is matched against. */
 
-export const isBreak = (mode: TimerMode): mode is BreakMode =>
-  mode !== "focus";
-
-export const toSettingsSnapshot = (
-  settings: TimerSettingsSnapshot,
-): TimerSettingsSnapshot => ({
-  focusDurationSeconds: settings.focusDurationSeconds,
-  shortBreakDurationSeconds: settings.shortBreakDurationSeconds,
-  longBreakDurationSeconds: settings.longBreakDurationSeconds,
-  longBreakInterval: settings.longBreakInterval,
-});
+export interface TimerState {
+  status: TimerStatus;
+  hasSession: boolean;
+  mode: TimerMode | null;
+}

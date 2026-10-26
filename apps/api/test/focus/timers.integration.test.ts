@@ -8,13 +8,13 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import * as dotenv from "dotenv";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import * as path from "path";
+import { TIMER_TRANSITION_RULES } from "src/focus/domain/timer-transition-rules";
 import request from "supertest";
 
 import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
 import { TimersService } from "@/api/focus/application/timers.service";
 import { TimersRepository } from "@/api/focus/domain/ports/timers.repository";
-import { TIMER_TRANSITION_RULES } from "@/api/focus/domain/timer-transitions";
 import { FocusModule } from "@/api/focus/focus.module";
 import { Clock } from "@/api/platform/clock/clock";
 import { ClockModule } from "@/api/platform/clock/clock.module";
@@ -258,7 +258,10 @@ describe("Timers (integration)", () => {
     const { getSettings, putSettings } = await createUserCtx();
     expect(await getSettings()).toEqual(DEFAULT_SETTINGS);
 
-    await putSettings({ focusDurationSeconds: 1200, inactivityTimeoutSeconds: null });
+    await putSettings({
+      focusDurationSeconds: 1200,
+      inactivityTimeoutSeconds: null,
+    });
     expect(await getSettings()).toMatchObject({
       focusDurationSeconds: 1200,
       inactivityTimeoutSeconds: null,
@@ -590,7 +593,12 @@ describe("Timers (integration)", () => {
       .expect(200);
 
     expect(res.headers["cache-control"]).toBe("private, max-age=3600");
-    expect(res.body.statuses).toEqual(["idle", "running", "paused", "completed"]);
+    expect(res.body.statuses).toEqual([
+      "idle",
+      "running",
+      "paused",
+      "completed",
+    ]);
     expect(res.body.triggerOrder).toEqual(["timeout", "inactivity"]);
     expect(res.body.transitions).toHaveLength(TIMER_TRANSITION_RULES.length);
     expect(res.body.transitions[0]).toEqual({

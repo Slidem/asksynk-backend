@@ -2,7 +2,8 @@ import { FocusSession } from "@/api/focus/domain/focus-session";
 import { TimerEvent } from "@/api/focus/domain/timer.events";
 import {
   AllowedCommand,
-  isBreak,
+  BREAK_MODES,
+  BreakMode,
   SessionEndReason,
   TimerCommand,
   TimerCommandInput,
@@ -11,15 +12,14 @@ import {
   TimerStatus,
   TimerTransition,
   TimerTrigger,
-  toSettingsSnapshot,
 } from "@/api/focus/domain/timer.model";
+import { TimerState } from "@/api/focus/domain/timer.model";
 import {
   allowedCommands,
   findCommandRule,
   findTriggerRule,
-  TimerState,
   TimerTransitionRule,
-} from "@/api/focus/domain/timer-transitions";
+} from "@/api/focus/domain/timer-transition-rules";
 import { timersError } from "@/api/focus/focus.errors";
 import { AggregateRoot } from "@/api/kernel/domain/aggregate-root";
 import { generateId } from "@/api/kernel/id";
@@ -43,8 +43,7 @@ export interface TimerProps {
  * each command.
  */
 export class Timer extends AggregateRoot<TimerEvent> {
-  // Ended since the last save; persisted with it.
-  private endedSessions: FocusSession[] = [];
+  private endedSessionsSinceLastSave: FocusSession[] = [];
 
   private constructor(
     private readonly props: TimerProps,
@@ -96,16 +95,16 @@ export class Timer extends AggregateRoot<TimerEvent> {
     return this.currentSession;
   }
 
+  override markSaved(): void {
+    super.markSaved();
+    this.endedSessionsSinceLastSave = [];
+  }
+
   /** Sessions to write with this save: any ended since the last save, then the open one. */
   sessionsToSave(): FocusSession[] {
     return this.currentSession
-      ? [...this.endedSessions, this.currentSession]
-      : [...this.endedSessions];
-  }
-
-  override markSaved(): void {
-    super.markSaved();
-    this.endedSessions = [];
+      ? [...this.endedSessionsSinceLastSave, this.currentSession]
+      : [...this.endedSessionsSinceLastSave];
   }
 
   /**
@@ -117,7 +116,7 @@ export class Timer extends AggregateRoot<TimerEvent> {
     settings: TimerSettingsValues,
     now: Date,
   ): void {
-    assertValidCommandInput(input);
+    this.assertValidCommandInput(input);
     this.settle(now, settings.inactivityTimeoutSeconds);
 
     switch (input.command) {
@@ -142,22 +141,25 @@ export class Timer extends AggregateRoot<TimerEvent> {
   /** Applies due triggers: timeout, then inactivity. Returns whether anything changed. */
   settle(now: Date, inactivityTimeoutSeconds: number | null): boolean {
     let changed = false;
+
     if (this.isDue(now)) {
       this.complete(now);
       changed = true;
     }
+
     if (this.isInactive(now, inactivityTimeoutSeconds)) {
       // The session ended when the user was last active, not when we noticed.
       const at = this.props.lastActivityAt!;
       this.endSession(this.triggerRule("inactivity"), "inactivity", at, now);
       changed = true;
     }
+
     return changed;
   }
 
   /** Ends the session if its snapshot no longer matches `settings`. Returns whether it did. */
   applySettingsChange(settings: TimerSettingsValues, now: Date): boolean {
-    if (!this.currentSession?.differsFrom(toSettingsSnapshot(settings))) {
+    if (!this.currentSession?.differsFrom(settings)) {
       return false;
     }
     this.endSession(
@@ -192,7 +194,7 @@ export class Timer extends AggregateRoot<TimerEvent> {
   /** Idle → focus; after/during focus → long break when the countdown hits 0; after a break → focus. */
   suggestedNextMode(): TimerMode {
     const { status, mode, focusBlocksUntilLongBreak } = this.props;
-    if (status === "idle" || mode === null || isBreak(mode)) {
+    if (status === "idle" || mode === null || this.isBreak(mode)) {
       return "focus";
     }
     const remaining = focusBlocksUntilLongBreak ?? 0;
@@ -277,23 +279,27 @@ export class Timer extends AggregateRoot<TimerEvent> {
       }
       this.transitioned("skipped", now);
     }
+
     if (rule.sessionEffect === "create") {
       this.currentSession = FocusSession.open(
         generateId(),
         this.props.userId,
-        toSettingsSnapshot(settings),
+        settings,
         now,
       );
       this.props.focusBlocksUntilLongBreak = settings.longBreakInterval;
     }
 
     const session = this.currentSession!;
-    if (isBreak(mode)) {
+
+    if (this.isBreak(mode)) {
       session.countBreakStarted(mode);
     }
+
     if (mode === "long_break") {
       this.props.focusBlocksUntilLongBreak = session.settings.longBreakInterval;
     }
+
     this.props.status = "running";
     this.props.mode = mode;
     this.props.remainingAtTransition = session.durationFor(mode);
@@ -345,9 +351,10 @@ export class Timer extends AggregateRoot<TimerEvent> {
     if (rule.blockEffect === "abandon") {
       this.abandonBlock(at, reason);
     }
+
     const session = this.currentSession!;
     session.end(reason, at);
-    this.endedSessions.push(session);
+    this.endedSessionsSinceLastSave.push(session);
     this.record({
       type: "focus_session_ended",
       userId: this.props.userId,
@@ -442,17 +449,21 @@ export class Timer extends AggregateRoot<TimerEvent> {
       occurredAt,
     });
   }
-}
 
-export function assertValidCommandInput(input: TimerCommandInput): void {
-  if (input.command === "start" && input.mode === undefined) {
-    throw timersError("invalid_command_input", {
-      reason: "mode is required to start",
-    });
+  private assertValidCommandInput(input: TimerCommandInput): void {
+    if (input.command === "start" && input.mode === undefined) {
+      throw timersError("invalid_command_input", {
+        reason: "mode is required to start",
+      });
+    }
+    if (input.command !== "start" && input.mode !== undefined) {
+      throw timersError("invalid_command_input", {
+        reason: "mode is only valid with start",
+      });
+    }
   }
-  if (input.command !== "start" && input.mode !== undefined) {
-    throw timersError("invalid_command_input", {
-      reason: "mode is only valid with start",
-    });
+
+  private isBreak(mode: string): mode is BreakMode {
+    return BREAK_MODES.includes(mode as BreakMode);
   }
 }

@@ -158,9 +158,7 @@ describe("Timer", () => {
       ["paused", "short_break", "short_break"],
     ])("rejects %s %s → %s", (status, mode, next) => {
       expect(
-        errorCode(() =>
-          run(timer(status, { mode }), "start", next as "focus"),
-        ),
+        errorCode(() => run(timer(status, { mode }), "start", next as "focus")),
       ).toBe(INVALID);
     });
 
@@ -186,7 +184,10 @@ describe("Timer", () => {
       expect(t.lastActivityAt).toEqual(at(100));
       expect(t.completesAt()).toBeNull();
       expect(transitionedEvents(t.pullEvents())).toEqual([
-        expect.objectContaining({ transition: "paused", remainingSeconds: 500 }),
+        expect.objectContaining({
+          transition: "paused",
+          remainingSeconds: 500,
+        }),
       ]);
     });
 
@@ -203,7 +204,10 @@ describe("Timer", () => {
       expect(t.status).toBe("running");
       expect(t.completesAt()).toEqual(at(650));
       expect(transitionedEvents(t.pullEvents())).toEqual([
-        expect.objectContaining({ transition: "resumed", remainingSeconds: 600 }),
+        expect.objectContaining({
+          transition: "resumed",
+          remainingSeconds: 600,
+        }),
       ]);
     });
 
@@ -254,11 +258,14 @@ describe("Timer", () => {
       expect(t.pullEvents()).toEqual([]);
     });
 
-    it.each([true, false])("rejects stop when idle (session: %s)", (hasSession) => {
-      expect(
-        errorCode(() => run(timer("idle", { hasSession }), "stop")),
-      ).toBe(INVALID);
-    });
+    it.each([true, false])(
+      "rejects stop when idle (session: %s)",
+      (hasSession) => {
+        expect(
+          errorCode(() => run(timer("idle", { hasSession }), "stop")),
+        ).toBe(INVALID);
+      },
+    );
   });
 
   describe("reset", () => {
@@ -305,15 +312,18 @@ describe("Timer", () => {
     it.each<[TimerStatus, boolean]>([
       ["idle", true],
       ["completed", true],
-    ])("ends the session from %s without a block event", (status, hasSession) => {
-      const t = timer(status, { hasSession });
-      run(t, "reset");
+    ])(
+      "ends the session from %s without a block event",
+      (status, hasSession) => {
+        const t = timer(status, { hasSession });
+        run(t, "reset");
 
-      const events = t.pullEvents();
-      expect(transitionedEvents(events)).toEqual([]);
-      expect(sessionEndedEvents(events)).toHaveLength(1);
-      expect(t.session).toBeNull();
-    });
+        const events = t.pullEvents();
+        expect(transitionedEvents(events)).toEqual([]);
+        expect(sessionEndedEvents(events)).toHaveLength(1);
+        expect(t.session).toBeNull();
+      },
+    );
 
     it("the next start after a reset opens a fresh session", () => {
       const t = timer("completed");
@@ -455,7 +465,10 @@ describe("Timer", () => {
     it("keeps the session when only the inactivity timeout changed", () => {
       const t = timer("running");
       expect(
-        t.applySettingsChange({ ...SETTINGS, inactivityTimeoutSeconds: null }, at(1)),
+        t.applySettingsChange(
+          { ...SETTINGS, inactivityTimeoutSeconds: null },
+          at(1),
+        ),
       ).toBe(false);
       expect(t.session!.id).toBe("s1");
       expect(t.pullEvents()).toEqual([]);
@@ -505,14 +518,14 @@ describe("Timer", () => {
         { command: "stop" },
         { command: "reset" },
       ]);
-      expect(timer("paused", { mode: "short_break" }).allowedCommands()).toEqual(
-        [
-          { command: "start", modes: ["focus"] },
-          { command: "resume" },
-          { command: "stop" },
-          { command: "reset" },
-        ],
-      );
+      expect(
+        timer("paused", { mode: "short_break" }).allowedCommands(),
+      ).toEqual([
+        { command: "start", modes: ["focus"] },
+        { command: "resume" },
+        { command: "stop" },
+        { command: "reset" },
+      ]);
       expect(timer("completed").allowedCommands()).toEqual([
         { command: "start", modes: ["focus", "short_break", "long_break"] },
         { command: "stop" },

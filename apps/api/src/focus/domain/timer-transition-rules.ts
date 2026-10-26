@@ -1,9 +1,11 @@
 import {
   AllowedCommand,
   BREAK_MODES,
+  FOCUS_MODES,
   TIMER_MODES,
   TimerCommand,
   TimerMode,
+  TimerState,
   TimerStatus,
   TimerTrigger,
 } from "@/api/focus/domain/timer.model";
@@ -31,15 +33,6 @@ export interface TimerTransitionRule {
   noop?: true;
 }
 
-/** What a rule is matched against. */
-export interface TimerState {
-  status: TimerStatus;
-  hasSession: boolean;
-  mode: TimerMode | null;
-}
-
-const FOCUS = ["focus"] as const;
-
 /**
  * The timer state machine. Single source of truth: `Timer` enforces it, and it is
  * exposed as-is (`GET /timers/transitions`) and per state (`allowedCommands`).
@@ -47,20 +40,20 @@ const FOCUS = ["focus"] as const;
 // prettier-ignore
 export const TIMER_TRANSITION_RULES: readonly TimerTransitionRule[] = [
   // idle, no session: a new session always starts with focus
-  { from: "idle", session: "none", on: { command: "start", modes: FOCUS }, to: "running", sessionEffect: "create", blockEffect: "start" },
+  { from: "idle", session: "none", on: { command: "start", modes: FOCUS_MODES }, to: "running", sessionEffect: "create", blockEffect: "start" },
   { from: "idle", session: "none", on: { command: "reset" }, to: "idle", sessionEffect: "keep", blockEffect: "none", noop: true },
   // idle, session attached (after a stop)
   { from: "idle", session: "attached", on: { command: "start", modes: TIMER_MODES }, to: "running", sessionEffect: "keep", blockEffect: "start" },
   { from: "idle", session: "attached", on: { command: "reset" }, to: "idle", sessionEffect: "end", blockEffect: "none" },
   // running: skip only between focus and a break
-  { from: "running", fromModes: FOCUS, on: { command: "start", modes: BREAK_MODES }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
-  { from: "running", fromModes: BREAK_MODES, on: { command: "start", modes: FOCUS }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
+  { from: "running", fromModes: FOCUS_MODES, on: { command: "start", modes: BREAK_MODES }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
+  { from: "running", fromModes: BREAK_MODES, on: { command: "start", modes: FOCUS_MODES }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
   { from: "running", on: { command: "pause" }, to: "paused", sessionEffect: "keep", blockEffect: "none" },
   { from: "running", on: { command: "stop" }, to: "idle", sessionEffect: "keep", blockEffect: "abandon" },
   { from: "running", on: { command: "reset" }, to: "idle", sessionEffect: "end", blockEffect: "abandon" },
   // paused
-  { from: "paused", fromModes: FOCUS, on: { command: "start", modes: BREAK_MODES }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
-  { from: "paused", fromModes: BREAK_MODES, on: { command: "start", modes: FOCUS }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
+  { from: "paused", fromModes: FOCUS_MODES, on: { command: "start", modes: BREAK_MODES }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
+  { from: "paused", fromModes: BREAK_MODES, on: { command: "start", modes: FOCUS_MODES }, to: "running", sessionEffect: "keep", blockEffect: "skip" },
   { from: "paused", on: { command: "resume" }, to: "running", sessionEffect: "keep", blockEffect: "none" },
   { from: "paused", on: { command: "stop" }, to: "idle", sessionEffect: "keep", blockEffect: "abandon" },
   { from: "paused", on: { command: "reset" }, to: "idle", sessionEffect: "end", blockEffect: "abandon" },
@@ -78,16 +71,6 @@ export const TIMER_TRANSITION_RULES: readonly TimerTransitionRule[] = [
   { from: "completed", session: "attached", on: { trigger: "settings_changed" }, to: "idle", sessionEffect: "end", blockEffect: "none" },
   { from: "idle", session: "attached", on: { trigger: "settings_changed" }, to: "idle", sessionEffect: "end", blockEffect: "none" },
 ];
-
-function matchesState(rule: TimerTransitionRule, state: TimerState): boolean {
-  if (rule.from !== state.status) return false;
-  if (rule.session === "none" && state.hasSession) return false;
-  if (rule.session === "attached" && !state.hasSession) return false;
-  if (rule.fromModes) {
-    return state.mode !== null && rule.fromModes.includes(state.mode);
-  }
-  return true;
-}
 
 export function findCommandRule(
   state: TimerState,
@@ -132,4 +115,14 @@ export function allowedCommands(state: TimerState): AllowedCommand[] {
     }
   }
   return allowed;
+}
+
+function matchesState(rule: TimerTransitionRule, state: TimerState): boolean {
+  if (rule.from !== state.status) return false;
+  if (rule.session === "none" && state.hasSession) return false;
+  if (rule.session === "attached" && !state.hasSession) return false;
+  if (rule.fromModes) {
+    return state.mode !== null && rule.fromModes.includes(state.mode);
+  }
+  return true;
 }

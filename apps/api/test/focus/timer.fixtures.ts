@@ -1,4 +1,7 @@
-import { FocusSession, FocusSessionProps } from "@/api/focus/domain/focus-session";
+import {
+  FocusSession,
+  FocusSessionProps,
+} from "@/api/focus/domain/focus-session";
 import { Timer, TimerProps } from "@/api/focus/domain/timer";
 import {
   FocusSessionEnded,
@@ -10,7 +13,6 @@ import {
   TimerMode,
   TimerSettingsValues,
   TimerStatus,
-  toSettingsSnapshot,
 } from "@/api/focus/domain/timer.model";
 
 export const t0 = new Date("2026-01-01T10:00:00Z");
@@ -34,7 +36,7 @@ export const session = (props: Partial<FocusSessionProps> = {}) =>
     completedFocusBlocks: 0,
     shortBreaks: 0,
     longBreaks: 0,
-    settings: toSettingsSnapshot(SETTINGS),
+    settings: SETTINGS,
     ...props,
   });
 
@@ -92,7 +94,9 @@ export const transitionedEvents = (events: TimerEvent[]) =>
   events.filter((e): e is TimerTransitioned => e.type === "timer_transitioned");
 
 export const sessionEndedEvents = (events: TimerEvent[]) =>
-  events.filter((e): e is FocusSessionEnded => e.type === "focus_session_ended");
+  events.filter(
+    (e): e is FocusSessionEnded => e.type === "focus_session_ended",
+  );
 
 export const transitions = (t: Timer) =>
   transitionedEvents(t.pullEvents()).map((e) => e.transition);

@@ -7,13 +7,13 @@ Efforts are relative-size guesses for one developer. Shipped waves keep one row 
 
 ## Done
 
-| Wave | Outcome | ADRs |
-| --- | --- | --- |
-| 0 — Safety net | Jest unit/integration split; `kernel/` + `platform/` tiers; typed `DomainError` catalogs; outbox events with ordered delivery, dead letters, retention; typed jobs API | [0005](adr/0005-kernel-and-platform-tiers.md), [0006](adr/0006-group-ordered-event-delivery.md), [0007](adr/0007-unified-typed-jobs.md) |
-| 1 — Pure core | `Actor`; `decideDueDate` policy; batch status in tasks' terms; `Timer` state machine; `RecurrenceRule` VO | — |
-| 2 — Ports and contracts | Repository ports + Drizzle adapters everywhere; published `contract/` ports; `scheduling` merge; auth ↔ sharing inverted (`GuestIdentityRegistry`) | [0002](adr/0002-repository-ports-as-abstract-classes.md), [0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
-| 3 — Layers + lint | Every context layered `contract / domain / application / infrastructure / presentation` under its target name; ESLint boundaries + dependency-cruiser as `error` in `pnpm lint` | — |
-| 4 — Transport adapters | Nest 11; `RealtimeBroadcaster` port; per-context broadcasters + WS gateways; `websockets/` = transport only; messaging on `Actor` | — |
+| Wave                    | Outcome                                                                                                                                                                         | ADRs                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Safety net          | Jest unit/integration split; `kernel/` + `platform/` tiers; typed `DomainError` catalogs; outbox events with ordered delivery, dead letters, retention; typed jobs API          | [0005](adr/0005-kernel-and-platform-tiers.md), [0006](adr/0006-group-ordered-event-delivery.md), [0007](adr/0007-unified-typed-jobs.md) |
+| 1 — Pure core           | `Actor`; `decideDueDate` policy; batch status in tasks' terms; `Timer` state machine; `RecurrenceRule` VO                                                                       | —                                                                                                                                       |
+| 2 — Ports and contracts | Repository ports + Drizzle adapters everywhere; published `contract/` ports; `scheduling` merge; auth ↔ sharing inverted (`GuestIdentityRegistry`)                              | [0002](adr/0002-repository-ports-as-abstract-classes.md), [0003](adr/0003-merge-calendar-events-and-calendar-integrations.md)           |
+| 3 — Layers + lint       | Every context layered `contract / domain / application / infrastructure / presentation` under its target name; ESLint boundaries + dependency-cruiser as `error` in `pnpm lint` | —                                                                                                                                       |
+| 4 — Transport adapters  | Nest 11; `RealtimeBroadcaster` port; per-context broadcasters + WS gateways; `websockets/` = transport only; messaging on `Actor`                                               | —                                                                                                                                       |
 
 `tasks` still speaks attention's status vocabulary via
 `attention/contract/attention-item-status.public.ts` until its outbound translator (6.2).
@@ -39,7 +39,7 @@ procedural guard. Methods per [03 §7](03-layering.md#7-rich-vs-not).
 | --- | ------------------------------------------------------------------------------------------------------------------------ | -------- |
 | 6.1 | Add `source_*` + `preview` nullable; backfill from `metadata`; verify counts; add unique index                           | **high** |
 | 6.2 | `AttentionSourceUpserted/Removed`; port `tasks` (outbound translator, `TaskUpserted` carries `TaskStatus`); dual-publish | low      |
-| 6.3 | Port `conversations` and the tag/calendar recompute handlers; delete the 3 bespoke handlers                                  | medium   |
+| 6.3 | Port `conversations` and the tag/calendar recompute handlers; delete the 3 bespoke handlers                              | medium   |
 | 6.4 | Reads via `findBySource` (check `EXPLAIN`); **separate commit:** drop `metadata`, `type`, enum                           | medium   |
 | 6.5 | Publish `attention.item.resolved`                                                                                        | none     |
 
@@ -64,13 +64,13 @@ more friction than expected, stopping after 7.2 keeps most of the benefit.
 
 ## Wave 8 — Cleanup
 
-| #   | Step                                                                                                        |
-| --- | ----------------------------------------------------------------------------------------------------------- |
+| #   | Step                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 8.1 | Split `platform/events/registry/events.registry.ts` into `<ctx>/contract/<ctx>.events.ts`; drop the `AttentionItemUpserted` zod copy |
-| 8.2 | `attachments.placement` → `visibility` + `owner_context`                                                    |
-| 8.3 | Merge `auth` + `user-profile` + `user-settings` → `identity`                                                |
-| 8.4 | Add the architecture rules (below) to `CLAUDE.md`                                                           |
-| 8.5 | Replace the 11 `HttpException`s in `files/application/attachments.service.ts` with `storage` catalog errors |
+| 8.2 | `attachments.placement` → `visibility` + `owner_context`                                                                             |
+| 8.3 | Merge `auth` + `user-profile` + `user-settings` → `identity`                                                                         |
+| 8.4 | Add the architecture rules (below) to `CLAUDE.md`                                                                                    |
+| 8.5 | Replace the 11 `HttpException`s in `files/application/attachments.service.ts` with `storage` catalog errors                          |
 
 ## Backlog (no wave)
 

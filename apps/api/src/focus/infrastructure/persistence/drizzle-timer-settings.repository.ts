@@ -2,9 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq } from "drizzle-orm";
 
-import {
-  TimerSettingsRepository,
-} from "@/api/focus/domain/ports/timer-settings.repository";
+import { TimerSettingsRepository } from "@/api/focus/domain/ports/timer-settings.repository";
 import { UpdateTimerSettingsInput } from "@/api/focus/domain/timer.model";
 import { UserTimerSettings } from "@/api/focus/domain/user-timer-settings";
 import { TxAdapter } from "@/api/platform/db/tx.module";
