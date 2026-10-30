@@ -27,6 +27,7 @@ import {
   MessageManagedStatusChanged,
   MessageUpdated,
 } from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 import { PublicLinkPort } from "@/api/sharing/contract/public-link.port";
 import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 import { TaskSuggestionPort } from "@/api/tasks/contract/task-suggestion.port";
@@ -523,8 +524,8 @@ export class MessagingService {
   }
 
   /**
-   * Forward sync: the recipient sets a managed message's status. Publishes
-   * `MessageManagedStatusChanged` (durable leg mirrors the attention item,
+   * The recipient sets a managed message's status. Publishes
+   * `MessageManagedStatusChanged` (durable leg feeds the attention item,
    * realtime leg pushes to the thread). Recipient-only — the sender cannot
    * resolve their own tagged message.
    */
@@ -538,13 +539,16 @@ export class MessagingService {
     if (actor.kind === "guest") {
       throw messagingError("guest_cannot_update_status");
     }
+
     const userId = actor.userId;
     const message = await this.messagingRepository.getMessageById(messageId);
+
     if (!message) {
       throw messagingError("message_not_found", {
         messageId,
       });
     }
+
     if (!message.managedStatus) {
       throw messagingError("cannot_update_message", {
         reason: "Message is not manageable",
@@ -555,11 +559,13 @@ export class MessagingService {
       message.threadId,
       userId,
     );
+
     if (!isParticipant) {
       throw messagingError("thread_not_found", {
         threadId: message.threadId,
       });
     }
+
     if (message.sender.kind === "user" && message.sender.userId === userId) {
       throw messagingError("cannot_update_message", {
         reason: "Only the recipient can update this message's status",
@@ -571,50 +577,22 @@ export class MessagingService {
     }
 
     const managedStatus: ManagedStatus = { ...message.managedStatus, status };
+
     await this.messagingRepository.updateManagedStatus(
       messageId,
       managedStatus,
     );
-    await this.publishManagedStatusChanged(
+
+    const updated = Message.create({ ...message, managedStatus });
+    await this.eventsPublisher.publish(MessageManagedStatusChanged, {
       userId,
-      message.threadId,
+      threadId: message.threadId,
       messageId,
       managedStatus,
-    );
+      message: this.toMessageSnapshot(updated),
+    });
 
-    return Message.create({ ...message, managedStatus });
-  }
-
-  /**
-   * Reverse sync: a tagged_message attention item was resolved from the inbox.
-   * Reflects the status back onto the message. Idempotent so the re-published
-   * `MessageManagedStatusChanged` no-ops on the attention side (no loop).
-   */
-  @Transactional()
-  async applyManagedStatusFromAttention(
-    userId: string,
-    messageId: string,
-    status: ManagedMessageStatus,
-  ): Promise<void> {
-    const message = await this.messagingRepository.getMessageById(messageId);
-    if (!message?.managedStatus) {
-      return; // message not managed — nothing to reflect
-    }
-    if (message.managedStatus.status === status) {
-      return; // already in sync
-    }
-
-    const managedStatus: ManagedStatus = { ...message.managedStatus, status };
-    await this.messagingRepository.updateManagedStatus(
-      messageId,
-      managedStatus,
-    );
-    await this.publishManagedStatusChanged(
-      userId,
-      message.threadId,
-      messageId,
-      managedStatus,
-    );
+    return updated;
   }
 
   private initialManagedStatus(tagIds: string[]): ManagedStatus | null {
@@ -638,20 +616,6 @@ export class MessagingService {
     if (next !== prior) {
       await this.messagingRepository.updateManagedStatus(messageId, next);
     }
-  }
-
-  private async publishManagedStatusChanged(
-    userId: string,
-    threadId: string,
-    messageId: string,
-    managedStatus: ManagedStatus,
-  ): Promise<void> {
-    await this.eventsPublisher.publish(MessageManagedStatusChanged, {
-      userId,
-      threadId,
-      messageId,
-      managedStatus,
-    });
   }
 
   private resolveRecipientUserId(
@@ -693,10 +657,7 @@ export class MessagingService {
     participants: ThreadParticipantRow[],
     eventType: typeof MessageCreated | typeof MessageUpdated,
   ): Promise<void> {
-    const senderId =
-      message.sender.kind === "user"
-        ? message.sender.userId
-        : message.sender.guestId;
+    const senderId = senderIdOf(message.sender);
 
     const participantUserIds = participants
       .map((p) => p.userId)
@@ -708,19 +669,7 @@ export class MessagingService {
 
     const notificationPromises: Promise<void>[] = [];
 
-    const messageForDispatch = {
-      id: message.id,
-      threadId: message.threadId,
-      parentMessageId: message.parentMessageId,
-      senderKind: message.sender.kind,
-      senderId: senderId,
-      body: message.body,
-      tagIds: message.tagIds,
-      attachmentIds: message.attachmentIds,
-      suggestionId: message.suggestionId,
-      managedStatus: message.managedStatus ?? undefined,
-      createdAt: message.createdAt.toISOString(),
-    };
+    const messageForDispatch = this.toMessageSnapshot(message);
 
     for (const userId of participantUserIds) {
       notificationPromises.push(
@@ -743,6 +692,24 @@ export class MessagingService {
     }
 
     await Promise.all(notificationPromises);
+  }
+
+  private toMessageSnapshot(
+    message: Message,
+  ): EventOf<typeof MessageCreated>["message"] {
+    return {
+      id: message.id,
+      threadId: message.threadId,
+      parentMessageId: message.parentMessageId,
+      senderKind: message.sender.kind,
+      senderId: senderIdOf(message.sender),
+      body: message.body,
+      tagIds: message.tagIds,
+      attachmentIds: message.attachmentIds,
+      suggestionId: message.suggestionId,
+      managedStatus: message.managedStatus ?? undefined,
+      createdAt: message.createdAt.toISOString(),
+    };
   }
 
   private async assertNotFrozen(
@@ -782,4 +749,8 @@ export class MessagingService {
       });
     }
   }
+}
+
+function senderIdOf(sender: MessageSender): string {
+  return sender.kind === "user" ? sender.userId : sender.guestId;
 }

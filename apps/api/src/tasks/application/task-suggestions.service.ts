@@ -10,6 +10,7 @@ import {
   TaskSuggestionResolved,
   TaskSuggestionUpdated,
 } from "@/api/platform/events/registry/events.registry";
+import { EventOf } from "@/api/platform/events/registry/events.types";
 import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 import {
   MaterializedTaskView,
@@ -60,13 +61,7 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
 
     // Opens the suggestee's inbox item (untagged — proposed tags live in the
     // payload and materialize onto the real task on accept).
-    await this.eventsPublisher.publish(TaskSuggested, {
-      suggestionId: id,
-      suggesteeUserId: input.suggesteeUserId,
-      suggesterUserId: input.suggesterUserId,
-      title: input.payload.title,
-      dueDate: input.payload.dueDate,
-    });
+    await this.eventsPublisher.publish(TaskSuggested, toSnapshot(suggestion));
 
     return suggestion;
   }
@@ -117,10 +112,7 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
       id,
       materialized,
     );
-    await this.eventsPublisher.publish(TaskSuggestionResolved, {
-      suggestionId: id,
-      suggesteeUserId: suggestion.suggesteeUserId,
-    });
+    await this.publishResolved(updated);
     await this.publishUpdated(id);
     return updated ?? suggestion;
   }
@@ -132,10 +124,7 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
       id,
       "rejected",
     );
-    await this.eventsPublisher.publish(TaskSuggestionResolved, {
-      suggestionId: id,
-      suggesteeUserId: suggestion.suggesteeUserId,
-    });
+    await this.publishResolved(updated);
     await this.publishUpdated(id);
     return updated ?? suggestion;
   }
@@ -143,12 +132,12 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
   // Suggester rescinds a still-pending suggestion.
   @Transactional()
   async rescind(userId: string, id: string): Promise<void> {
-    const suggestion = await this.requirePending(userId, id, "suggester");
-    await this.suggestionsRepository.updateStatus(id, "rejected");
-    await this.eventsPublisher.publish(TaskSuggestionResolved, {
-      suggestionId: id,
-      suggesteeUserId: suggestion.suggesteeUserId,
-    });
+    await this.requirePending(userId, id, "suggester");
+    const updated = await this.suggestionsRepository.updateStatus(
+      id,
+      "rejected",
+    );
+    await this.publishResolved(updated);
     await this.publishUpdated(id);
   }
 
@@ -193,12 +182,12 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
       input.id,
       merged,
     );
-    await this.eventsPublisher.publish(TaskSuggestionUpdated, {
-      suggestionId: input.id,
-      title: merged.title,
-      dueDate: merged.dueDate,
-      suggesteeUserId: suggestion.suggesteeUserId,
-    });
+    if (updated) {
+      await this.eventsPublisher.publish(
+        TaskSuggestionUpdated,
+        toSnapshot(updated),
+      );
+    }
     await this.publishUpdated(input.id);
     return updated ?? suggestion;
   }
@@ -215,6 +204,16 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
     const suggestion =
       await this.suggestionsRepository.findByMaterializedBatchId(taskBatchId);
     if (suggestion) await this.publishUpdated(suggestion.id);
+  }
+
+  private async publishResolved(
+    suggestion: TaskSuggestion | null,
+  ): Promise<void> {
+    if (!suggestion) return;
+    await this.eventsPublisher.publish(
+      TaskSuggestionResolved,
+      toSnapshot(suggestion),
+    );
   }
 
   // Realtime broadcast of the full suggestion (incl. materialized tasks) to both
@@ -317,4 +316,19 @@ export class TaskSuggestionsService extends TaskSuggestionPort {
   private parseDate(value: string | null): Date | null {
     return value ? new Date(value) : null;
   }
+}
+
+// Full post-state carried by every suggestion lifecycle event.
+function toSnapshot(
+  s: TaskSuggestion,
+): EventOf<typeof TaskSuggested> {
+  return {
+    suggestionId: s.id,
+    suggesteeUserId: s.suggesteeUserId,
+    suggesterUserId: s.suggesterUserId,
+    status: s.status,
+    title: s.payload.title,
+    dueDate: s.payload.dueDate,
+    createdAt: s.createdAt.toISOString(),
+  };
 }

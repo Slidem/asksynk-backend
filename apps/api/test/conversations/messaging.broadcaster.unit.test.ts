@@ -89,6 +89,7 @@ describe("MessagingBroadcaster", () => {
       threadId: "t1",
       messageId: "m1",
       managedStatus: { type: "tagged_message", status: "resolved" },
+      message: created().message,
     });
 
     expect(emit).toHaveBeenCalledWith(

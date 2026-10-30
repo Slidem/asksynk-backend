@@ -1,10 +1,4 @@
-import { TimerState } from "src/focus/domain/timer.model";
-import {
-  findCommandRule,
-  TIMER_TRANSITION_RULES,
-  TimerTransitionRule,
-} from "src/focus/domain/timer-transition-rules";
-
+import { TimerState } from "@/api/focus/domain/timer.model";
 import {
   AllowedCommand,
   TIMER_COMMANDS,
@@ -14,6 +8,11 @@ import {
   TimerMode,
   TimerStatus,
 } from "@/api/focus/domain/timer.model";
+import {
+  findCommandRule,
+  TIMER_TRANSITION_RULES,
+  TimerTransitionRule,
+} from "@/api/focus/domain/timer-transition-rules";
 import {
   at,
   errorCode,

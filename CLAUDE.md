@@ -25,8 +25,8 @@ Spine: _input → tagging → attention → scheduling_. A tag is a policy (answ
 - **Ports:** `abstract class` = contract + DI token (no `Symbol` tokens). Services never hit DB directly — always via repository.
 - **Errors:** one `DomainError` + per-context catalogs; HTTP status decided at edge.
 - **Events/jobs:** outbox events, one `key_strict_fifo` queue per consumer group + dead-letter table; one typed jobs API.
-- **Status (2026-10-15):** Waves 0–4 ✅ (see `07-roadmap.md` § Done).
-- **Next: Wave 5** — rich aggregates. Then: 6 attention core redesign, 7 schema per context, 8 cleanup.
+- **Status (2026-10-30):** Waves 0–4, 6 ✅ (see `07-roadmap.md` § Done). Reference patterns (`03-layering.md` §7): `Timer` = aggregate (ADR 0008); `AttentionItem` = pure projection (ADR 0009), sources translate via own `attention-projection.handler` → `attention.source.*`.
+- **Next: rest of Wave 5** (5.2–5.6, copy `Timer`). Then: 7 schema per context, 8 cleanup.
 - **Placement:** `<ctx>/{contract,domain,application,infrastructure,presentation}/` + root `<ctx>.module.ts`, `<ctx>.errors.ts` (docs/architecture/03-layering.md §3). Job definitions in `application/jobs/`; event-payload views in `application/read/`. `pnpm lint` enforces layers (ESLint boundaries) + cross-context rules (`pnpm lint:boundaries`, dependency-cruiser).
 - **Docs upkeep:** docs describe what is + what's left, present tense; history lives in git (no "was X", before/after tables, "As built", strikethroughs). A shipped wave becomes one row in the roadmap's Done table; shipped plans in `docs/architecture/plans/` are deleted. Keep `01-current-state.md` reflecting reality.
 - New/touched application methods take `Actor`, not `userId: string`.

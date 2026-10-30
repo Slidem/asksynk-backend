@@ -3,8 +3,12 @@
 How the backend is shaped, the pragmatic-DDD shape it is moving to, and the order to
 get there.
 
-**Status:** Waves 0–4 done ([Done](07-roadmap.md#done)). **Next:
-[Wave 5 — rich aggregates](07-roadmap.md#wave-5--rich-aggregates).**
+**Status:** Waves 0–4 and 6 done ([Done](07-roadmap.md#done)). The two hard parts
+are modelled and serve as the reference for every other context
+([03 §7](03-layering.md#reference-implementations)): `Timer` (aggregate) and
+`AttentionItem` (projection). **Next: rest of
+[Wave 5 — rich aggregates](07-roadmap.md#wave-5--rich-aggregates)**, then 7 (schema per
+context) and 8 (cleanup).
 
 ---
 
@@ -33,25 +37,25 @@ Rich aggregates only where a real state machine exists. Code stays in place unde
 
 ## Decisions
 
-| Decision              | Choice                                                                  | Record                                                              |
-| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Persistence isolation | Postgres schema per context; no cross-schema FKs except `users`         | [ADR 0001](adr/0001-schema-per-context.md)                          |
-| Repository ports      | `abstract class` = contract + DI token; no `Symbol` tokens              | [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)        |
-| Calendar boundary     | Native calendar + provider sync are one context, `scheduling`           | [ADR 0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
-| Attention shape       | Aggregate with a projected slice; typed `source_*` columns              | [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md)   |
-| Shared code           | `kernel/` (pure, domain may import) + `platform/` (framework-aware)     | [ADR 0005](adr/0005-kernel-and-platform-tiers.md)                   |
-| Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table   | [ADR 0006](adr/0006-group-ordered-event-delivery.md)                |
-| Background jobs       | One typed jobs API; caller-derived ids, nothing stored                  | [ADR 0007](adr/0007-unified-typed-jobs.md)                          |
-| Aggregates            | Self-mutating; `save` checks `version` and flushes recorded events      | [ADR 0008](adr/0008-self-mutating-aggregates.md)                    |
-| Domain errors         | One `DomainError` + per-context catalogs; HTTP status decided at edge  | [platform/errors](../platform/errors.md)                            |
+| Decision              | Choice                                                                | Record                                                                  |
+| --------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Persistence isolation | Postgres schema per context; no cross-schema FKs except `users`       | [ADR 0001](adr/0001-schema-per-context.md)                              |
+| Repository ports      | `abstract class` = contract + DI token; no `Symbol` tokens            | [ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)            |
+| Calendar boundary     | Native calendar + provider sync are one context, `scheduling`         | [ADR 0003](adr/0003-merge-calendar-events-and-calendar-integrations.md) |
+| Attention source      | Typed `source_*` columns; sources translate into attention's contract | [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md)       |
+| Attention shape       | Pure projection; status source → attention only; sticky user delete   | [ADR 0009](adr/0009-attention-as-pure-projection.md)                    |
+| Shared code           | `kernel/` (pure, domain may import) + `platform/` (framework-aware)   | [ADR 0005](adr/0005-kernel-and-platform-tiers.md)                       |
+| Event delivery        | One `key_strict_fifo` queue per consumer group; own dead-letter table | [ADR 0006](adr/0006-group-ordered-event-delivery.md)                    |
+| Background jobs       | One typed jobs API; caller-derived ids, nothing stored                | [ADR 0007](adr/0007-unified-typed-jobs.md)                              |
+| Aggregates            | Self-mutating; `save` checks `version` and flushes recorded events    | [ADR 0008](adr/0008-self-mutating-aggregates.md)                        |
+| Domain errors         | One `DomainError` + per-context catalogs; HTTP status decided at edge | [platform/errors](../platform/errors.md)                                |
 
 ## Deliberately not doing
 
 - **Microservices.** A modular monolith is the end state.
 - **CQRS framework / event sourcing / `@nestjs/cqrs`.** The outbox is enough; read
   models are plain queries.
-- **A value object per primitive.** Only `AnswerMode`, `RecurrenceRule`,
-  `AttentionSource`.
+- **A value object per primitive.** Only `AnswerMode`, `RecurrenceRule`.
 - **Workspace packages per context.** Lint gives most of the benefit.
 - **A rewrite.** Every wave ships alone and leaves the app working.
 
@@ -59,17 +63,17 @@ Rich aggregates only where a real state machine exists. Code stays in place unde
 
 ## Docs
 
-| Doc                                          | Answers                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------ |
-| [01-current-state.md](01-current-state.md)   | What is solid, what is still wrong, with numbers                   |
-| [02-context-map.md](02-context-map.md)       | The target contexts and why each boundary sits where it does       |
-| [03-layering.md](03-layering.md)             | Layer template, `kernel/` vs `platform/`, Nest mechanics, lint     |
-| [04-integration.md](04-integration.md)       | How contexts talk; the published contracts                         |
-| [05-persistence.md](05-persistence.md)       | Schema per context, FK policy, repositories vs queries             |
-| [06-attention-core.md](06-attention-core.md) | The core domain, designed for the channels that are coming         |
-| [07-roadmap.md](07-roadmap.md)               | Done waves, Waves 5–8, guardrails, what to leave alone             |
-| [adr/](adr/)                                 | Decisions that are expensive to reverse                            |
-| [../platform/](../platform/)                 | As-built reference: events, jobs, errors                           |
+| Doc                                          | Answers                                                        |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| [01-current-state.md](01-current-state.md)   | What is solid, what is still wrong, with numbers               |
+| [02-context-map.md](02-context-map.md)       | The target contexts and why each boundary sits where it does   |
+| [03-layering.md](03-layering.md)             | Layer template, `kernel/` vs `platform/`, Nest mechanics, lint |
+| [04-integration.md](04-integration.md)       | How contexts talk; the published contracts                     |
+| [05-persistence.md](05-persistence.md)       | Schema per context, FK policy, repositories vs queries         |
+| [06-attention-core.md](06-attention-core.md) | The core domain, designed for the channels that are coming     |
+| [07-roadmap.md](07-roadmap.md)               | Done waves, Waves 5, 7, 8, guardrails, what to leave alone     |
+| [adr/](adr/)                                 | Decisions that are expensive to reverse                        |
+| [../platform/](../platform/)                 | As-built reference: events, jobs, errors                       |
 
 Key references: Grzybek, [Modular Monolith: A Primer](https://www.kamilgrzybek.com/blog/posts/modular-monolith-primer)
 and [Integration Styles](https://www.kamilgrzybek.com/blog/posts/modular-monolith-integration-styles);

@@ -13,6 +13,7 @@ import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
 import { DrizzleTaskBatchesRepository } from "@/api/tasks/infrastructure/persistence/drizzle-task-batches.repository";
 import { DrizzleTaskSuggestionsRepository } from "@/api/tasks/infrastructure/persistence/drizzle-task-suggestions.repository";
 import { DrizzleTasksRepository } from "@/api/tasks/infrastructure/persistence/drizzle-tasks.repository";
+import { TasksAttentionProjectionHandler } from "@/api/tasks/presentation/events/attention-projection.handler";
 import { SuggestionSyncHandler } from "@/api/tasks/presentation/events/suggestion-sync.handler";
 import { TaskBatchesController } from "@/api/tasks/presentation/rest/task-batches.controller";
 import { TaskSuggestionsController } from "@/api/tasks/presentation/rest/task-suggestions.controller";
@@ -30,6 +31,7 @@ import { TaskSuggestionsBroadcaster } from "@/api/tasks/presentation/ws/task-sug
     TaskSuggestionsService,
     { provide: TaskSuggestionPort, useExisting: TaskSuggestionsService },
     SuggestionSyncHandler,
+    TasksAttentionProjectionHandler,
     TaskSuggestionsBroadcaster,
   ],
   controllers: [

@@ -1,14 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, SQL, sql } from "drizzle-orm";
 import { ContextLogger } from "nestjs-context-logger";
 
 import { AttentionItemStatus } from "@/api/attention/contract/attention-item-status.public";
-import { AttentionItem } from "@/api/attention/domain/attention-item";
-import { AttentionItemMetadata, AttentionItemType, CreateAttentionItemInput, ListAttentionItemsInput } from "@/api/attention/domain/attention-item.model";
 import {
-  AttentionItemsRepository,
-} from "@/api/attention/domain/ports/attention-items.repository";
+  AttentionItem,
+  AttentionItemState,
+  AttentionPreview,
+  AttentionSource,
+  ListAttentionItemsInput,
+} from "@/api/attention/domain/attention-item";
+import { AttentionItemsRepository } from "@/api/attention/domain/ports/attention-items.repository";
 import { TxAdapter } from "@/api/platform/db/tx.module";
 import { attentionItems } from "@/migrations/schema/attentionItems";
 import { attentionItemTags } from "@/migrations/schema/attentionItemTags";
@@ -24,54 +27,9 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
     super();
   }
 
-  async add(input: CreateAttentionItemInput): Promise<AttentionItem> {
-    this.logger.info("Adding attention item", {
-      id: input.id,
-      type: input.type,
-    });
-
-    const [created] = await this.txHost.tx
-      .insert(attentionItems)
-      .values({
-        id: input.id,
-        userId: input.userId,
-        type: input.type,
-        status: "created",
-        dueDate: input.dueDate,
-        dueDatePinned: input.dueDatePinned ?? false,
-        metadata: input.metadata,
-        sourceCalendarEventId: input.sourceCalendarEventId,
-      })
-      .returning();
-
-    if (input.tagIds.length > 0) {
-      await this.txHost.tx
-        .insert(attentionItemTags)
-        .values(
-          input.tagIds.map((tagId) => ({ attentionItemId: input.id, tagId })),
-        );
-    }
-
-    return this.mapRowToItem(created, input.tagIds);
-  }
-
   async getById(id: string): Promise<AttentionItem | null> {
-    const rows = await this.txHost.tx
-      .select({
-        item: attentionItems,
-        tagId: tags.id,
-      })
-      .from(attentionItems)
-      .leftJoin(
-        attentionItemTags,
-        eq(attentionItemTags.attentionItemId, attentionItems.id),
-      )
-      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
-      .where(eq(attentionItems.id, id));
-
-    if (rows.length === 0) return null;
-
-    return this.mapRowsToItem(rows);
+    const [item] = await this.findWhere(eq(attentionItems.id, id));
+    return item ?? null;
   }
 
   async listByUserId(
@@ -87,8 +45,8 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
       filters.push(eq(attentionItems.status, input.status));
     }
 
-    if (input.type) {
-      filters.push(eq(attentionItems.type, input.type));
+    if (input.sourceKind) {
+      filters.push(eq(attentionItems.sourceKind, input.sourceKind));
     }
 
     if (input.cursor) {
@@ -113,73 +71,81 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
     return this.groupRowsToItems(rows);
   }
 
-  async update(item: AttentionItem): Promise<AttentionItem> {
-    this.logger.info("Updating attention item", { id: item.id });
+  async findBySource(
+    userId: string,
+    source: AttentionSource,
+  ): Promise<AttentionItem | null> {
+    const [item] = await this.findWhere(this.sourceFilter(userId, source));
+    return item ?? null;
+  }
 
-    const [updated] = await this.txHost.tx
-      .update(attentionItems)
-      .set({
-        status: item.status,
-        note: item.note,
-        updatedAt: new Date(),
+  async upsert(state: AttentionItemState): Promise<AttentionItem | null> {
+    const values = {
+      preview: state.preview,
+      status: state.status,
+      dueDate: state.dueDate,
+      dueDatePinned: state.dueDatePinned,
+      dueSourceEventId: state.dueSourceEventId,
+    };
+
+    const [row] = await this.txHost.tx
+      .insert(attentionItems)
+      .values({
+        userId: state.userId,
+        sourceContext: state.source.context,
+        sourceKind: state.source.kind,
+        sourceId: state.source.id,
+        ...values,
       })
-      .where(eq(attentionItems.id, item.id))
+      .onConflictDoUpdate({
+        target: [
+          attentionItems.userId,
+          attentionItems.sourceContext,
+          attentionItems.sourceKind,
+          attentionItems.sourceId,
+        ],
+        set: { ...values, updatedAt: new Date() },
+        setWhere: isNull(attentionItems.deletedAt),
+      })
       .returning();
+
+    if (!row) return null;
+
+    this.logger.info("Upserted attention item", {
+      id: row.id,
+      source: state.source,
+    });
 
     await this.txHost.tx
       .delete(attentionItemTags)
-      .where(eq(attentionItemTags.attentionItemId, item.id));
+      .where(eq(attentionItemTags.attentionItemId, row.id));
 
-    if (item.tagIds.length > 0) {
+    if (state.tagIds.length > 0) {
       await this.txHost.tx
         .insert(attentionItemTags)
         .values(
-          item.tagIds.map((tagId) => ({ attentionItemId: item.id, tagId })),
+          state.tagIds.map((tagId) => ({ attentionItemId: row.id, tagId })),
         );
     }
 
-    return this.mapRowToItem(updated, item.tagIds);
+    return this.mapRowToItem(row, state.tagIds);
   }
 
-  // Full in-place update for source-mirrored items (task/batch): rewrites status,
-  // metadata (title), tag list, due date + pin, and calendar source on the same id.
-  // Distinct from update(), which only touches status/note/tags.
-  async updateFromSource(input: {
-    id: string;
-    status: AttentionItemStatus;
-    metadata: AttentionItemMetadata;
-    tagIds: string[];
-    dueDate: Date | null;
-    dueDatePinned: boolean;
-    sourceCalendarEventId: string | null;
-  }): Promise<AttentionItem> {
-    const [updated] = await this.txHost.tx
-      .update(attentionItems)
-      .set({
-        status: input.status,
-        metadata: input.metadata,
-        dueDate: input.dueDate,
-        dueDatePinned: input.dueDatePinned,
-        sourceCalendarEventId: input.sourceCalendarEventId,
-        updatedAt: new Date(),
-      })
-      .where(eq(attentionItems.id, input.id))
-      .returning();
+  async deleteLiveBySource(
+    userId: string,
+    source: AttentionSource,
+  ): Promise<string | null> {
+    const [row] = await this.txHost.tx
+      .delete(attentionItems)
+      .where(
+        and(
+          this.sourceFilter(userId, source),
+          isNull(attentionItems.deletedAt),
+        ),
+      )
+      .returning({ id: attentionItems.id });
 
-    await this.txHost.tx
-      .delete(attentionItemTags)
-      .where(eq(attentionItemTags.attentionItemId, input.id));
-
-    if (input.tagIds.length > 0) {
-      await this.txHost.tx.insert(attentionItemTags).values(
-        input.tagIds.map((tagId) => ({
-          attentionItemId: input.id,
-          tagId,
-        })),
-      );
-    }
-
-    return this.mapRowToItem(updated, input.tagIds);
+    return row?.id ?? null;
   }
 
   async softDelete(id: string): Promise<void> {
@@ -197,41 +163,29 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
       .where(eq(attentionItemTags.tagId, tagId));
   }
 
-  async updateDueDate(
-    id: string,
-    dueDate: Date | null,
-    sourceCalendarEventId: string | null,
-  ): Promise<void> {
-    await this.txHost.tx
-      .update(attentionItems)
-      .set({ dueDate, sourceCalendarEventId, updatedAt: new Date() })
-      .where(eq(attentionItems.id, id));
-  }
-
-  async updateContent(
-    id: string,
-    metadata: AttentionItemMetadata,
-    dueDate: Date | null,
-  ): Promise<void> {
-    await this.txHost.tx
-      .update(attentionItems)
-      .set({ metadata, dueDate, updatedAt: new Date() })
-      .where(eq(attentionItems.id, id));
-  }
-
   async batchUpdateDueDates(
     updates: {
       id: string;
       dueDate: Date | null;
-      sourceCalendarEventId: string | null;
+      dueSourceEventId: string | null;
     }[],
-  ): Promise<void> {
-    if (updates.length === 0) return;
+  ): Promise<AttentionItem[]> {
+    if (updates.length === 0) return [];
+
     await Promise.all(
       updates.map((u) =>
-        this.updateDueDate(u.id, u.dueDate, u.sourceCalendarEventId),
+        this.txHost.tx
+          .update(attentionItems)
+          .set({
+            dueDate: u.dueDate,
+            dueSourceEventId: u.dueSourceEventId,
+            updatedAt: new Date(),
+          })
+          .where(eq(attentionItems.id, u.id)),
       ),
     );
+
+    return this.findByIds(updates.map((u) => u.id));
   }
 
   async findByTagIds(tagIds: string[]): Promise<AttentionItem[]> {
@@ -250,9 +204,32 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
     return this.findByIds(matching.map((r) => r.id));
   }
 
+  async findByDueSourceEventId(eventId: string): Promise<AttentionItem[]> {
+    return this.findWhere(
+      and(
+        isNull(attentionItems.deletedAt),
+        eq(attentionItems.dueSourceEventId, eventId),
+      ),
+    );
+  }
+
   private async findByIds(ids: string[]): Promise<AttentionItem[]> {
     if (ids.length === 0) return [];
+    return this.findWhere(
+      and(isNull(attentionItems.deletedAt), inArray(attentionItems.id, ids)),
+    );
+  }
 
+  private sourceFilter(userId: string, source: AttentionSource): SQL {
+    return and(
+      eq(attentionItems.userId, userId),
+      eq(attentionItems.sourceContext, source.context),
+      eq(attentionItems.sourceKind, source.kind),
+      eq(attentionItems.sourceId, source.id),
+    )!;
+  }
+
+  private async findWhere(where: SQL | undefined): Promise<AttentionItem[]> {
     const rows = await this.txHost.tx
       .select({
         item: attentionItems,
@@ -264,102 +241,9 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
         eq(attentionItemTags.attentionItemId, attentionItems.id),
       )
       .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
-      .where(
-        and(isNull(attentionItems.deletedAt), inArray(attentionItems.id, ids)),
-      );
+      .where(where);
 
     return this.groupRowsToItems(rows);
-  }
-
-  async findByMessageId(messageId: string): Promise<AttentionItem[]> {
-    const rows = await this.txHost.tx
-      .select({
-        item: attentionItems,
-        tagId: tags.id,
-      })
-      .from(attentionItems)
-      .leftJoin(
-        attentionItemTags,
-        eq(attentionItemTags.attentionItemId, attentionItems.id),
-      )
-      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
-      .where(
-        and(
-          isNull(attentionItems.deletedAt),
-          sql`${attentionItems.metadata}->>'messageId' = ${messageId}`,
-        ),
-      );
-
-    return this.groupRowsToItems(rows);
-  }
-
-  async findByTaskId(taskId: string): Promise<AttentionItem[]> {
-    return this.findBySourceMetadata("taskId", taskId);
-  }
-
-  async findByTaskBatchId(batchId: string): Promise<AttentionItem[]> {
-    return this.findBySourceMetadata("taskBatchId", batchId);
-  }
-
-  async findBySuggestionId(suggestionId: string): Promise<AttentionItem[]> {
-    return this.findBySourceMetadata("suggestionId", suggestionId);
-  }
-
-  private async findBySourceMetadata(
-    key: "taskId" | "taskBatchId" | "suggestionId",
-    value: string,
-  ): Promise<AttentionItem[]> {
-    const rows = await this.txHost.tx
-      .select({
-        item: attentionItems,
-        tagId: tags.id,
-      })
-      .from(attentionItems)
-      .leftJoin(
-        attentionItemTags,
-        eq(attentionItemTags.attentionItemId, attentionItems.id),
-      )
-      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
-      .where(
-        and(
-          isNull(attentionItems.deletedAt),
-          sql`${attentionItems.metadata}->>${key} = ${value}`,
-        ),
-      );
-
-    return this.groupRowsToItems(rows);
-  }
-
-  async findBySourceCalendarEventId(eventId: string): Promise<AttentionItem[]> {
-    const rows = await this.txHost.tx
-      .select({
-        item: attentionItems,
-        tagId: tags.id,
-      })
-      .from(attentionItems)
-      .leftJoin(
-        attentionItemTags,
-        eq(attentionItemTags.attentionItemId, attentionItems.id),
-      )
-      .leftJoin(tags, eq(tags.id, attentionItemTags.tagId))
-      .where(
-        and(
-          isNull(attentionItems.deletedAt),
-          eq(attentionItems.sourceCalendarEventId, eventId),
-        ),
-      );
-
-    return this.groupRowsToItems(rows);
-  }
-
-  private mapRowsToItem(
-    rows: { item: AttentionItemRow; tagId: string | null }[],
-  ): AttentionItem {
-    const [first] = rows;
-    const tagIds = rows
-      .map((r) => r.tagId)
-      .filter((id): id is string => id !== null);
-    return this.mapRowToItem(first.item, tagIds);
   }
 
   private groupRowsToItems(
@@ -391,14 +275,17 @@ export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
     return AttentionItem.create({
       id: row.id,
       userId: row.userId,
-      type: row.type as AttentionItemType,
+      source: {
+        context: row.sourceContext,
+        kind: row.sourceKind,
+        id: row.sourceId,
+      },
+      preview: row.preview as AttentionPreview,
       status: row.status as AttentionItemStatus,
-      dueDate: row.dueDate,
-      dueDatePinned: row.dueDatePinned ?? false,
-      note: row.note,
-      metadata: row.metadata as AttentionItemMetadata,
       tagIds,
-      sourceCalendarEventId: row.sourceCalendarEventId,
+      dueDate: row.dueDate,
+      dueDatePinned: row.dueDatePinned,
+      dueSourceEventId: row.dueSourceEventId,
       deletedAt: row.deletedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

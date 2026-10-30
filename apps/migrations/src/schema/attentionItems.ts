@@ -7,20 +7,11 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
 import { users } from "@/migrations/schema/users";
-
-export const attentionItemType = pgEnum("attention_item_type", [
-  "tagged_message",
-  "incoming_email",
-  "slack_message",
-  "whatsapp_message",
-  "suggested_timeblock",
-  "suggested_task",
-  "task",
-]);
 
 export const attentionItemStatus = pgEnum("attention_item_status", [
   "created",
@@ -37,13 +28,20 @@ export const attentionItems = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    type: attentionItemType("type").notNull(),
+    // 'conversations' | 'tasks' | 'channels.gmail' | …; text so a channel needs no migration.
+    sourceContext: text("source_context").notNull(),
+    // 'message' | 'task' | 'task_batch' | 'task_suggestion'
+    sourceKind: text("source_kind").notNull(),
+    // Opaque to attention.
+    sourceId: text("source_id").notNull(),
+    // Display only; never queried.
+    preview: jsonb("preview").$type<Record<string, unknown>>().notNull(),
     status: attentionItemStatus("status").notNull().default("created"),
     dueDate: timestamp("due_date", { withTimezone: true }),
     dueDatePinned: boolean("due_date_pinned").notNull().default(false),
-    note: text("note"),
-    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(),
-    sourceCalendarEventId: uuid("source_calendar_event_id"),
+    // Soft ref into scheduling.
+    dueSourceEventId: uuid("due_source_event_id"),
+    // User tombstone; sticky.
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -53,16 +51,23 @@ export const attentionItems = pgTable(
       .defaultNow(),
   },
   (t) => [
+    // Covers tombstones — that is what makes a user delete sticky.
+    uniqueIndex("uq_attention_items_source").on(
+      t.userId,
+      t.sourceContext,
+      t.sourceKind,
+      t.sourceId,
+    ),
     index("idx_attention_items_user_status")
       .on(t.userId, t.status)
       .where(sql`deleted_at IS NULL`),
     index("idx_attention_items_user_due_date")
       .on(t.userId, t.dueDate)
       .where(sql`deleted_at IS NULL AND status != 'resolved'`),
-    index("idx_attention_items_source_calendar_event")
-      .on(t.sourceCalendarEventId)
+    index("idx_attention_items_due_source_event")
+      .on(t.dueSourceEventId)
       .where(
-        sql`deleted_at IS NULL AND status != 'resolved' AND source_calendar_event_id IS NOT NULL`,
+        sql`deleted_at IS NULL AND status != 'resolved' AND due_source_event_id IS NOT NULL`,
       ),
   ],
 );

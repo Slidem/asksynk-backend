@@ -8,7 +8,6 @@ import {
   TaskBatchUpserted,
 } from "@/api/platform/events/registry/events.registry";
 import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
-import { mapTaskStatusToAttention } from "@/api/tasks/application/task-status.util";
 import { TaskBatchesRepository } from "@/api/tasks/domain/ports/task-batches.repository";
 import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
 import { Task } from "@/api/tasks/domain/task";
@@ -119,8 +118,7 @@ export class TaskBatchesService {
   }
 
   // One durable event carrying the batch's full post-state + aggregate status
-  // (computed here from child statuses, so the consumer needs no task access).
-  // The consumer creates/updates/removes the assignee's single "task" item.
+  // (computed here from child statuses, so consumers need no task access).
   @Transactional()
   async emitBatchUpserted(batchId: string): Promise<void> {
     const batch = await this.batchesRepository.getById(batchId);
@@ -131,10 +129,9 @@ export class TaskBatchesService {
       taskBatchId: batch.id,
       assigneeUserId: batch.assigneeUserId,
       title: batch.title,
-      aggregateStatus: mapTaskStatusToAttention(deriveBatchStatus(statuses)),
+      aggregateStatus: deriveBatchStatus(statuses),
       tagIds: batch.tagIds,
       dueDate: batch.dueDate ? batch.dueDate.toISOString() : null,
-      dueDatePinned: batch.dueDate !== null,
       createdAt: batch.createdAt.toISOString(),
     });
   }

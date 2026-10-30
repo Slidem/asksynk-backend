@@ -8,13 +8,13 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import * as dotenv from "dotenv";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import * as path from "path";
-import { TIMER_TRANSITION_RULES } from "src/focus/domain/timer-transition-rules";
 import request from "supertest";
 
 import { ERROR_CATALOGUES } from "@/api/error-catalogs.root";
 import { EventsModule } from "@/api/events/events.module";
 import { TimersService } from "@/api/focus/application/timers.service";
 import { TimersRepository } from "@/api/focus/domain/ports/timers.repository";
+import { TIMER_TRANSITION_RULES } from "@/api/focus/domain/timer-transition-rules";
 import { FocusModule } from "@/api/focus/focus.module";
 import { Clock } from "@/api/platform/clock/clock";
 import { ClockModule } from "@/api/platform/clock/clock.module";

@@ -21,14 +21,14 @@ outbox row is at most one job per group.
 ## Defining events
 
 `defineEvent({ name, schema, delivery })` (`registry/events.registration.ts`); names
-are dotted lowercase. All 21 events live in `registry/events.registry.ts` (one central
+are dotted lowercase. All 23 events live in `registry/events.registry.ts` (one central
 file — see Known gaps).
 
-| Delivery | Events                                                                                                                                                                                                      |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dual     | `tag.updated`, `message.created`, `message.updated`, `message.status.changed`, `timer.lifecycle`                                                                                                             |
-| Durable  | `tag.deleted`, `attention.message.synced`, `calendar.event.{created,updated,deleted}`, `task.{upserted,deleted}`, `task.batch.{upserted,deleted}`, `task.suggestion.{created,resolved,updated}` |
-| Realtime | `attention.upserted`, `attention.removed`, `task.suggestion.broadcast`, `timer.session_ended`                                                                                                                                       |
+| Delivery | Events                                                                                                                                                                                                     |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dual     | `tag.updated`, `message.created`, `message.updated`, `message.status.changed`, `timer.lifecycle`                                                                                                           |
+| Durable  | `tag.deleted`, `calendar.event.{created,updated,deleted}`, `task.{upserted,deleted}`, `task.batch.{upserted,deleted}`, `task.suggestion.{created,resolved,updated}`, `attention.source.{upserted,removed}` |
+| Realtime | `attention.upserted`, `attention.removed`, `task.suggestion.broadcast`, `attention.item.resolved` (no listener yet), `timer.session_ended`                                                                 |
 
 ## Handling events
 
@@ -50,16 +50,17 @@ bootstrap (`EventHandlersRegistry`); there is no registration step.
 
 ### Consumer groups
 
-| Group             | File                                                    | Ordering key                                                                                      | Handles                                                                 |
-| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `attention-items` | `attention/presentation/events/attention-items.consumer-group.ts` | `user:` + first of `sentToUserId`, `sentToGuestId`, `assigneeUserId`, `suggesteeUserId`, `userId`; else `user:unknown` (a bug if reached) | `task.*`, `task.batch.*`, `task.suggestion.*` (task-attention), `message.*` (message-attention), `calendar.event.*`, `tag.*` (tag-calendar-attention) — 15 events |
-| `suggestion-sync` | `tasks/presentation/events/suggestion-sync.consumer-group.ts` | `assignee:<assigneeUserId>`                                                                        | `task.upserted`, `task.batch.upserted` (`suggestion-sync.handler`)        |
-| `calendar-sync`   | `scheduling/presentation/events/calendar-sync.consumer-group.ts` | `<userId>`                                                                                         | `calendar.event.*` (calendar-sync.event-handler)                        |
-| `messaging`       | `conversations/presentation/events/messaging.consumer-group.ts` | `<messageId>`                                                                              | `attention.message.synced` (`attention-message.handler`)                |
-| `timer-log`       | `focus/presentation/events/timer-log.consumer-group.ts`       | `user:<userId>`                                                                              | `timer.lifecycle` (`timer-log.handler`)                          |
-| `public-views`    | `sharing/presentation/events/public-views.consumer-group.ts` | `sender:<message.senderId>`                                                                        | `message.created` (`guest-message-count.handler`: `public_view_guests.message_count`) |
+| Group                                | File                                                                       | Ordering key                                                                          | Handles                                                                                                              |
+| ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `attention-items`                    | `attention/presentation/events/attention-items.consumer-group.ts`          | `user:<userId>`                                                                       | `attention.source.*` (attention-source), `calendar.event.*`, `tag.*` (tag-calendar-attention)                        |
+| `tasks-attention-projection`         | `tasks/presentation/events/attention-projection.consumer-group.ts`         | `user:` + `assigneeUserId` or `suggesteeUserId`                                       | `task.*`, `task.batch.*`, `task.suggestion.*` → `attention.source.*` (attention-projection.handler)                  |
+| `conversations-attention-projection` | `conversations/presentation/events/attention-projection.consumer-group.ts` | `user:<userId>` (status changed), `user:<sentToUserId>`, else `guest:<sentToGuestId>` | `message.created`, `message.updated`, `message.status.changed` → `attention.source.*` (attention-projection.handler) |
+| `suggestion-sync`                    | `tasks/presentation/events/suggestion-sync.consumer-group.ts`              | `assignee:<assigneeUserId>`                                                           | `task.upserted`, `task.batch.upserted` (`suggestion-sync.handler`)                                                   |
+| `calendar-sync`                      | `scheduling/presentation/events/calendar-sync.consumer-group.ts`           | `<userId>`                                                                            | `calendar.event.*` (calendar-sync.event-handler)                                                                     |
+| `timer-log`                          | `focus/presentation/events/timer-log.consumer-group.ts`                    | `user:<userId>`                                                                       | `timer.lifecycle` (`timer-log.handler`)                                                                              |
+| `public-views`                       | `sharing/presentation/events/public-views.consumer-group.ts`               | `sender:<message.senderId>`                                                           | `message.created` (`guest-message-count.handler`: `public_view_guests.message_count`)                                |
 
-Realtime handlers live per context in `<ctx>/presentation/ws/*.broadcaster.ts` (7 across
+Realtime handlers live per context in `<ctx>/presentation/ws/*.broadcaster.ts` (8 across
 `conversations`, `attention`, `focus`, `tasks`) and emit via `RealtimeBroadcaster`.
 
 ### Rules when adding an event or handler
@@ -165,13 +166,13 @@ dead letters 30 days after `updated_at`. `pending` dead letters are kept.
 
 ## Known gaps
 
-| Gap                              | Notes                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------------------------- |
-| No consumer inbox / dedup        | `TODO` in the runtime; handlers must be idempotent on their own                           |
-| Key prefixes inconsistent        | `calendar-sync`, `messaging` use bare ids. Harmless (keys only matter within a queue)     |
-| Guest-recipient jobs             | `attention-items` enqueues `message.*` for guest recipients; the handler ignores them     |
-| Thread-room duplicates           | Per-recipient publish → `MessagingBroadcaster` emits to the thread room N times; none if sender is alone |
-| Central event catalogue          | All events in `registry/events.registry.ts`; split into `<ctx>/contract/<ctx>.events.ts` in 8.1 |
-| `tag.updated` is Dual            | No realtime handler exists                                                                |
-| Stale comment                    | `MessageBusService.insertJobs` claims it ensures queues; queues are ensured at bootstrap  |
-| No origin device                 | Events and WS pushes carry no triggering device id, so the device that caused a change also receives its push. Normalize event/WS payloads with an origin device id and skip that device |
+| Gap                       | Notes                                                                                                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No consumer inbox / dedup | `TODO` in the runtime; handlers must be idempotent on their own                                                                                                                          |
+| Key prefixes inconsistent | `calendar-sync` uses bare ids. Harmless (keys only matter within a queue)                                                                                                                |
+| Guest-recipient jobs      | `conversations-attention-projection` enqueues `message.*` for guest recipients; the mapper ignores them                                                                                  |
+| Thread-room duplicates    | Per-recipient publish → `MessagingBroadcaster` emits to the thread room N times; none if sender is alone                                                                                 |
+| Central event catalogue   | All events in `registry/events.registry.ts`; split into `<ctx>/contract/<ctx>.events.ts` in 8.1                                                                                          |
+| `tag.updated` is Dual     | No realtime handler exists                                                                                                                                                               |
+| Stale comment             | `MessageBusService.insertJobs` claims it ensures queues; queues are ensured at bootstrap                                                                                                 |
+| No origin device          | Events and WS pushes carry no triggering device id, so the device that caused a change also receives its push. Normalize event/WS payloads with an origin device id and skip that device |

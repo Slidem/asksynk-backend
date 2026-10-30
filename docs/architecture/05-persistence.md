@@ -13,7 +13,7 @@ Repositories return aggregates; queries return views.
 | `scheduling`    | `calendars`, `calendar_events`, `calendar_event_exceptions`, `calendar_event_tags`, `calendar_integrations`, `calendar_event_links` |
 | `conversations` | `message_threads`, `thread_participants`, `messages`, `message_tags`, `message_attachments`                                         |
 | `tasks`         | `tasks`, `task_batches`, `task_suggestions`, `task_tags`, `task_batch_tags`                                                         |
-| `focus`         | `user_timers`, `focus_sessions`, `user_timer_settings`, `user_timer_log`                                                                              |
+| `focus`         | `user_timers`, `focus_sessions`, `user_timer_settings`, `user_timer_log`                                                            |
 | `network`       | `user_invites`, `user_network`                                                                                                      |
 | `sharing`       | `public_views`, `public_view_guests`                                                                                                |
 | `files`         | `attachments`                                                                                                                       |
@@ -67,10 +67,10 @@ What replaces the cascade:
 ## 4. Raw SQL
 
 Under schemas, a cross-context query errors instead of passing silently — including
-inside raw `sql` strings, which lint can't see. Cost: every `sql` template (33 in
-context repositories) must be audited for unqualified table names before the move.
+inside raw `sql` strings, which lint can't see. Cost: every `sql` template (24 in
+context `infrastructure/`) must be audited for unqualified table names before the move.
 Heaviest (all in `<ctx>/infrastructure/persistence/`):
-`drizzle-attention-items.repository.ts`, `drizzle-calendar-events.repository.ts`,
+`drizzle-calendar-events.repository.ts`, `calendar-occurrence.query.ts`,
 `drizzle-messaging.repository.ts`. That is why the schema move is the last wave.
 
 ## 5. Repositories vs queries
@@ -95,10 +95,9 @@ join with a nicer name and invisible to lint.
 
 ## 7. Schema changes queued
 
-| Change                                                                                                    | Wave    | Risk                                                                  |
-| --------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `attention_items`: `source_context` / `source_kind` / `source_id` + unique index; drop `metadata`, `type` | 6       | **High** — data migration ([06 §8](06-attention-core.md#8-migration)) |
-| Drop the 9 cross-context FKs                                                                              | 7.2     | Low (needs the `tag.deleted` handlers first)                          |
-| `pgSchema` per context                                                                                    | 7.3     | Medium-high                                                           |
-| `attachments.placement` → `visibility` + `owner_context`                                                  | 8.2     | Low                                                                   |
-| `tags`: unique on `(user_id, lower(name))`                                                                | backlog | Medium — dedupe case variants first                                   |
+| Change                                                   | Wave    | Risk                                         |
+| -------------------------------------------------------- | ------- | -------------------------------------------- |
+| Drop the 9 cross-context FKs                             | 7.2     | Low (needs the `tag.deleted` handlers first) |
+| `pgSchema` per context                                   | 7.3     | Medium-high                                  |
+| `attachments.placement` → `visibility` + `owner_context` | 8.2     | Low                                          |
+| `tags`: unique on `(user_id, lower(name))`               | backlog | Medium — dedupe case variants first          |

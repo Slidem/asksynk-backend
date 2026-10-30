@@ -1,175 +1,195 @@
 # 06 — The attention core
 
-The product. Design target for Waves 5 (aggregate) and 6 (typed source).
-→ [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md)
+The product.
+→ [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md) (typed source,
+ingestion contract), [ADR 0009](adr/0009-attention-as-pure-projection.md) (pure
+projection)
 
 ## 1. What an attention item is
 
 _A thing that arrived, carrying tags, that the user has to decide about — and the tags
 decide when._
 
-| Data                          | Owner          | Written by                       |
-| ----------------------------- | -------------- | -------------------------------- |
-| source identity               | source context | ingestion, once                  |
-| preview (title, body, sender) | source context | ingestion, every update          |
-| `tagIds`                      | source context | ingestion, every update          |
-| `status`                      | contested — §5 | the user _and_ the source        |
-| `dueDate`, `dueDatePinned`    | **attention**  | the due-date policy, or the user |
-| `note`                        | **attention**  | the user                         |
+A pure projection of its source plus fields attention derives. The user never edits it;
+they act on the source, and the item follows.
 
-An aggregate with a projected slice. `dueDate`, `dueDatePinned` and user-set `status`
-are decisions no source can make — that is the product.
+| Data                                           | Owner          | Written by                                         |
+| ---------------------------------------------- | -------------- | -------------------------------------------------- |
+| source identity                                | source context | ingestion, once                                    |
+| `preview` (title, body, actor, meta)           | source context | ingestion, every upsert                            |
+| `tagIds`                                       | source context | ingestion, every upsert                            |
+| `status`                                       | source context | ingestion, every upsert                            |
+| `dueDate`, `dueDatePinned`, `dueSourceEventId` | **attention**  | the due-date policy, or the source's explicit date |
+| `deletedAt`                                    | **attention**  | the user (`DELETE`)                                |
 
-## 2. Today's problems
+- **Status flows one way.** Message resolved → item resolved; task in progress → item
+  in progress. No `PATCH /attention-items/:id`; the inbox resolves by calling the
+  source (message status, task `PATCH`).
+- **A user delete is permanent.** The item is tombstoned and no later source event
+  revives it (§5).
+- The REST surface is `GET /attention-items` (`?status`, `?sourceKind`), `GET :id`,
+  `DELETE :id`.
 
-See [01 §3.2, §3.6](01-current-state.md#36-attention_items-is-a-projection-wearing-an-aggregates-clothes):
-`type` enum naming sources (3 without producers), source ids in unindexed `metadata`
-jsonb, `upsertFromSource` hardcoding `type: "task"` for tasks and batches, three
-bespoke handlers, hand-rolled idempotency, the pinned-date invariant defended by a
-service `.filter()`. Adding Gmail today = new enum value + metadata arm + handler +
-unindexed probe.
+## 2. Why a projection
 
-## 3. Typed source identity (Wave 6)
+One writer per field: no message ↔ attention loop, no inbox edits drifting from the
+source, and a new channel touches no attention code. Context and rejected
+alternatives: [ADR 0004](adr/0004-attention-as-projection-with-typed-source.md),
+[ADR 0009](adr/0009-attention-as-pure-projection.md).
 
-```ts
-export const attentionItems = attention.table(
-  "attention_items",
-  {
-    id: uuid("id")
-      .primaryKey()
-      .default(sql`uuidv7()`),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+## 3. Typed source identity
 
-    sourceContext: text("source_context").notNull(), // 'conversations' | 'tasks' | 'channels.gmail' | …
-    sourceKind: text("source_kind").notNull(), // 'message' | 'task' | 'task_batch' | 'task_suggestion'
-    sourceId: text("source_id").notNull(), // opaque to attention
-    preview: jsonb("preview").$type<AttentionPreview>().notNull(), // display only
+`apps/migrations/src/schema/attentionItems.ts`:
 
-    status: attentionItemStatus("status").notNull().default("created"),
-    dueDate: timestamp("due_date", { withTimezone: true }),
-    dueDatePinned: boolean("due_date_pinned").notNull().default(false),
-    dueSourceEventId: uuid("due_source_event_id"), // soft ref into scheduling
-    note: text("note"),
-    deletedAt,
-    createdAt,
-    updatedAt,
-  },
-  (t) => [
-    uniqueIndex("uq_attention_items_source").on(
-      t.userId,
-      t.sourceContext,
-      t.sourceKind,
-      t.sourceId,
-    ),
-    // + existing user/status, user/due_date, due_source_event partial indexes
-  ],
-);
-```
+| Column                                               | Type                         | Notes                                                       |
+| ---------------------------------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| `source_context`, `source_kind`, `source_id`         | `text`                       | e.g. `tasks` / `task_batch` / `<uuid>`; opaque to attention |
+| `preview`                                            | `jsonb` (`AttentionPreview`) | display only, never queried                                 |
+| `status`                                             | `attention_item_status` enum | `created \| in_progress \| resolved`                        |
+| `due_date`, `due_date_pinned`, `due_source_event_id` | timestamp, bool, `uuid`      | `due_source_event_id` is a soft ref into scheduling         |
+| `deleted_at`                                         | timestamp                    | user tombstone, sticky                                      |
+
+`uq_attention_items_source (user_id, source_context, source_kind, source_id)` covers
+tombstones — that is what makes a delete sticky — and backs `findBySource` and the
+`ON CONFLICT` upsert. Partial indexes on `(user_id, status)`, `(user_id, due_date)` and
+`due_source_event_id` skip tombstones.
 
 - **Three-part source:** `tasks` alone produces three kinds; one enum would recreate
   the problem.
-- **`text`, not enum:** adding a channel must not need a migration.
-- **Deletes:** `attention_item_type` enum, `AttentionItemMetadata` union, the four
-  `metadata->>` finders (→ one `findBySource` on a unique index), hand-rolled
-  idempotency (the unique index makes upsert real).
-- `attention_item_tags` unchanged, including the deliberate missing FK on `tag_id`.
+- **`text`, not enum:** adding a channel must not need a migration. One constant per
+  source context guards typos.
+- `attention_item_tags` holds `tagIds`, with a deliberate missing FK on `tag_id`.
 
-## 4. Attention publishes the ingestion contract (Wave 6)
+## 4. Attention publishes the ingestion contract
 
-Today each source publishes its own event and attention has a handler per source.
-Instead attention publishes the language and sources conform (Open Host Service +
-Published Language; sources are Conformists).
+Attention publishes the language and sources conform (Open Host Service + Published
+Language; sources are Conformists).
 
 ```ts
-// attention/contract/attention-source.events.ts
+// events.registry.ts (8.1 moves it to attention/contract/attention-source.events.ts)
+const attentionSource = z.object({
+  context: z.string(),
+  kind: z.string(),
+  id: z.string(),
+});
+
 export const AttentionSourceUpserted = defineEvent({
   name: "attention.source.upserted",
   schema: z.object({
     userId: z.string(),
-    source: z.object({ context: z.string(), kind: z.string(), id: z.string() }),
+    source: attentionSource,
     preview: z.object({
       title: z.string(),
       body: z.string().nullable(),
-      actorLabel: z.string().nullable(),
+      actor: z
+        .object({ kind: z.enum(["user", "guest"]), id: z.string() })
+        .nullable(),
+      meta: z.record(z.string(), z.string()), // opaque to attention
     }),
     tagIds: z.array(z.string()),
     status: z.enum(["created", "in_progress", "resolved"]),
     dueDate: z.string().nullable(), // non-null = explicit, pins the item
-    occurredAt: z.string(),
+    occurredAt: z.string(), // due-date policy base
   }),
   delivery: DeliveryMode.Durable,
 });
 export const AttentionSourceRemoved = defineEvent({
   name: "attention.source.removed",
-  schema: z.object({
-    userId: z.string(),
-    source: z.object({ context: z.string(), kind: z.string(), id: z.string() }),
-  }),
+  schema: z.object({ userId: z.string(), source: attentionSource }),
   delivery: DeliveryMode.Durable,
 });
 ```
 
-Attention's consumer group stays user-keyed and also takes the tag / calendar
-recompute events, so every change to a user's attention applies in order.
+- **One event per target user.** The source fans out to recipients / assignees.
+- **Full snapshot, not a delta.** Every upsert carries the whole projected state, so
+  the handler is a plain upsert and redelivery is harmless.
+- **`preview.meta`** carries source-specific display and navigation extras (e.g.
+  `{ threadId }` for a message deep link). Attention stores and returns it verbatim and
+  never reads or queries it; anything attention must filter on becomes a column.
 
-Each source publishes it from a thin outbound translator it owns:
+### Two hops; the source owns translation
+
+```
+tasks.service ──TaskUpserted──▶ tasks/…/attention-projection.handler ──AttentionSourceUpserted──▶ attention-source.handler
+               (outbox, tx 1)   (consumer group tasks-attention-projection)  (outbox, tx 2)        (consumer group attention-items)
+```
+
+Each source context has `<ctx>/presentation/events/attention-projection.handler.ts`
+in its own consumer group (`<ctx>-attention-projection`, keyed `user:<target>`), with
+the mapping in a pure `<ctx>/application/attention-projection.mapper.ts`.
 
 ```ts
-// tasks/presentation/events/attention-projection.publisher.ts — tasks' outbound ACL
-@EventHandler(TaskUpserted, AttentionProjectionConsumerGroup) // keyed user:<assigneeUserId>
-async onTask(p: EventOf<typeof TaskUpserted>) {
-  await this.publisher.publish(AttentionSourceUpserted, {
-    userId: p.assigneeUserId,
-    source: { context: "tasks", kind: "task", id: p.taskId },
-    preview: { title: p.title, body: null, actorLabel: null },
-    tagIds: p.tagIds,
-    status: mapTaskStatusToAttention(p.status), // translation lives here, once
-    dueDate: p.dueDatePinned ? p.dueDate : null,
-    occurredAt: p.createdAt,
-  });
+// tasks/presentation/events/attention-projection.handler.ts — tasks' outbound ACL
+@Transactional()
+@EventHandler(TaskUpserted, TasksAttentionProjectionConsumerGroup)
+async onTaskUpserted(p: EventOf<typeof TaskUpserted>) {
+  await this.publish(fromTask(p)); // pure mapper: tagged → upserted, untagged → removed
 }
 ```
 
-`TaskUpserted.status` is already mapped to attention's status today; part of 6.2 is
-making it carry tasks' own `TaskStatus` so translation happens exactly once.
+| Source                           | Consumes                                                                     | Upserted when                          | Removed when       | `status`                             |
+| -------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- | ------------------ | ------------------------------------ |
+| `conversations/message`          | `message.created`, `message.updated`, `message.status.changed`               | tagged, per non-sender user recipient  | untagged on update | `managed_status.status`              |
+| `tasks/task`, `tasks/task_batch` | `task.upserted`, `task.deleted`, `task.batch.upserted`, `task.batch.deleted` | tagged, per assignee                   | untagged, deleted  | tasks' status, mapped here only      |
+| `tasks/task_suggestion`          | `task.suggestion.{created,updated,resolved}`                                 | created, edited, resolved (`resolved`) | —                  | `pending → created`, else `resolved` |
 
-**Attention then has three handlers, permanently:** `attention-source.handler.ts`
-(upserted/removed, all sources), `tag-changed.handler.ts`,
-`calendar-changed.handler.ts`. Adding Gmail = `channels/gmail/` publishing
-`AttentionSourceUpserted`; attention changes zero lines.
+Source events carry what their translator needs; it never reads foreign state.
+`task.upserted` / `task.batch.upserted` carry tasks' own status, so translation happens
+exactly once, in the mapper. Guests never get items. The assignee is immutable, so
+"assignee change removes the old user's item" has no trigger yet.
 
-## 5. The aggregate (Wave 5)
+Trade-off, accepted: two consumer groups and two dead-letter points per source, one
+extra dispatcher poll of latency, and no causation id linking the hops until tracing
+exists ([roadmap backlog](07-roadmap.md#backlog-no-wave)). Rejected: publishing
+`attention.source.*` from the source's write transaction (every mutation site must
+remember); translators inside attention (source semantics leak into the core).
+
+**Attention has two handlers, permanently:** `attention-source.handler.ts`
+(upserted/removed, all sources) and `tag-calendar-attention.handler.ts` (tag /
+calendar recompute). Both run in the `attention-items` group, which
+is keyed `user:<userId>`. Order between a tag change and a source upsert isn't
+guaranteed across hops; every upsert recomputes the due date from current tags, so it
+converges. Adding Gmail = `channels/gmail/` with its translator; attention changes
+zero lines.
+
+## 5. The projection
+
+No aggregate: the rules are one pure function, and every write is serialized per user
+by the consumer group; the user `DELETE` only sets `deleted_at` and `upsert` never
+writes it (`WHERE deleted_at IS NULL`), so no `version`.
 
 ```ts
-export class AttentionItem {
-  static open(input: OpenAttentionItem): AttentionItem; // source triple + userId non-empty
-  static rehydrate(props: AttentionItemProps): AttentionItem;
-
-  // owned by attention
-  transitionTo(status: AttentionItemStatus, now: Date): boolean;
-  pinDueDate(dueDate: Date, now: Date): void;
-  applyDueDateDecision(decision: DueDateDecision, now: Date): boolean; // NO-OP when pinned
-  annotate(note: string | null, now: Date): void;
-
-  // mirrored from the source
-  applyMirror(m: { preview; tagIds; status }, now: Date): boolean;
-
-  belongsTo(userId: string): boolean;
-  get needsDueDateRecompute(): boolean; // !pinned && !deleted && status !== "resolved"
-}
+// attention/domain/attention-projection.ts
+/** Next state of the item, or null when nothing changes (no write, no realtime push). */
+export function applySnapshot(
+  current: AttentionItem | null,
+  snapshot: AttentionSourceSnapshot,
+  decision: DueDateDecision,
+): AttentionItemState | null; // every column an upsert writes; never `deletedAt`
 ```
 
-- `applyDueDateDecision` no-ops when pinned — the invariant moves out of the service.
-- `boolean` returns let the application publish `attention.upserted` only on real
-  change (today recompute republishes unconditionally).
+| Case                        | Result                                                            |
+| --------------------------- | ----------------------------------------------------------------- |
+| `current` tombstoned        | `null` — a user delete is permanent                               |
+| `snapshot.dueDate` non-null | `dueDate` = it, `dueDatePinned = true`, `dueSourceEventId = null` |
+| otherwise                   | `decideDueDate` on `occurredAt`, unpinned                         |
+| nothing differs             | `null`                                                            |
 
-**On `status`: don't over-model.** It is bidirectional (task completed → item
-resolved; user resolves tagged-message item → `attention.message.synced` →
-`messages.managed_status`) and the loop is broken by three idempotency guards that
-work. Keep last-writer-wins and the outbound event; just route both writers through
-`applyMirror` / `transitionTo`.
+`attention.source.removed` hard-deletes a live item (tags cascade) and publishes
+`attention.removed`; a tombstoned item stays as it is, so untag → retag never revives
+it. Tombstones of deleted sources stay in the table.
+
+`AttentionProjectionService` (application) is orchestration only: `findBySource` →
+due-date decision → `applySnapshot` → `upsert` → `attention.upserted` on change, plus
+`attention.item.resolved` on the transition to `resolved`. The repository's upsert is
+`ON CONFLICT … DO UPDATE … WHERE deleted_at IS NULL`, so a delete racing an upsert
+still wins.
+Recompute (tag / calendar handlers) filters `!dueDatePinned && !deleted && status !==
+"resolved"`, fetches modes + occurrences once, `decideDueDate` per item, saves and
+publishes only what changed (`AttentionDueDateService`). The base is the item's
+`createdAt`. `tag.deleted` removes a non-resolved item left with no tags, as an untag
+would (the source's tag rows cascade without an event). `AttentionItemsService` keeps
+`get` / `list` / `delete`.
 
 ## 6. The tag → due-date policy
 
@@ -178,8 +198,7 @@ The pure function `attention/domain/due-date.policy.ts`, called by
 occurrences from `CalendarOccurrencePort`.
 
 ```ts
-// domain/due-date.policy.ts
-export type TimeblockOccurrence = { startAt: Date; eventId: string };
+// attention/domain/due-date.policy.ts
 export type DueDateDecision = {
   dueDate: Date | null;
   dueSourceEventId: string | null;
@@ -189,70 +208,23 @@ export type DueDateDecision = {
  *  of an event carrying that tag. Ties keep the first candidate. */
 export function decideDueDate(input: {
   answerModes: readonly AnswerModeSpec[];
-  occurrences: ReadonlyMap<string, TimeblockOccurrence>;
+  occurrences: ReadonlyMap<string, TimeblockOccurrence>; // by tagId
   base: Date;
-}): DueDateDecision {
-  let dueDate: Date | null = null;
-  let dueSourceEventId: string | null = null;
-  for (const mode of input.answerModes) {
-    if (mode.type === "immediately") {
-      const candidate = new Date(
-        input.base.getTime() + mode.responseTimeMillis,
-      );
-      if (!dueDate || candidate < dueDate) {
-        dueDate = candidate;
-        dueSourceEventId = null;
-      }
-    } else {
-      const occ = input.occurrences.get(mode.tagId);
-      if (occ && (!dueDate || occ.startAt < dueDate)) {
-        dueDate = occ.startAt;
-        dueSourceEventId = occ.eventId;
-      }
-    }
-  }
-  return { dueDate, dueSourceEventId };
-}
+}): DueDateDecision;
 ```
 
 Unit cases: immediate wins, timeblock wins, mixed tie, no tags, timeblock with no
 upcoming occurrence.
 
-Ports declared by attention, in its own language; bound with `useExisting`:
-
-```ts
-// attention/domain/ports/
-export abstract class TagAnswerModePort {
-  abstract getAnswerModes(tagIds: string[]): Promise<AnswerModeSpec[]>;
-}
-export abstract class TimeblockOccurrencePort {
-  abstract findNextOccurrenceByTag(tagIds: string[], after: Date): Promise<Map<string, TimeblockOccurrence>>;
-}
-
-// attention.module.ts
-{ provide: TagAnswerModePort,       useExisting: TagCatalogPort },          // tagging/contract
-{ provide: TimeblockOccurrencePort, useExisting: CalendarOccurrencePort },  // scheduling/contract
-```
-
-The recompute use case is then orchestration only: filter `needsDueDateRecompute`,
-fetch modes + occurrences once, `decideDueDate` per item, save + publish when
-`applyDueDateDecision` returns true.
+Attention injects the published ports directly (`TaggingModule`, `SchedulingModule`
+imports); no attention-side port wraps them until a second implementation exists.
 
 ## 7. Designed-in growth
 
-| Feature                  | Cost after this design                                      | Do now                                                                                                        |
-| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Gmail / Slack / WhatsApp | `channels/<provider>/` publishing `AttentionSourceUpserted` | Nothing beyond Wave 6. Don't create `channels/` speculatively                                                 |
-| Gamification             | `momentum/` consuming `attention.item.resolved`             | Publish `attention.item.resolved { userId, itemId, resolvedAt, dueDate, wasOverdue }` (6.5) so history exists |
-| Analytics                | `insights` projections from events                          | Nothing. Don't use the outbox as an event log (retention prunes it at 30 days)                                |
-| AI agents                | Another `Actor` through the same application layer          | `Actor` in every application method                                                                           |
-
-## 8. Migration
-
-1. Add `source_*` + `preview` nullable; keep `type` and `metadata`.
-2. Backfill per old `type`: `tagged_message → ('conversations','message', metadata->>'messageId')`,
-   `task → ('tasks','task'|'task_batch', …)`, `suggested_task → ('tasks','task_suggestion', metadata->>'suggestionId')`.
-3. Verify counts per old `type` = counts per `(source_context, source_kind)`; zero nulls.
-4. Add the unique index. If it fails there are duplicates — investigate, don't force.
-5. Switch reads to `findBySource`; confirm index scan with `EXPLAIN`.
-6. **Separate commit:** drop `metadata`, `type`, the enum. Irreversible.
+| Feature                  | Cost after this design                                 | Do now                                                                                                                      |
+| ------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Gmail / Slack / WhatsApp | `channels/<provider>/` with its own translator handler | Nothing. Don't create `channels/` speculatively                                                                             |
+| Gamification             | `momentum/` consuming `attention.item.resolved`        | `attention.item.resolved { userId, itemId, resolvedAt, dueDate, wasOverdue }` is published (realtime); make it durable then |
+| Analytics                | `insights` projections from events                     | Nothing. Don't use the outbox as an event log (retention prunes it at 30 days)                                              |
+| AI agents                | Another `Actor` through the same application layer     | `Actor` in every application method                                                                                         |
+| Tracing across hops      | Causation / correlation id on the event envelope       | Nothing; backlog                                                                                                            |

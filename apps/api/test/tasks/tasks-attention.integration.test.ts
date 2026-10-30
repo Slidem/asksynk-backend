@@ -42,26 +42,13 @@ import {
 const POLL_TIMEOUT_MS = 10000;
 const ASSERT_TOLERANCE_MS = 10000;
 
-interface TaskMeta {
-  type: "task";
-  title: string;
-  taskId?: string;
-  taskBatchId?: string;
-}
+type TasksKind = "task" | "task_batch" | "task_suggestion";
 
-interface SuggestedTaskMeta {
-  type: "suggested_task";
-  suggestionId: string;
-  suggesterUserId: string;
-  title: string;
-}
-
-function taskMeta(i: AttentionItemResponse): TaskMeta {
-  return i.metadata as unknown as TaskMeta;
-}
-
-function suggMeta(i: AttentionItemResponse): SuggestedTaskMeta {
-  return i.metadata as unknown as SuggestedTaskMeta;
+// Id of the tasks-context source the item projects, if it is of `kind`.
+function sourceIdOf(i: AttentionItemResponse, kind: TasksKind): string | null {
+  return i.source.context === "tasks" && i.source.kind === kind
+    ? i.source.id
+    : null;
 }
 
 function isoNoMillis(d: Date): string {
@@ -356,9 +343,15 @@ describe("Tasks → Attention Items (integration)", () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Ship it", tagIds: [tagId] });
 
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
-      expect(item.type).toBe("task");
+      expect(item.source).toEqual({
+        context: "tasks",
+        kind: "task",
+        id: task.id,
+      });
+      expect(item.preview.title).toBe("Ship it");
+      expect(item.dueDatePinned).toBe(false);
       expect(item.userId).toBe(owner.id);
       expect(item.status).toBe("created");
       expect(item.tagIds).toEqual([tagId]);
@@ -369,19 +362,19 @@ describe("Tasks → Attention Items (integration)", () => {
 
     it("creates no item for an untagged task", async () => {
       const task = await createTask({ title: "No tags" });
-      await awaitNoItem((i) => taskMeta(i).taskId === task.id);
+      await awaitNoItem((i) => sourceIdOf(i, "task") === task.id);
     });
 
     it("updates the SAME item (no new id) when the title changes", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Old title", tagIds: [tagId] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await patchTask(task.id, { title: "New title" });
 
       const updated = await awaitItemState(
         item.id,
-        (i) => taskMeta(i).title === "New title",
+        (i) => i.preview.title === "New title",
       );
       expect(updated.id).toBe(item.id);
     });
@@ -390,7 +383,7 @@ describe("Tasks → Attention Items (integration)", () => {
       const fast = await createTag(10 * 60 * 1000);
       const slow = await createTag(60 * 60 * 1000);
       const task = await createTask({ title: "Retag", tagIds: [slow] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await patchTask(task.id, { tagIds: [fast] });
 
@@ -404,17 +397,17 @@ describe("Tasks → Attention Items (integration)", () => {
     it("removes the item when all tags are cleared", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Will untag", tagIds: [tagId] });
-      await awaitItem((i) => taskMeta(i).taskId === task.id);
+      await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await patchTask(task.id, { tagIds: [] });
 
-      await awaitNoItem((i) => taskMeta(i).taskId === task.id);
+      await awaitNoItem((i) => sourceIdOf(i, "task") === task.id);
     });
 
     it("pins the due date when one is set explicitly", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Pin me", tagIds: [tagId] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       const due = new Date(Date.now() + 5 * 60 * 60 * 1000);
       await patchTask(task.id, { dueDate: isoNoMillis(due) });
@@ -423,12 +416,41 @@ describe("Tasks → Attention Items (integration)", () => {
         approxEqual(i.dueDate, due),
       );
       expect(updated.id).toBe(item.id);
+      expect(updated.dueDatePinned).toBe(true);
+    });
+
+    it("keeps a pinned due date across a tag recompute", async () => {
+      const tagId = await createTag();
+      const due = new Date(Date.now() + 5 * 60 * 60 * 1000);
+      const task = await createTask({
+        title: "Pinned",
+        tagIds: [tagId],
+        dueDate: isoNoMillis(due),
+      });
+      const item = await awaitItem(
+        (i) => sourceIdOf(i, "task") === task.id && i.dueDatePinned,
+      );
+      expect(approxEqual(item.dueDate, due)).toBe(true);
+
+      await request(app.getHttpServer())
+        .patch(`/tags/${tagId}`)
+        .set("x-test-user-id", owner.id)
+        .send({
+          answerMode: { type: "immediately", responseTimeMillis: 60 * 1000 },
+        })
+        .expect(200);
+
+      // Let the tag recompute run, then assert the date did not move.
+      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
+      const after = (await getItems()).find((i) => i.id === item.id)!;
+      expect(after.dueDate).toBe(item.dueDate);
+      expect(after.dueDatePinned).toBe(true);
     });
 
     it("mirrors status changes onto the item", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Progress", tagIds: [tagId] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await patchTask(task.id, { status: "in_progress" });
       const inProgress = await awaitItemState(
@@ -441,7 +463,7 @@ describe("Tasks → Attention Items (integration)", () => {
     it("resolves the item when the task is completed", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Finish", tagIds: [tagId] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await patchTask(task.id, { status: "completed" });
 
@@ -455,11 +477,11 @@ describe("Tasks → Attention Items (integration)", () => {
     it("removes the item when the task is deleted", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Delete me", tagIds: [tagId] });
-      await awaitItem((i) => taskMeta(i).taskId === task.id);
+      await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await deleteTask(task.id);
 
-      await awaitNoItem((i) => taskMeta(i).taskId === task.id);
+      await awaitNoItem((i) => sourceIdOf(i, "task") === task.id);
     });
   });
 
@@ -480,19 +502,19 @@ describe("Tasks → Attention Items (integration)", () => {
       const tagId = await createTag();
       const batch = await createBatch(batchBody(tagId));
 
-      const item = await awaitItem((i) => taskMeta(i).taskBatchId === batch.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task_batch") === batch.id);
       expect(item.status).toBe("created");
 
       const items = await getItems();
       expect(
-        items.filter((i) => taskMeta(i).taskBatchId === batch.id),
+        items.filter((i) => sourceIdOf(i, "task_batch") === batch.id),
       ).toHaveLength(1);
     });
 
     it("goes in_progress when one of two children completes", async () => {
       const tagId = await createTag();
       const batch = await createBatch(batchBody(tagId));
-      const item = await awaitItem((i) => taskMeta(i).taskBatchId === batch.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task_batch") === batch.id);
 
       await patchTask(batch.tasks[0].id, { status: "completed" });
 
@@ -506,7 +528,7 @@ describe("Tasks → Attention Items (integration)", () => {
     it("resolves only when all children complete (same id throughout)", async () => {
       const tagId = await createTag();
       const batch = await createBatch(batchBody(tagId));
-      const item = await awaitItem((i) => taskMeta(i).taskBatchId === batch.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task_batch") === batch.id);
 
       await patchTask(batch.tasks[0].id, { status: "completed" });
       await patchTask(batch.tasks[1].id, { status: "completed" });
@@ -521,7 +543,7 @@ describe("Tasks → Attention Items (integration)", () => {
     it("re-aggregates without a new item when a child is added", async () => {
       const tagId = await createTag();
       const batch = await createBatch(batchBody(tagId));
-      const item = await awaitItem((i) => taskMeta(i).taskBatchId === batch.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task_batch") === batch.id);
 
       await createTask({ title: "c", batchId: batch.id });
 
@@ -529,7 +551,7 @@ describe("Tasks → Attention Items (integration)", () => {
       await new Promise((r) => setTimeout(r, 500));
       const items = await getItems();
       const batchItems = items.filter(
-        (i) => taskMeta(i).taskBatchId === batch.id,
+        (i) => sourceIdOf(i, "task_batch") === batch.id,
       );
       expect(batchItems).toHaveLength(1);
       expect(batchItems[0].id).toBe(item.id);
@@ -539,7 +561,7 @@ describe("Tasks → Attention Items (integration)", () => {
       const tagId = await createTag();
       const other = await createTag(60 * 60 * 1000);
       const batch = await createBatch(batchBody(tagId));
-      const item = await awaitItem((i) => taskMeta(i).taskBatchId === batch.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task_batch") === batch.id);
 
       await patchBatch(batch.id, { tagIds: [other] });
 
@@ -553,11 +575,11 @@ describe("Tasks → Attention Items (integration)", () => {
     it("removes the item when the batch is deleted", async () => {
       const tagId = await createTag();
       const batch = await createBatch(batchBody(tagId));
-      await awaitItem((i) => taskMeta(i).taskBatchId === batch.id);
+      await awaitItem((i) => sourceIdOf(i, "task_batch") === batch.id);
 
       await deleteBatch(batch.id);
 
-      await awaitNoItem((i) => taskMeta(i).taskBatchId === batch.id);
+      await awaitNoItem((i) => sourceIdOf(i, "task_batch") === batch.id);
     });
   });
 
@@ -569,11 +591,12 @@ describe("Tasks → Attention Items (integration)", () => {
     it("opens an untagged suggested_task inbox item for the suggestee", async () => {
       const sugg = await suggest({ kind: "task", title: "Please do X" });
 
-      const item = await awaitItem((i) => suggMeta(i).suggestionId === sugg.id);
-      expect(item.type).toBe("suggested_task");
+      const item = await awaitItem((i) => sourceIdOf(i, "task_suggestion") === sugg.id);
+      expect(item.source.kind).toBe("task_suggestion");
       expect(item.userId).toBe(owner.id);
       expect(item.tagIds).toEqual([]);
-      expect(suggMeta(item).suggesterUserId).toBe(suggester.id);
+      expect(item.preview.title).toBe("Please do X");
+      expect(item.preview.actor).toEqual({ kind: "user", id: suggester.id });
     });
 
     it("resolves the suggestion item AND creates a real task item on accept", async () => {
@@ -584,7 +607,7 @@ describe("Tasks → Attention Items (integration)", () => {
         tagIds: [tagId],
       });
       const suggItem = await awaitItem(
-        (i) => suggMeta(i).suggestionId === sugg.id,
+        (i) => sourceIdOf(i, "task_suggestion") === sugg.id,
       );
 
       await setSuggestionStatus(sugg.id, "accepted");
@@ -592,31 +615,31 @@ describe("Tasks → Attention Items (integration)", () => {
       await awaitItemState(suggItem.id, (i) => i.status === "resolved");
       const taskItem = await awaitItem(
         (i) =>
-          i.type === "task" &&
+          sourceIdOf(i, "task") !== null &&
           i.tagIds.includes(tagId) &&
           i.status !== "resolved",
       );
       expect(taskItem.id).not.toBe(suggItem.id);
-      expect(taskMeta(taskItem).taskId).toBeDefined();
+      expect(sourceIdOf(taskItem, "task")).not.toBeNull();
     });
 
     it("resolves the item and creates no task on reject", async () => {
       const sugg = await suggest({ kind: "task", title: "Nope" });
       const suggItem = await awaitItem(
-        (i) => suggMeta(i).suggestionId === sugg.id,
+        (i) => sourceIdOf(i, "task_suggestion") === sugg.id,
       );
 
       await setSuggestionStatus(sugg.id, "rejected");
 
       await awaitItemState(suggItem.id, (i) => i.status === "resolved");
       const items = await getItems();
-      expect(items.some((i) => i.type === "task")).toBe(false);
+      expect(items.some((i) => sourceIdOf(i, "task") !== null)).toBe(false);
     });
 
     it("resolves the item when the suggester rescinds", async () => {
       const sugg = await suggest({ kind: "task", title: "Take it back" });
       const suggItem = await awaitItem(
-        (i) => suggMeta(i).suggestionId === sugg.id,
+        (i) => sourceIdOf(i, "task_suggestion") === sugg.id,
       );
 
       await rescindSuggestion(sugg.id);
@@ -627,14 +650,14 @@ describe("Tasks → Attention Items (integration)", () => {
     it("updates the SAME suggestion item when the pending payload is edited", async () => {
       const sugg = await suggest({ kind: "task", title: "Draft title" });
       const suggItem = await awaitItem(
-        (i) => suggMeta(i).suggestionId === sugg.id,
+        (i) => sourceIdOf(i, "task_suggestion") === sugg.id,
       );
 
       await editSuggestion(sugg.id, { title: "Edited title" });
 
       const updated = await awaitItemState(
         suggItem.id,
-        (i) => suggMeta(i).title === "Edited title",
+        (i) => i.preview.title === "Edited title",
       );
       expect(updated.id).toBe(suggItem.id);
     });
@@ -648,7 +671,7 @@ describe("Tasks → Attention Items (integration)", () => {
     it("publishes a realtime attention.upserted matching the GET response", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Notify", tagIds: [tagId] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       const row = await awaitOutbox(
         "attention.upserted",
@@ -664,7 +687,7 @@ describe("Tasks → Attention Items (integration)", () => {
     it("publishes attention.removed when a task-sourced item is deleted", async () => {
       const tagId = await createTag();
       const task = await createTask({ title: "Removable", tagIds: [tagId] });
-      const item = await awaitItem((i) => taskMeta(i).taskId === task.id);
+      const item = await awaitItem((i) => sourceIdOf(i, "task") === task.id);
 
       await deleteTask(task.id);
 

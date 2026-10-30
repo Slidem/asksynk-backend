@@ -10,7 +10,7 @@ import { TaskSuggestionsService } from "@/api/tasks/application/task-suggestions
 import { SuggestionSyncConsumerGroup } from "@/api/tasks/presentation/events/suggestion-sync.consumer-group";
 
 // Materialized tasks/batches changed: rebroadcast their parent suggestion. Own
-// consumer group so it never starves the attention-items consumer of the same events.
+// consumer group so it never starves the attention translator of the same events.
 @Injectable()
 export class SuggestionSyncHandler {
   constructor(private readonly suggestions: TaskSuggestionsService) {}

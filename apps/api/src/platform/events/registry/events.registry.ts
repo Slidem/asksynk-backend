@@ -3,11 +3,23 @@ import z from "zod";
 import { defineEvent } from "@/api/platform/events/registry/events.registration";
 import { DeliveryMode } from "@/api/platform/events/registry/events.types";
 
-// A managed message's status mirrors the attention-item status 1:1.
-const managedStatusEnum = z.enum(["created", "in_progress", "resolved"]);
 const managedStatusSchema = z.object({
   type: z.literal("tagged_message"),
-  status: managedStatusEnum,
+  status: z.enum(["created", "in_progress", "resolved"]),
+});
+
+const messageSnapshotSchema = z.object({
+  id: z.string(),
+  threadId: z.string(),
+  parentMessageId: z.string().nullable(),
+  senderKind: z.enum(["user", "guest"]),
+  senderId: z.string(),
+  body: z.string(),
+  tagIds: z.optional(z.array(z.string())),
+  attachmentIds: z.optional(z.array(z.string())),
+  suggestionId: z.string().nullable().optional(),
+  managedStatus: managedStatusSchema.optional(),
+  createdAt: z.string(),
 });
 
 export const TagUpdated = defineEvent({
@@ -34,19 +46,7 @@ export const MessageCreated = defineEvent({
   name: "message.created",
   schema: z.object({
     threadId: z.string(),
-    message: z.object({
-      id: z.string(),
-      threadId: z.string(),
-      parentMessageId: z.string().nullable(),
-      senderKind: z.enum(["user", "guest"]),
-      senderId: z.string(),
-      body: z.string(),
-      tagIds: z.optional(z.array(z.string())),
-      attachmentIds: z.optional(z.array(z.string())),
-      suggestionId: z.string().nullable().optional(),
-      managedStatus: managedStatusSchema.optional(),
-      createdAt: z.string(),
-    }),
+    message: messageSnapshotSchema,
     sentToUserId: z.string().optional(),
     sentToGuestId: z.string().optional(),
   }),
@@ -74,9 +74,9 @@ export const MessageUpdated = defineEvent({
   delivery: DeliveryMode.Dual,
 });
 
-// Recipient changed a tagged message's managed_status (WS message.updateStatus)
-// or it was synced from the inbox. Durable leg mirrors it onto the linked
-// attention item; realtime leg pushes message.status.updated to the thread.
+// Recipient changed a tagged message's managed_status (WS message.updateStatus).
+// Carries the message snapshot so the attention translator needs no lookup.
+// Realtime leg pushes message.status.updated to the thread.
 export const MessageManagedStatusChanged = defineEvent({
   name: "message.status.changed",
   schema: z.object({
@@ -84,22 +84,9 @@ export const MessageManagedStatusChanged = defineEvent({
     threadId: z.string(),
     messageId: z.string(),
     managedStatus: managedStatusSchema,
+    message: messageSnapshotSchema,
   }),
   delivery: DeliveryMode.Dual,
-});
-
-// Reverse sync: a tagged_message attention item's status was changed from the
-// inbox (PATCH /attention-items/:id). The messaging consumer reflects it back
-// onto the message. Published only from the user PATCH, never from the forward
-// sync, so the two directions cannot loop.
-export const AttentionMessageStatusChanged = defineEvent({
-  name: "attention.message.synced",
-  schema: z.object({
-    userId: z.string(),
-    messageId: z.string(),
-    status: managedStatusEnum,
-  }),
-  delivery: DeliveryMode.Durable,
 });
 
 export const CalendarEventCreated = defineEvent({
@@ -176,10 +163,9 @@ export const TimerSessionEnded = defineEvent({
   delivery: DeliveryMode.Realtime,
 });
 
-// Tasks emit durable domain events; the attention-items consumer group mirrors
-// them into attention items. Status fields already carry the mapped attention
-// status (created|in_progress|resolved) so the consumer needs no task imports.
-const attentionStatusSchema = z.enum(["created", "in_progress", "resolved"]);
+// Tasks emit durable domain events carrying their own state; tasks' attention
+// translator maps them onto attention.source.*.
+const taskStatusSchema = z.enum(["todo", "in_progress", "completed"]);
 
 export const TaskUpserted = defineEvent({
   name: "task.upserted",
@@ -187,10 +173,9 @@ export const TaskUpserted = defineEvent({
     taskId: z.string(),
     assigneeUserId: z.string(),
     title: z.string(),
-    status: attentionStatusSchema,
+    status: taskStatusSchema,
     tagIds: z.array(z.string()),
     dueDate: z.string().nullable(),
-    dueDatePinned: z.boolean(),
     createdAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
@@ -208,10 +193,9 @@ export const TaskBatchUpserted = defineEvent({
     taskBatchId: z.string(),
     assigneeUserId: z.string(),
     title: z.string(),
-    aggregateStatus: attentionStatusSchema,
+    aggregateStatus: taskStatusSchema,
     tagIds: z.array(z.string()),
     dueDate: z.string().nullable(),
-    dueDatePinned: z.boolean(),
     createdAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
@@ -223,70 +207,102 @@ export const TaskBatchDeleted = defineEvent({
   delivery: DeliveryMode.Durable,
 });
 
+// Full post-state of a suggestion; shared by created / updated / resolved.
+const taskSuggestionSnapshotSchema = z.object({
+  suggestionId: z.string(),
+  suggesteeUserId: z.string(),
+  suggesterUserId: z.string(),
+  status: z.enum(["pending", "accepted", "rejected"]),
+  title: z.string(),
+  dueDate: z.string().nullable(),
+  createdAt: z.string(),
+});
+
 export const TaskSuggested = defineEvent({
   name: "task.suggestion.created",
-  schema: z.object({
-    suggestionId: z.string(),
-    suggesteeUserId: z.string(),
-    suggesterUserId: z.string(),
-    title: z.string(),
-    dueDate: z.string().nullable(),
-  }),
+  schema: taskSuggestionSnapshotSchema,
   delivery: DeliveryMode.Durable,
 });
 
 export const TaskSuggestionResolved = defineEvent({
   name: "task.suggestion.resolved",
-  schema: z.object({ suggestionId: z.string(), suggesteeUserId: z.string() }),
+  schema: taskSuggestionSnapshotSchema,
   delivery: DeliveryMode.Durable,
 });
 
 export const TaskSuggestionUpdated = defineEvent({
   name: "task.suggestion.updated",
+  schema: taskSuggestionSnapshotSchema,
+  delivery: DeliveryMode.Durable,
+});
+
+// Attention's ingestion contract (Published Language): each source's translator
+// publishes one event per target user carrying the full projected state.
+const attentionSourceSchema = z.object({
+  context: z.string(),
+  kind: z.string(),
+  id: z.string(),
+});
+
+const attentionStatusSchema = z.enum(["created", "in_progress", "resolved"]);
+
+const attentionPreviewSchema = z.object({
+  title: z.string(),
+  body: z.string().nullable(),
+  actor: z
+    .object({ kind: z.enum(["user", "guest"]), id: z.string() })
+    .nullable(),
+  // Source-specific display / navigation extras; opaque to attention.
+  meta: z.record(z.string(), z.string()),
+});
+
+export const AttentionSourceUpserted = defineEvent({
+  name: "attention.source.upserted",
   schema: z.object({
-    suggestionId: z.string(),
-    suggesteeUserId: z.string(),
-    title: z.string(),
+    userId: z.string(),
+    source: attentionSourceSchema,
+    preview: attentionPreviewSchema,
+    tagIds: z.array(z.string()),
+    status: attentionStatusSchema,
+    // Non-null = explicit, pins the item.
     dueDate: z.string().nullable(),
+    // Due-date policy base.
+    occurredAt: z.string(),
   }),
   delivery: DeliveryMode.Durable,
 });
 
-const attentionItemTypeSchema = z.enum([
-  "tagged_message",
-  "incoming_email",
-  "slack_message",
-  "whatsapp_message",
-  "suggested_timeblock",
-  "suggested_task",
-  "task",
-]);
+export const AttentionSourceRemoved = defineEvent({
+  name: "attention.source.removed",
+  schema: z.object({ userId: z.string(), source: attentionSourceSchema }),
+  delivery: DeliveryMode.Durable,
+});
+
+// An item turned resolved. No consumer yet (future momentum/insights); realtime
+// so nothing piles up in the outbox. Switch to durable when a consumer group lands.
+export const AttentionItemResolved = defineEvent({
+  name: "attention.item.resolved",
+  schema: z.object({
+    userId: z.string(),
+    itemId: z.string(),
+    resolvedAt: z.string(),
+    dueDate: z.string().nullable(),
+    wasOverdue: z.boolean(),
+  }),
+  delivery: DeliveryMode.Realtime,
+});
 
 // Mirrors AttentionItemResponse (apps/api). Kept inline because the shared
-// package must not depend on apps/api. metadata is `{ type } & Partial<...>`.
+// package must not depend on apps/api.
 const attentionItemDtoSchema = z.object({
   id: z.string(),
   userId: z.string(),
-  type: attentionItemTypeSchema,
-  status: z.enum(["created", "in_progress", "resolved"]),
-  dueDate: z.string().nullable(),
-  note: z.string().nullable(),
-  metadata: z.object({
-    type: attentionItemTypeSchema,
-    messageId: z.string().optional(),
-    threadId: z.string().optional(),
-    senderId: z.string().optional(),
-    senderType: z.enum(["user", "guest"]).optional(),
-    content: z.string().optional(),
-    originalTagIds: z.array(z.string()).optional(),
-    title: z.string().optional(),
-    taskId: z.string().optional(),
-    taskBatchId: z.string().optional(),
-    suggestionId: z.string().optional(),
-    suggesterUserId: z.string().optional(),
-  }),
+  source: attentionSourceSchema,
+  preview: attentionPreviewSchema,
+  status: attentionStatusSchema,
   tagIds: z.array(z.string()),
-  sourceCalendarEventId: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  dueDatePinned: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

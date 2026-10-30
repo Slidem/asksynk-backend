@@ -6,7 +6,7 @@ import { MessageAttachmentRepository } from "@/api/conversations/domain/ports/me
 import { MessagingRepository } from "@/api/conversations/domain/ports/messaging.repository";
 import { DrizzleMessageAttachmentRepository } from "@/api/conversations/infrastructure/persistence/drizzle-message-attachment.repository";
 import { DrizzleMessagingRepository } from "@/api/conversations/infrastructure/persistence/drizzle-messaging.repository";
-import { AttentionMessageHandler } from "@/api/conversations/presentation/events/attention-message.handler";
+import { ConversationsAttentionProjectionHandler } from "@/api/conversations/presentation/events/attention-projection.handler";
 import { GuestMessagingController } from "@/api/conversations/presentation/rest/guest-messaging.controller";
 import { ThreadsController } from "@/api/conversations/presentation/rest/threads.controller";
 import { ConversationsGateway } from "@/api/conversations/presentation/ws/conversations.gateway";
@@ -35,7 +35,7 @@ import { TasksModule } from "@/api/tasks/tasks.module";
       useClass: DrizzleMessageAttachmentRepository,
     },
     MessageAttachmentResolver,
-    AttentionMessageHandler,
+    ConversationsAttentionProjectionHandler,
     MessagingBroadcaster,
     ConversationsGateway,
   ],

@@ -9,7 +9,6 @@ import {
 } from "@/api/platform/events/registry/events.registry";
 import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 import { TaskBatchesService } from "@/api/tasks/application/task-batches.service";
-import { mapTaskStatusToAttention } from "@/api/tasks/application/task-status.util";
 import { TasksRepository } from "@/api/tasks/domain/ports/tasks.repository";
 import { Task } from "@/api/tasks/domain/task";
 import {
@@ -136,18 +135,16 @@ export class TasksService {
     }
   }
 
-  // One durable event carrying the full post-state; the attention-items consumer
-  // creates/updates/removes the assignee's single "task" item. Untagged tasks
-  // produce no item (the consumer no-ops). Due date is derived consumer-side.
+  // One durable event carrying the full post-state; tasks' attention translator
+  // turns it into the assignee's item (or its removal when untagged).
   private async publishTaskUpserted(task: Task): Promise<void> {
     await this.eventsPublisher.publish(TaskUpserted, {
       taskId: task.id,
       assigneeUserId: task.assigneeUserId,
       title: task.title,
-      status: mapTaskStatusToAttention(task.status),
+      status: task.status,
       tagIds: task.tagIds,
       dueDate: task.dueDate ? task.dueDate.toISOString() : null,
-      dueDatePinned: task.dueDate !== null,
       createdAt: task.createdAt.toISOString(),
     });
   }

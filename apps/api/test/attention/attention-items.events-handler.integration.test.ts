@@ -59,18 +59,13 @@ type ImmediateMode = { type: "immediately"; responseTimeMillis: number };
 type TimeblockMode = { type: "timeblock" };
 type AnswerModeInput = ImmediateMode | TimeblockMode;
 
-interface TaggedMessageMetadata {
-  type: "tagged_message";
-  messageId: string;
-  threadId: string;
-  senderId: string;
-  senderType: "user" | "guest";
-  content: string;
-  originalTagIds: string[];
-}
+// The response plus `dueSourceEventId`, read from the DB (not on the wire).
+type TestItem = AttentionItemResponse & { dueSourceEventId: string | null };
 
-function msgMeta(i: AttentionItemResponse): TaggedMessageMetadata {
-  return i.metadata as unknown as TaggedMessageMetadata;
+function messageIdOf(i: AttentionItemResponse): string | null {
+  return i.source.context === "conversations" && i.source.kind === "message"
+    ? i.source.id
+    : null;
 }
 
 function isoNoMillis(d: Date): string {
@@ -322,25 +317,65 @@ describe("AttentionItemsEventHandler (integration)", () => {
     );
   }
 
-  async function getItems(): Promise<AttentionItemResponse[]> {
+  async function getItems(): Promise<TestItem[]> {
     const res = await request(app.getHttpServer())
       .get("/attention-items")
       .set("x-test-user-id", recipient.id)
       .expect(200);
-    return res.body;
+    const items = res.body as AttentionItemResponse[];
+    if (items.length === 0) return [];
+    const rows = await db
+      .select({
+        id: attentionItems.id,
+        dueSourceEventId: attentionItems.dueSourceEventId,
+      })
+      .from(attentionItems)
+      .where(
+        inArray(
+          attentionItems.id,
+          items.map((i) => i.id),
+        ),
+      );
+    const bySource = new Map(rows.map((r) => [r.id, r.dueSourceEventId]));
+    return items.map((i) => ({
+      ...i,
+      dueSourceEventId: bySource.get(i.id) ?? null,
+    }));
   }
 
-  async function updateItemStatus(id: string, status: string): Promise<void> {
+  async function getItemRow(
+    id: string,
+  ): Promise<{ id: string; deletedAt: Date | null } | null> {
+    const [row] = await db
+      .select({ id: attentionItems.id, deletedAt: attentionItems.deletedAt })
+      .from(attentionItems)
+      .where(eq(attentionItems.id, id));
+    return row ?? null;
+  }
+
+  async function deleteItem(id: string): Promise<void> {
     await request(app.getHttpServer())
-      .patch(`/attention-items/${id}`)
+      .delete(`/attention-items/${id}`)
       .set("x-test-user-id", recipient.id)
-      .send({ status: status })
-      .expect(200);
+      .expect(204);
+  }
+
+  async function resolveMessage(messageId: string): Promise<void> {
+    await messagingService.updateManagedStatus(
+      userActorOf(recipient.id),
+      messageId,
+      "resolved",
+    );
+  }
+
+  // No event to wait on for "nothing happened": give both hops time to drain.
+  function settle(): Promise<void> {
+    return new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
   }
 
   async function awaitItem(
-    predicate: (i: AttentionItemResponse) => boolean,
-  ): Promise<AttentionItemResponse> {
+    predicate: (i: TestItem) => boolean,
+  ): Promise<TestItem> {
     const items = await pollUntil(getItems, (xs) => xs.some(predicate), {
       timeoutMs: POLL_TIMEOUT_MS,
     });
@@ -349,8 +384,8 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
   async function awaitItemState(
     id: string,
-    predicate: (i: AttentionItemResponse) => boolean,
-  ): Promise<AttentionItemResponse> {
+    predicate: (i: TestItem) => boolean,
+  ): Promise<TestItem> {
     const items = await pollUntil(
       getItems,
       (xs) => {
@@ -363,7 +398,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
   }
 
   async function awaitNoItem(
-    predicate: (i: AttentionItemResponse) => boolean,
+    predicate: (i: TestItem) => boolean,
   ): Promise<void> {
     await pollUntil(getItems, (xs) => !xs.some(predicate), {
       timeoutMs: POLL_TIMEOUT_MS,
@@ -404,33 +439,6 @@ describe("AttentionItemsEventHandler (integration)", () => {
     return (row?.managedStatus as { type: string; status: string }) ?? null;
   }
 
-  async function awaitMessageManagedStatus(
-    messageId: string,
-    status: string,
-  ): Promise<void> {
-    await pollUntil(
-      () => getMessageManaged(messageId),
-      (m) => m?.status === status,
-      { timeoutMs: POLL_TIMEOUT_MS },
-    );
-  }
-
-  async function countOutboxForMessage(
-    eventType: string,
-    messageId: string,
-  ): Promise<number> {
-    const rows = await db
-      .select({ id: eventsOutbox.id })
-      .from(eventsOutbox)
-      .where(
-        and(
-          eq(eventsOutbox.eventType, eventType),
-          sql`${eventsOutbox.payload}->>'messageId' = ${messageId}`,
-        ),
-      );
-    return rows.length;
-  }
-
   function approxEqual(actual: string | null, expected: Date): boolean {
     if (!actual) return false;
 
@@ -448,14 +456,25 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hello", [tagId]);
 
       const item = await awaitItem(
-        (i) => msgMeta(i).messageId === msgId && i.dueDate !== null,
+        (i) => messageIdOf(i) === msgId && i.dueDate !== null,
       );
 
       expect(approxEqual(item.dueDate, start)).toBe(true);
-      expect(item.sourceCalendarEventId).toBe(tbId);
+      expect(item.dueSourceEventId).toBe(tbId);
       expect(item.tagIds).toEqual([tagId]);
       expect(item.userId).toBe(recipient.id);
-      expect(item.type).toBe("tagged_message");
+      expect(item.source).toEqual({
+        context: "conversations",
+        kind: "message",
+        id: msgId,
+      });
+      expect(item.preview).toEqual({
+        title: "hello",
+        body: "hello",
+        actor: { kind: "user", id: sender.id },
+        meta: { threadId },
+      });
+      expect(item.dueDatePinned).toBe(false);
     });
 
     it("should create an attention item for the owner from a guest tagged message", async () => {
@@ -469,14 +488,13 @@ describe("AttentionItemsEventHandler (integration)", () => {
       );
 
       const item = await awaitItem(
-        (i) => msgMeta(i).messageId === msg.id && i.dueDate !== null,
+        (i) => messageIdOf(i) === msg.id && i.dueDate !== null,
       );
 
       expect(item.userId).toBe(recipient.id);
-      expect(item.type).toBe("tagged_message");
-      expect(msgMeta(item).senderType).toBe("guest");
-      expect(msgMeta(item).senderId).toBe(guest.id);
-      expect(item.sourceCalendarEventId).toBe(tbId);
+      expect(item.preview.actor).toEqual({ kind: "guest", id: guest.id });
+      expect(item.preview.meta).toEqual({ threadId: guestThreadId });
+      expect(item.dueSourceEventId).toBe(tbId);
       expect(item.tagIds).toEqual([tagId]);
       expect(approxEqual(item.dueDate, start)).toBe(true);
     });
@@ -495,7 +513,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
         sendInput(null, "hi", [tagA]),
       );
 
-      const item = await awaitItem((i) => msgMeta(i).messageId === msg.id);
+      const item = await awaitItem((i) => messageIdOf(i) === msg.id);
       expect(item.tagIds).toEqual([tagA]);
 
       await messagingService.tagMessage(guestActor(guest), msg.id, [tagB]);
@@ -522,15 +540,15 @@ describe("AttentionItemsEventHandler (integration)", () => {
       });
       const msgId = await sendTaggedMessage("hello", [tagId]);
 
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       const { item: emitted } = await awaitOutboxAttentionUpserted(item.id);
 
       // Payload must match the GET /attention-items shape byte-for-byte.
-      expect(emitted).toEqual(item);
-      // tagIds populated (empty => client stays silent); metadata.type === item.type.
+      const wire: Partial<TestItem> = { ...item };
+      delete wire.dueSourceEventId;
+      expect(emitted).toEqual(wire);
       expect(emitted.tagIds.length).toBeGreaterThan(0);
-      expect(emitted.metadata.type).toBe(emitted.type);
     });
 
     it("should set due date to start of ongoing timeblock when message arrives during it", async () => {
@@ -544,11 +562,11 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hello", [tagId]);
 
       const item = await awaitItem(
-        (i) => msgMeta(i).messageId === msgId && i.dueDate !== null,
+        (i) => messageIdOf(i) === msgId && i.dueDate !== null,
       );
 
       expect(approxEqual(item.dueDate, start)).toBe(true);
-      expect(item.sourceCalendarEventId).toBe(tbId);
+      expect(item.dueSourceEventId).toBe(tbId);
     });
 
     it("should create new attention item when message is created with immediate tag type", async () => {
@@ -560,20 +578,18 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hello", [tagId]);
 
       const item = await awaitItem(
-        (i) => msgMeta(i).messageId === msgId && i.dueDate !== null,
+        (i) => messageIdOf(i) === msgId && i.dueDate !== null,
       );
 
       const expected = new Date(
         new Date(item.createdAt).getTime() + responseTimeMillis,
       );
       expect(approxEqual(item.dueDate, expected)).toBe(true);
-      expect(item.sourceCalendarEventId).toBeNull();
+      expect(item.dueSourceEventId).toBeNull();
       expect(item.tagIds).toEqual([tagId]);
     });
 
-    it("should delete attention item when message is deleted", async () => {
-      // No message-delete API exists. Closest analogue per handler: clearing
-      // all tags soft-deletes the item. Cover that flow with two starting tags.
+    it("should remove attention item when all of multiple tags are cleared", async () => {
       const tagA = await createTag({
         type: "immediately",
         responseTimeMillis: 60 * 1000,
@@ -583,24 +599,25 @@ describe("AttentionItemsEventHandler (integration)", () => {
         responseTimeMillis: 60 * 1000,
       });
       const msgId = await sendTaggedMessage("hi", [tagA, tagB]);
-      await awaitItem((i) => msgMeta(i).messageId === msgId);
+      await awaitItem((i) => messageIdOf(i) === msgId);
 
       await reTagMessage(msgId, []);
 
-      await awaitNoItem((i) => msgMeta(i).messageId === msgId);
+      await awaitNoItem((i) => messageIdOf(i) === msgId);
     });
 
-    it("should delete attention item when message tags are removed", async () => {
+    it("should hard-delete attention item when message tags are removed", async () => {
       const tagId = await createTag({
         type: "immediately",
         responseTimeMillis: 60 * 1000,
       });
       const msgId = await sendTaggedMessage("hi", [tagId]);
-      await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       await reTagMessage(msgId, []);
 
-      await awaitNoItem((i) => msgMeta(i).messageId === msgId);
+      await awaitNoItem((i) => messageIdOf(i) === msgId);
+      expect(await getItemRow(item.id)).toBeNull();
     });
 
     it("should delete attention item when message tags are deleted", async () => {
@@ -609,7 +626,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       });
 
       const msgId = await sendTaggedMessage("hi", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       await deleteTag(tagId);
 
@@ -627,7 +644,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       });
 
       const msgId = await sendTaggedMessage("hi", [tagA, tagB]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       await deleteTag(tagA);
 
@@ -649,7 +666,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       });
 
       const msgId = await sendTaggedMessage("hi", [tagA, tagB]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
       expect(item.tagIds.sort()).toEqual([tagA, tagB].sort());
 
       await deleteTag(tagB);
@@ -660,20 +677,21 @@ describe("AttentionItemsEventHandler (integration)", () => {
       );
     });
 
-    it("should not soft-delete resolved attention item when its only tag is deleted", async () => {
+    it("should not remove resolved attention item when its only tag is deleted", async () => {
       const tagId = await createTag({
         type: "immediately",
         responseTimeMillis: 60 * 1000,
       });
       const msgId = await sendTaggedMessage("hi", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
-      await updateItemStatus(item.id, "resolved");
+      await resolveMessage(msgId);
+      await awaitItemState(item.id, (i) => i.status === "resolved");
 
       await deleteTag(tagId);
 
       // give the handler time to process; then assert item is still present
-      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
+      await settle();
       const items = await getItems();
       const found = items.find((i) => i.id === item.id);
       expect(found).toBeDefined();
@@ -687,7 +705,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
         responseTimeMillis: 30 * 60 * 1000,
       });
       const msgId = await sendTaggedMessage("hi", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       const newResponseTime = 60 * 60 * 1000;
       await patchTag(tagId, {
@@ -716,7 +734,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
         responseTimeMillis: 10 * 60 * 1000,
       });
       const msgId = await sendTaggedMessage("hi", [tagA]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       await reTagMessage(msgId, [tagB]);
 
@@ -730,7 +748,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
             new Date(new Date(i.createdAt).getTime() + 10 * 60 * 1000),
           ),
       );
-      expect(updated.sourceCalendarEventId).toBeNull();
+      expect(updated.dueSourceEventId).toBeNull();
     });
 
     it("should recompute due date for attention item when message tags list changed (immediate -> timeblock)", async () => {
@@ -742,7 +760,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const tagB = await createTag({ type: "timeblock" });
       const tbId = await createTimeblock({ start, tagIds: [tagB] });
       const msgId = await sendTaggedMessage("hi", [tagA]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       await reTagMessage(msgId, [tagB]);
 
@@ -753,7 +771,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
           i.tagIds[0] === tagB &&
           approxEqual(i.dueDate, start),
       );
-      expect(updated.sourceCalendarEventId).toBe(tbId);
+      expect(updated.dueSourceEventId).toBe(tbId);
     });
 
     it("should remove due date for attention item when associated timeblock is moved in the past", async () => {
@@ -763,7 +781,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hi", [tagId]);
       const item = await awaitItem(
         (i) =>
-          msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+          messageIdOf(i) === msgId && i.dueSourceEventId === tbId,
       );
 
       const past = new Date(Date.now() - 60 * 60 * 1000);
@@ -773,7 +791,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       });
 
       const updated = await awaitItemState(item.id, (i) => i.dueDate === null);
-      expect(updated.sourceCalendarEventId).toBeNull();
+      expect(updated.dueSourceEventId).toBeNull();
     });
 
     it("should remove due date for attention item when tag for messages are removed from associated timeblock", async () => {
@@ -783,13 +801,13 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hi", [tagId]);
       const item = await awaitItem(
         (i) =>
-          msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+          messageIdOf(i) === msgId && i.dueSourceEventId === tbId,
       );
 
       await updateTimeblock(tbId, { tagIds: [] });
 
       const updated = await awaitItemState(item.id, (i) => i.dueDate === null);
-      expect(updated.sourceCalendarEventId).toBeNull();
+      expect(updated.dueSourceEventId).toBeNull();
     });
 
     it("should recompute due date for attention item when associated timeblock is moved but still in the future", async () => {
@@ -799,7 +817,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hi", [tagId]);
       const item = await awaitItem(
         (i) =>
-          msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+          messageIdOf(i) === msgId && i.dueSourceEventId === tbId,
       );
 
       const newStart = new Date(Date.now() + 3 * 60 * 60 * 1000);
@@ -811,7 +829,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const updated = await awaitItemState(item.id, (i) =>
         approxEqual(i.dueDate, newStart),
       );
-      expect(updated.sourceCalendarEventId).toBe(tbId);
+      expect(updated.dueSourceEventId).toBe(tbId);
     });
 
     it("should recompute due date for attention item when multiple timeblocks in the future associated with the same tag and earliest timeblock gets tag list removed", async () => {
@@ -823,7 +841,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hi", [tagId]);
       const item = await awaitItem(
         (i) =>
-          msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbA,
+          messageIdOf(i) === msgId && i.dueSourceEventId === tbA,
       );
 
       await updateTimeblock(tbA, { tagIds: [] });
@@ -831,7 +849,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const updated = await awaitItemState(
         item.id,
         (i) =>
-          i.sourceCalendarEventId === tbB && approxEqual(i.dueDate, startB),
+          i.dueSourceEventId === tbB && approxEqual(i.dueDate, startB),
       );
       expect(updated.dueDate).not.toBeNull();
     });
@@ -846,7 +864,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const msgId = await sendTaggedMessage("hi", [tagId]);
       const item = await awaitItem(
         (i) =>
-          msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbA,
+          messageIdOf(i) === msgId && i.dueSourceEventId === tbA,
       );
 
       await updateTimeblock(tbA, { tagIds: [otherTagId] });
@@ -854,7 +872,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const updated = await awaitItemState(
         item.id,
         (i) =>
-          i.sourceCalendarEventId === tbB && approxEqual(i.dueDate, startB),
+          i.dueSourceEventId === tbB && approxEqual(i.dueDate, startB),
       );
       expect(updated.dueDate).not.toBeNull();
       expect(updated.dueDate).toBe(isoToTruncatedMillis(startB));
@@ -870,7 +888,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
       const item = await awaitItem(
         (i) =>
-          msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbA,
+          messageIdOf(i) === msgId && i.dueSourceEventId === tbA,
       );
 
       await deleteTimeblock(tbA);
@@ -878,7 +896,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
       const updated = await awaitItemState(
         item.id,
         (i) =>
-          i.sourceCalendarEventId === tbB && approxEqual(i.dueDate, startB),
+          i.dueSourceEventId === tbB && approxEqual(i.dueDate, startB),
       );
 
       expect(updated.dueDate).not.toBeNull();
@@ -904,7 +922,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
         const item = await awaitItem(
           (i) =>
-            msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+            messageIdOf(i) === msgId && i.dueSourceEventId === tbId,
         );
         expect(item.dueDate).toBe(
           isoToTruncatedMillis(new Date(start.getTime() + DAY)),
@@ -932,7 +950,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
 
         const item = await awaitItem(
           (i) =>
-            msgMeta(i).messageId === msgId && i.sourceCalendarEventId === tbId,
+            messageIdOf(i) === msgId && i.dueSourceEventId === tbId,
         );
         expect(item.dueDate).toBe(
           isoToTruncatedMillis(new Date(start.getTime() + 2 * DAY)),
@@ -941,7 +959,7 @@ describe("AttentionItemsEventHandler (integration)", () => {
     });
   });
 
-  describe("managed status sync (message <-> attention item)", () => {
+  describe("status flows one way (message → attention item)", () => {
     function immediateTag(): Promise<string> {
       return createTag({ type: "immediately", responseTimeMillis: 60 * 1000 });
     }
@@ -961,10 +979,10 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(await getMessageManaged(untagged.id)).toBeNull();
     });
 
-    it("forward: the recipient resolving the message resolves the linked attention item", async () => {
+    it("the recipient resolving the message resolves the linked attention item", async () => {
       const tagId = await immediateTag();
       const msgId = await sendTaggedMessage("resolve me", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
       await messagingService.updateManagedStatus(
         userActorOf(recipient.id),
@@ -976,20 +994,10 @@ describe("AttentionItemsEventHandler (integration)", () => {
       await awaitItemState(item.id, (i) => i.status === "resolved");
     });
 
-    it("reverse: resolving the attention item from the inbox resolves the message", async () => {
-      const tagId = await immediateTag();
-      const msgId = await sendTaggedMessage("inbox resolve", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
-
-      await updateItemStatus(item.id, "resolved");
-
-      await awaitMessageManagedStatus(msgId, "resolved");
-    });
-
     it("rejects a non-recipient (the sender) resolving the message", async () => {
       const tagId = await immediateTag();
       const msgId = await sendTaggedMessage("mine", [tagId]);
-      await awaitItem((i) => msgMeta(i).messageId === msgId);
+      await awaitItem((i) => messageIdOf(i) === msgId);
 
       await expect(
         messagingService.updateManagedStatus(
@@ -1035,52 +1043,85 @@ describe("AttentionItemsEventHandler (integration)", () => {
       expect(await getMessageManaged(msg.id)).toBeNull();
     });
 
-    it("forward sync terminates: one status event, never triggers the reverse event", async () => {
+    it("has no PATCH: the inbox cannot write an item", async () => {
       const tagId = await immediateTag();
-      const msgId = await sendTaggedMessage("fwd", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+      const msgId = await sendTaggedMessage("no patch", [tagId]);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
-      await messagingService.updateManagedStatus(
-        userActorOf(recipient.id),
-        msgId,
-        "resolved",
-      );
-      await awaitItemState(item.id, (i) => i.status === "resolved");
+      await request(app.getHttpServer())
+        .patch(`/attention-items/${item.id}`)
+        .set("x-test-user-id", recipient.id)
+        .send({ status: "resolved" })
+        .expect(404);
+    });
+  });
 
-      // Let any (erroneous) follow-on events flush before counting.
-      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
+  describe("user delete is permanent", () => {
+    function immediateTag(): Promise<string> {
+      return createTag({ type: "immediately", responseTimeMillis: 60 * 1000 });
+    }
 
-      expect(await countOutboxForMessage("message.status.changed", msgId)).toBe(
-        1,
-      );
-      // The forward path uses syncSourceStatus, which never emits the reverse
-      // event — so it cannot loop back onto the message.
-      expect(
-        await countOutboxForMessage("attention.message.synced", msgId),
-      ).toBe(0);
+    it("tombstones the item on DELETE", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("bye", [tagId]);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
+
+      await deleteItem(item.id);
+
+      expect((await getItems()).some((i) => i.id === item.id)).toBe(false);
+      expect((await getItemRow(item.id))?.deletedAt).not.toBeNull();
+      await request(app.getHttpServer())
+        .get(`/attention-items/${item.id}`)
+        .set("x-test-user-id", recipient.id)
+        .expect(404);
     });
 
-    it("reverse sync terminates: one reverse event, one status event, item stays resolved", async () => {
-      const tagId = await immediateTag();
-      const msgId = await sendTaggedMessage("rev", [tagId]);
-      const item = await awaitItem((i) => msgMeta(i).messageId === msgId);
+    it("a later source upsert does not revive a deleted item", async () => {
+      const tagA = await immediateTag();
+      const tagB = await immediateTag();
+      const msgId = await sendTaggedMessage("sticky", [tagA]);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
 
-      await updateItemStatus(item.id, "resolved");
-      await awaitMessageManagedStatus(msgId, "resolved");
+      await deleteItem(item.id);
+      await reTagMessage(msgId, [tagB]);
+      await resolveMessage(msgId);
+      await settle();
 
-      await new Promise((r) => setTimeout(r, POLL_TIMEOUT_MS));
-
-      // The inbox PATCH publishes exactly one reverse event...
-      expect(
-        await countOutboxForMessage("attention.message.synced", msgId),
-      ).toBe(1);
-      // ...and the message publishes exactly one status event; the durable
-      // re-sync no-ops on the idempotency guard, so nothing loops.
-      expect(await countOutboxForMessage("message.status.changed", msgId)).toBe(
-        1,
+      expect((await getItems()).some((i) => messageIdOf(i) === msgId)).toBe(
+        false,
       );
-      const finalItem = (await getItems()).find((i) => i.id === item.id);
-      expect(finalItem?.status).toBe("resolved");
+      const row = await getItemRow(item.id);
+      expect(row?.deletedAt).not.toBeNull();
+    });
+
+    it("untag → retag after a user delete does not revive the item", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("untag retag", [tagId]);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
+
+      await deleteItem(item.id);
+      await reTagMessage(msgId, []);
+      await reTagMessage(msgId, [tagId]);
+      await settle();
+
+      expect((await getItems()).some((i) => messageIdOf(i) === msgId)).toBe(
+        false,
+      );
+      // The tombstone survives the removal and blocks the re-create.
+      expect((await getItemRow(item.id))?.deletedAt).not.toBeNull();
+    });
+
+    it("untag → retag without a user delete re-creates the item", async () => {
+      const tagId = await immediateTag();
+      const msgId = await sendTaggedMessage("retag", [tagId]);
+      const item = await awaitItem((i) => messageIdOf(i) === msgId);
+
+      await reTagMessage(msgId, []);
+      await awaitNoItem((i) => messageIdOf(i) === msgId);
+      await reTagMessage(msgId, [tagId]);
+
+      const recreated = await awaitItem((i) => messageIdOf(i) === msgId);
+      expect(recreated.id).not.toBe(item.id);
     });
   });
 

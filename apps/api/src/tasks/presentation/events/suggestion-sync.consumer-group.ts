@@ -5,8 +5,8 @@ import {
 import { ConsumerGroup } from "@/api/platform/events/registry/events.types";
 
 // suggestion-sync: independent queue that rebroadcasts the parent suggestion
-// (if any) when a materialized task changes. Must NOT share attention-items'
-// queue or events would be split between the two consumers.
+// (if any) when a materialized task changes. Must NOT share another group's
+// queue or events would be split between the consumers.
 export const SuggestionSyncConsumerGroup: ConsumerGroup<
   typeof TaskUpserted | typeof TaskBatchUpserted
 > = {

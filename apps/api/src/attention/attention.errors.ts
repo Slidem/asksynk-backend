@@ -7,16 +7,10 @@ const { catalog, createError } = defineCatalog("attention-items", {
     exposable: true,
     message: "Attention item with id { id } not found",
   },
-  forbidden: {
+  guest_not_allowed: {
     category: DomainErrorCategory.FORBIDDEN,
     exposable: true,
-    message: "User { userId } is not allowed to access attention item { id }",
-  },
-  item_already_exists: {
-    category: DomainErrorCategory.CONFLICT,
-    exposable: true,
-    message:
-      "Attention item with source { source } already exists for user { userId }",
+    message: "Guests can't access attention items",
   },
 });
 

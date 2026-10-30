@@ -39,7 +39,13 @@ export class FocusSession {
       completedFocusBlocks: 0,
       shortBreaks: 0,
       longBreaks: 0,
-      settings: { ...settings },
+      // Pick, don't spread: callers pass full settings (incl. the live-only timeout).
+      settings: {
+        focusDurationSeconds: settings.focusDurationSeconds,
+        shortBreakDurationSeconds: settings.shortBreakDurationSeconds,
+        longBreakDurationSeconds: settings.longBreakDurationSeconds,
+        longBreakInterval: settings.longBreakInterval,
+      },
     });
   }
 

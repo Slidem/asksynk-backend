@@ -17,7 +17,7 @@ Every context gets the same layers and dependency rule, over two shared tiers
 
 | Layer             | May import                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------- |
-| `domain/`         | own `domain/` + own `contract/` types + own `<ctx>.errors.ts`, `kernel/`                 |
+| `domain/`         | own `domain/` + own `contract/` types + own `<ctx>.errors.ts`, `kernel/`                |
 | `contract/`       | `kernel/`, other `contract/`, `platform/` types (`defineEvent`, `RequestHeaders`) + zod |
 | `application/`    | own `domain/` + `application/`, `kernel/`, `platform/`, **other contexts' `contract/`** |
 | `infrastructure/` | own `domain/` + `application/`, `kernel/`, `platform/`, Drizzle, SDKs                   |
@@ -32,11 +32,11 @@ touch repositories.
 
 ## 2. `kernel/` vs `platform/`
 
-|                   | `kernel/`                                                                       | `platform/`                                                                       |
-| ----------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Contains          | pure domain vocabulary                                                          | framework-aware shared infra                                                      |
-| Imported by       | everything, **including `domain/`**                                             | `application/`, `infrastructure/`, `presentation/` — never `domain/`              |
-| Today             | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http (incl. `http/auth/` request decorators + principal types), jobs, logger, mappers, realtime (`RealtimeBroadcaster` port + WS command plumbing) |
+|             | `kernel/`                                                                                                                     | `platform/`                                                                                                                                                                                              |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contains    | pure domain vocabulary                                                                                                        | framework-aware shared infra                                                                                                                                                                             |
+| Imported by | everything, **including `domain/`**                                                                                           | `application/`, `infrastructure/`, `presentation/` — never `domain/`                                                                                                                                     |
+| Today       | `id.ts`, `actor/actor.ts`, `time/iso.ts`, `domain/aggregate-root.ts`, `errors/{domain-errors,error-catalog,kernel.errors}.ts` | clock, config, db, decorators, email, errors, events, http (incl. `http/auth/` request decorators + principal types), jobs, logger, mappers, realtime (`RealtimeBroadcaster` port + WS command plumbing) |
 
 **Placement test for `kernel/` — both must be yes:** (1) it is pure, transitively;
 (2) `domain/` code actually references it. Q2 keeps `kernel/` from becoming the old
@@ -45,10 +45,10 @@ touch repositories.
 **Ports don't split along this seam.** A port lives with the layer that declares the
 need, both halves together:
 
-| Port                                                              | Abstract              | Adapter                             |
-| ----------------------------------------------------------------- | --------------------- | ----------------------------------- |
-| `TagRepository`, `AttentionItemsRepository`, …                    | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/` |
-| published ports (`CalendarOccurrencePort`, …)                     | `<ctx>/contract/`     | owning context's `infrastructure/`  |
+| Port                                                              | Abstract              | Adapter                                                                             |
+| ----------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `TagRepository`, `AttentionItemsRepository`, …                    | `<ctx>/domain/ports/` | `<ctx>/infrastructure/persistence/`                                                 |
+| published ports (`CalendarOccurrencePort`, …)                     | `<ctx>/contract/`     | owning context's `infrastructure/`                                                  |
 | `EventsPublisher`, `JobScheduler`, `Clock`, `RealtimeBroadcaster` | `platform/<area>/`    | `platform/<area>/` (`RealtimeBroadcaster`: `websockets/ws.gateway.ts` — needs auth) |
 
 `EventsPublisher` / `JobScheduler` signatures depend on zod/platform types, and only
@@ -104,27 +104,22 @@ An `abstract class` is a runtime value, so it is a DI token with no framework im
 ([ADR 0002](adr/0002-repository-ports-as-abstract-classes.md)):
 
 ```ts
-// domain/ports/attention-items.repository.ts — zero framework imports
-export abstract class AttentionItemsRepository {
-  abstract findById(id: string): Promise<AttentionItem | null>;
-  abstract save(item: AttentionItem): Promise<void>;
+// focus/domain/ports/timers.repository.ts — zero framework imports
+export abstract class TimersRepository {
+  abstract getByUserId(userId: string): Promise<Timer | null>;
+  abstract save(timer: Timer): Promise<void>;
 }
 
-// infrastructure/persistence/drizzle-attention-items.repository.ts
+// focus/infrastructure/persistence/drizzle-timers.repository.ts
 @Injectable()
-export class DrizzleAttentionItemsRepository extends AttentionItemsRepository {
-  constructor(private readonly txHost: TransactionHost<TxAdapter>) {
+export class DrizzleTimersRepository extends TimersRepository {
+  constructor(private readonly txHost: TransactionHost<TxAdapter> /* … */) {
     super();
   }
 }
 
-// attention.module.ts
-providers: [
-  {
-    provide: AttentionItemsRepository,
-    useClass: DrizzleAttentionItemsRepository,
-  },
-];
+// focus.module.ts
+providers: [{ provide: TimersRepository, useClass: DrizzleTimersRepository }];
 ```
 
 Injection sites name the abstract type; no `@Inject()`, no `Symbol`.
@@ -138,13 +133,11 @@ Injection sites name the abstract type; no `@Inject()`, no `Symbol`.
 
   ```ts
   @Transactional()
-  async execute(cmd: { itemId: string; actor: Actor; status: AttentionStatus }) {
-    const item = await this.repo.findById(cmd.itemId);
-    if (!item || !item.belongsTo(ownerUserIdOf(cmd.actor))) throw attentionError("not_found");
-    if (item.transitionTo(cmd.status, this.clock.now())) {   // the rule is in the aggregate
-      await this.repo.save(item);
-      await this.events.publish(AttentionItemUpserted, { item: toResponse(item) });
-    }
+  async accept(cmd: { suggestionId: string; actor: Actor }) {
+    const suggestion = await this.repo.findById(cmd.suggestionId);
+    if (!suggestion || !suggestion.isFor(ownerUserIdOf(cmd.actor))) throw tasksError("suggestion_not_found");
+    suggestion.accept(this.clock.now());   // the rule is in the aggregate
+    await this.repo.save(suggestion);      // checks version, flushes recorded events
   }
   ```
 
@@ -168,7 +161,11 @@ export type RealtimeTarget =
   | { kind: "thread"; id: string };
 
 export abstract class RealtimeBroadcaster {
-  abstract emit(targets: RealtimeTarget[], event: string, payload: unknown): void;
+  abstract emit(
+    targets: RealtimeTarget[],
+    event: string,
+    payload: unknown,
+  ): void;
 }
 ```
 
@@ -195,22 +192,52 @@ Rich only where an invariant would otherwise be enforced in several places. Shap
 [ADR 0008](adr/0008-self-mutating-aggregates.md): methods guard, mutate and record
 events; the repository's `save` checks `version` and flushes them to the outbox.
 
-| Aggregate             | Methods                                                                                | Replaces                      |
-| --------------------- | -------------------------------------------------------------------------------------- | ----------------------------- |
-| `Timer`               | `execute` (start/pause/resume/stop/reset), `settle`, `applySettingsChange`, `complete` | done: `focus/domain/timer.ts` |
-| `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`            |
+| Aggregate             | Methods                                                                                | Replaces                                         |
+| --------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `Timer`               | `execute` (start/pause/resume/stop/reset), `settle`, `applySettingsChange`, `complete` | done: `focus/domain/timer.ts`                    |
+| `TaskSuggestion`      | `accept`, `reject`, `rescind`, `editPayload`                                           | `requirePending()`                               |
 | `Invite`              | `accept`, `reject`                                                                     | `network/application/networks.service.ts` guards |
-| `AttentionItem`       | `transitionTo`, `pinDueDate`, `applyDueDateDecision`, `applyMirror`                    | field assignment in service   |
-| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `tasks/domain/task-batch-status.ts` |
-| `CalendarEvent`       | `reschedule`, `addException`, `splitSeriesAt`, `detachInstance`, `applyProviderFields` | service logic + `applyFields` |
-| `CalendarIntegration` | `markError`, `revoke`, `withRefreshedCredentials`                                      | status mutated externally     |
+| `Task` / `TaskBatch`  | `changeStatus`; batch status derived from tasks                                        | `tasks/domain/task-batch-status.ts`              |
+| `CalendarEvent`       | `reschedule`, `addException`, `splitSeriesAt`, `detachInstance`, `applyProviderFields` | service logic + `applyFields`                    |
+| `CalendarIntegration` | `markError`, `revoke`, `withRefreshedCredentials`                                      | status mutated externally                        |
+
+Projections, not aggregates: `AttentionItem` (`applySnapshot` pure function,
+[ADR 0009](adr/0009-attention-as-pure-projection.md)).
+
+### Reference implementations
+
+Copy these; don't reinvent per context.
+
+**Aggregate — `Timer`** (state machine, [ADR 0008](adr/0008-self-mutating-aggregates.md)):
+
+| Layer                    | File                                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Base                     | `kernel/domain/aggregate-root.ts`; conflict → `core.concurrency_conflict` (409)                                           |
+| Aggregate + child entity | `focus/domain/timer.ts`, `focus/domain/focus-session.ts` (mutated only through `Timer`)                                   |
+| Transition table         | `focus/domain/timer-transition-rules.ts` (static rows; also served by `GET /timers/transitions`)                          |
+| Domain events            | `focus/domain/timer.events.ts`                                                                                            |
+| Port                     | `focus/domain/ports/timers.repository.ts` (`ensure`, `getByUserId`, `save`)                                               |
+| `save` + events mapper   | `focus/infrastructure/persistence/drizzle-timers.repository.ts`, `timer-events.mapper.ts`                                 |
+| Application              | `focus/application/timers.service.ts` (load → method → `save` → jobs; reload on conflict for lazy `GET`)                  |
+| Tests                    | `test/focus/timer.unit.test.ts`, `timer-transitions.unit.test.ts`, `timers.integration.test.ts` (stale version, rollback) |
+
+**Projection — `AttentionItem`** (read model fed by other contexts' events,
+[ADR 0009](adr/0009-attention-as-pure-projection.md)):
+
+| Layer                  | File                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rules (pure)           | `attention/domain/attention-projection.ts` (`applySnapshot`), `attention/domain/due-date.policy.ts`                                                                            |
+| Orchestration          | `attention/application/attention-projection.service.ts`, `attention-due-date.service.ts`                                                                                       |
+| Ingestion              | `attention/presentation/events/attention-source.handler.ts` (one handler for all sources)                                                                                      |
+| Source-side translator | `<ctx>/application/attention-projection.mapper.ts` (pure) + `<ctx>/presentation/events/attention-projection.{handler,consumer-group}.ts`                                       |
+| Tests                  | `test/attention/attention-projection.unit.test.ts`, `test/<ctx>/attention-projection.mapper.unit.test.ts`, `test/attention/attention-items.events-handler.integration.test.ts` |
 
 Stay typed records: `UserSettings`, `UserProfile`, `Attachment`, `Calendar`,
 `PublicView`, `Thread`, `NetworkConnection`, `CalendarEventLink`, `PublicViewGuest`.
 
 Value objects only where a rule attaches: `AnswerMode` (tagging), `RecurrenceRule`
-(scheduling — rejects `COUNT=`, requires `UNTIL` + `TZID=`, caps `UNTIL`),
-`AttentionSource` (attention).
+(scheduling — rejects `COUNT=`, requires `UNTIL` + `TZID=`, caps `UNTIL`).
+`AttentionSource` is a plain `{ context, kind, id }` type — no rule attaches.
 
 ## 8. Enforcement
 

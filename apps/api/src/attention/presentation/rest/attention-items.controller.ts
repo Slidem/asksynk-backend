@@ -1,25 +1,17 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Patch,
-  Query,
-} from "@nestjs/common";
+import { Controller, Delete, Get, HttpCode, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { AttentionItemsService } from "@/api/attention/application/attention-items.service";
 import { toAttentionItemView } from "@/api/attention/application/read/attention-item.view";
 import { ListAttentionItemsQueryDto } from "@/api/attention/presentation/rest/dto/list-attention-items-query.dto";
-import { PatchAttentionItemDto } from "@/api/attention/presentation/rest/dto/patch-attention-item.dto";
 import { AttentionItemResponse } from "@/api/attention/presentation/rest/responses/attention-item.response";
+import { Actor } from "@/api/kernel/actor/actor";
 import { UuidV7Param } from "@/api/platform/decorators/paramValidators.decorators";
 import { ApiStandardErrors } from "@/api/platform/errors/swagger.decorator";
-import { AuthUser as AuthUserType } from "@/api/platform/http/auth/auth.types";
-import { AuthUser } from "@/api/platform/http/auth/auth-user.decorator";
+import { RequestActor } from "@/api/platform/http/auth/request-actor.decorator";
 import { toNonNegativeNumberOptional } from "@/api/platform/mappers/string.utils";
 
+// Read + delete only: items are projections; status changes go to the source.
 @ApiTags("Attention Items")
 @ApiBearerAuth("bearer")
 @ApiStandardErrors()
@@ -27,15 +19,15 @@ import { toNonNegativeNumberOptional } from "@/api/platform/mappers/string.utils
 export class AttentionItemsController {
   constructor(private readonly attentionItemsService: AttentionItemsService) {}
 
-  /** List the current user's attention items, optionally filtered by status/type */
+  /** List the current user's attention items, optionally filtered by status/source kind */
   @Get()
   async listAttentionItems(
     @Query() query: ListAttentionItemsQueryDto,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<AttentionItemResponse[]> {
-    const items = await this.attentionItemsService.listAttentionItems(user.id, {
+    const items = await this.attentionItemsService.listAttentionItems(actor, {
       status: query.status,
-      type: query.type,
+      sourceKind: query.sourceKind,
       cursor: query.cursor,
       limit: toNonNegativeNumberOptional(query.limit),
     });
@@ -46,36 +38,19 @@ export class AttentionItemsController {
   @Get(":id")
   async getAttentionItem(
     @UuidV7Param("id") id: string,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<AttentionItemResponse> {
-    const item = await this.attentionItemsService.getAttentionItem(user.id, id);
+    const item = await this.attentionItemsService.getAttentionItem(actor, id);
     return toAttentionItemView(item);
   }
 
-  /** Update an attention item's status, note, or tags */
-  @Patch(":id")
-  async updateAttentionItem(
-    @UuidV7Param("id") id: string,
-    @Body() body: PatchAttentionItemDto,
-    @AuthUser() user: AuthUserType,
-  ): Promise<AttentionItemResponse> {
-    const item = await this.attentionItemsService.updateAttentionItem({
-      id,
-      userId: user.id,
-      status: body.status,
-      note: body.note,
-      tagIds: body.tagIds,
-    });
-    return toAttentionItemView(item);
-  }
-
-  /** Delete an attention item */
+  /** Delete an attention item; permanent, no later source change revives it */
   @Delete(":id")
   @HttpCode(204)
   async deleteAttentionItem(
     @UuidV7Param("id") id: string,
-    @AuthUser() user: AuthUserType,
+    @RequestActor() actor: Actor,
   ): Promise<void> {
-    await this.attentionItemsService.deleteAttentionItem(user.id, id);
+    await this.attentionItemsService.deleteAttentionItem(actor, id);
   }
 }

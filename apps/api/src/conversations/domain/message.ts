@@ -2,7 +2,7 @@ export type MessageSender =
   | { kind: "user"; userId: string }
   | { kind: "guest"; guestId: string };
 
-// Status values mirror the attention item 1:1 so the sync is a passthrough.
+// Status values match attention item statuses 1:1; the item follows the message.
 export const MANAGED_MESSAGE_STATUSES = [
   "created",
   "in_progress",
