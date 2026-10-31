@@ -9,7 +9,7 @@ export const calendarEventExceptions = pgTable(
       .notNull()
       .references(() => calendarEvents.id, { onDelete: "cascade" }),
     originalStart: timestamp("original_start", {
-      withTimezone: false,
+      withTimezone: true,
     }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.eventId, t.originalStart] })],

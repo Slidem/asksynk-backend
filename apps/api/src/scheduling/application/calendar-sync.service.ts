@@ -16,7 +16,7 @@ import {
   ExternalEvent,
   ExternalEventTime,
 } from "@/api/scheduling/domain/ports/calendar-provider.types";
-import { parseIsoWallClockInTimezone } from "@/api/scheduling/domain/recurrence";
+import { zonedDateToUtc } from "@/api/scheduling/domain/zoned-date";
 
 interface MappedEventFields {
   title: string;
@@ -231,7 +231,10 @@ export class CalendarSyncService {
         ext.recurringEventExternalId,
       );
       if (masterLink) {
-        const tz = calendar.providerState.timezone ?? "UTC";
+        const tz =
+          ext.originalStart.timezone ??
+          calendar.providerState.timezone ??
+          "UTC";
         await this.calendarEventsRepository.addException(
           masterLink.asksynkEventId,
           this.toInstant(ext.originalStart, tz),
@@ -292,12 +295,11 @@ export class CalendarSyncService {
     event.rrule = fields.rrule;
   }
 
-  /** Wall-clock instant from a provider time, honouring asksynk's tz convention. */
+  /** All-day "YYYY-MM-DD" is local midnight in `timezone`; timed RFC3339 carries its own offset. */
   private toInstant(time: ExternalEventTime, timezone: string): Date {
-    // all-day comes as "YYYY-MM-DD"; timed as RFC3339. Normalize to a wall-clock ISO.
-    const iso =
-      time.value.length === 10 ? `${time.value}T00:00:00` : time.value;
-    return parseIsoWallClockInTimezone(iso, timezone);
+    return time.value.length === 10
+      ? zonedDateToUtc(time.value, timezone)
+      : new Date(time.value);
   }
 
   /**

@@ -277,16 +277,14 @@ export class GoogleCalendarProvider extends CalendarProvider {
       location: event.location ?? undefined,
     };
     if (event.allDay) {
-      body.start = { date: event.start.slice(0, 10) };
-      body.end = { date: event.end.slice(0, 10) };
+      body.start = { date: event.start };
+      body.end = { date: event.end };
     } else {
       body.start = { dateTime: event.start, timeZone: event.timezone };
       body.end = { dateTime: event.end, timeZone: event.timezone };
     }
     if (event.rrule) {
-      // Google expects an "RRULE:" line without a TZID param (tz lives on start).
-      const rule = event.rrule.replace(/;?TZID=[^;]+/i, "");
-      body.recurrence = [`RRULE:${rule}`];
+      body.recurrence = [`RRULE:${event.rrule}`];
     }
     return body;
   }

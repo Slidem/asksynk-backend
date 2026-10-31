@@ -13,7 +13,7 @@ import { CalendarEventLinkRepository } from "@/api/scheduling/domain/ports/calen
 import { CalendarEventsRepository } from "@/api/scheduling/domain/ports/calendar-events.repository";
 import { CalendarIntegrationRepository } from "@/api/scheduling/domain/ports/calendar-integration.repository";
 import { ExternalEventInput } from "@/api/scheduling/domain/ports/calendar-provider.types";
-import { utcToIso } from "@/api/scheduling/domain/recurrence";
+import { formatDateInTimezone } from "@/api/scheduling/domain/zoned-date";
 
 /**
  * Mirrors native asksynk events out to bidirectional integrations. Handlers are
@@ -178,12 +178,14 @@ export class CalendarOutboundSyncService {
 
   private buildInput(event: CalendarEvent): ExternalEventInput {
     const end = new Date(event.start.getTime() + event.durationSeconds * 1000);
+    const format = (d: Date) =>
+      event.allDay ? formatDateInTimezone(d, event.timezone) : d.toISOString();
     return {
       title: event.title,
       description: event.description,
       location: event.location,
-      start: utcToIso(event.start, event.timezone),
-      end: utcToIso(end, event.timezone),
+      start: format(event.start),
+      end: format(end),
       timezone: event.timezone,
       allDay: event.allDay,
       rrule: event.rrule,

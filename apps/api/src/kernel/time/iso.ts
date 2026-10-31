@@ -1,11 +1,15 @@
 /**
- *  Checks if a given string is a valid ISO 8601 date with an offset (e.g., "2023-03-15T12:30:00+02:00" or "2023-03-15T12:30:00Z").
+ *  Checks if a given string is a valid ISO 8601 date with an offset (e.g., "2023-03-15T12:30:00+02:00", "2023-03-15T12:30:00.000Z").
  *
  * @param value
  * @returns true if the string is a valid ISO 8601 date with an offset, false otherwise.
  */
 export function isIsoDateWithOffset(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$/.test(value)) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?([+-]\d{2}:\d{2}|Z)$/.test(
+      value,
+    )
+  ) {
     return false;
   }
   return !isNaN(new Date(value).getTime());

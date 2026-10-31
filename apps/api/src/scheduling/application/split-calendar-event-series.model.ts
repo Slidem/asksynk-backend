@@ -4,7 +4,7 @@ export interface SplitCalendarEventSeriesInput {
   description?: string;
   location?: string;
   link?: string;
-  start?: string;
+  start?: Date;
   durationSeconds?: number;
   timezone?: string;
   rrule?: string;

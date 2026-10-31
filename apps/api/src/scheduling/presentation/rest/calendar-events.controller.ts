@@ -21,7 +21,6 @@ import { AuthUser as AuthUserType } from "@/api/platform/http/auth/auth.types";
 import { AuthUser } from "@/api/platform/http/auth/auth-user.decorator";
 import { RequestActor } from "@/api/platform/http/auth/request-actor.decorator";
 import { CalendarEventsService } from "@/api/scheduling/application/calendar-events.service";
-import { parseIsoWallClockInTimezone } from "@/api/scheduling/domain/recurrence";
 import { toCalendarResponseDto } from "@/api/scheduling/presentation/rest/calendar.mapper";
 import { AddCalendarEventExceptionRequestDto } from "@/api/scheduling/presentation/rest/dto/add-calendar-event-exception.dto";
 import { CreateCalendarEventRequestDto } from "@/api/scheduling/presentation/rest/dto/create-calendar-event.dto";
@@ -37,9 +36,7 @@ import { CalendarEventInstanceResponse } from "@/api/scheduling/presentation/res
 @ApiStandardErrors()
 @Controller()
 export class CalendarEventsController {
-  constructor(
-    private readonly calendarEventsService: CalendarEventsService,
-  ) {}
+  constructor(private readonly calendarEventsService: CalendarEventsService) {}
 
   /** Ensure the current user has a native calendar, creating it if missing */
   @Post("calendars")
@@ -71,7 +68,7 @@ export class CalendarEventsController {
       description: dto.description,
       location: dto.location,
       link: dto.link,
-      start: parseIsoWallClockInTimezone(dto.start, dto.timezone),
+      start: new Date(dto.start),
       durationSeconds: dto.durationSeconds,
       allDay: dto.allDay,
       timezone: dto.timezone,
@@ -90,8 +87,8 @@ export class CalendarEventsController {
   ): Promise<CalendarEventInstanceResponse[]> {
     return await this.calendarEventsService.listCalendarEvents(actor, {
       userId: query.userId,
-      windowStart: parseIsoWallClockInTimezone(query.start, query.timezone),
-      windowEnd: parseIsoWallClockInTimezone(query.end, query.timezone),
+      windowStart: new Date(query.start),
+      windowEnd: new Date(query.end),
       tagIds: query.tagIds,
       calendarId: query.calendarId,
     });
@@ -119,10 +116,7 @@ export class CalendarEventsController {
       description: dto.description,
       location: dto.location,
       link: dto.link,
-      start:
-        dto.start && dto.timezone
-          ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
-          : undefined,
+      start: dto.start ? new Date(dto.start) : undefined,
       durationSeconds: dto.durationSeconds,
       allDay: dto.allDay,
       timezone: dto.timezone,
@@ -153,7 +147,7 @@ export class CalendarEventsController {
     await this.calendarEventsService.addException(
       user.id,
       id,
-      dto.occurrenceStart,
+      new Date(dto.occurrenceStart),
     );
   }
 
@@ -165,20 +159,22 @@ export class CalendarEventsController {
     @Body() dto: UpdateCalendarEventInstanceRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstanceResponse> {
-    return this.calendarEventsService.detachInstance(user.id, id, start, {
-      title: dto.title,
-      description: dto.description,
-      location: dto.location,
-      link: dto.link,
-      start:
-        dto.start && dto.timezone
-          ? parseIsoWallClockInTimezone(dto.start, dto.timezone)
-          : undefined,
-      durationSeconds: dto.durationSeconds,
-      timezone: dto.timezone,
-      color: dto.color,
-      tagIds: dto.tagIds,
-    });
+    return this.calendarEventsService.detachInstance(
+      user.id,
+      id,
+      new Date(start),
+      {
+        title: dto.title,
+        description: dto.description,
+        location: dto.location,
+        link: dto.link,
+        start: dto.start ? new Date(dto.start) : undefined,
+        durationSeconds: dto.durationSeconds,
+        timezone: dto.timezone,
+        color: dto.color,
+        tagIds: dto.tagIds,
+      },
+    );
   }
 
   /** Split a recurring series at an occurrence into a new series going forward */
@@ -189,17 +185,22 @@ export class CalendarEventsController {
     @Body() dto: SplitCalendarEventSeriesRequestDto,
     @AuthUser() user: AuthUserType,
   ): Promise<CalendarEventInstanceResponse> {
-    return this.calendarEventsService.splitSeries(user.id, id, start, {
-      title: dto.title,
-      description: dto.description,
-      location: dto.location,
-      link: dto.link,
-      start: dto.start,
-      durationSeconds: dto.durationSeconds,
-      timezone: dto.timezone,
-      rrule: dto.rrule,
-      color: dto.color,
-      tagIds: dto.tagIds,
-    });
+    return this.calendarEventsService.splitSeries(
+      user.id,
+      id,
+      new Date(start),
+      {
+        title: dto.title,
+        description: dto.description,
+        location: dto.location,
+        link: dto.link,
+        start: dto.start ? new Date(dto.start) : undefined,
+        durationSeconds: dto.durationSeconds,
+        timezone: dto.timezone,
+        rrule: dto.rrule,
+        color: dto.color,
+        tagIds: dto.tagIds,
+      },
+    );
   }
 }

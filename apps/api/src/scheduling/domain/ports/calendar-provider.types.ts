@@ -18,7 +18,7 @@ export interface ExternalCalendar {
   timezone: string | null;
 }
 
-/** A point in time as the provider reports it (wall-clock + tz, or a date for all-day). */
+/** A point in time as the provider reports it (an RFC3339 instant, or a date for all-day). */
 export interface ExternalEventTime {
   // RFC3339 dateTime for timed events, or "YYYY-MM-DD" for all-day events
   value: string;
@@ -58,7 +58,7 @@ export interface ExternalEventInput {
   title: string;
   description: string | null;
   location: string | null;
-  // wall-clock ISO 8601; timezone is the source of truth
+  // ISO 8601 instant for timed events; "YYYY-MM-DD" in `timezone` for all-day
   start: string;
   end: string;
   timezone: string;

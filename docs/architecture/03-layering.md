@@ -144,8 +144,6 @@ Injection sites name the abstract type; no `@Inject()`, no `Symbol`.
 - **infrastructure** — maps rows ↔ aggregates; never returns a raw row upward.
 - **presentation** — thin: validate → command → use case → map. Current violations:
   `tasks/presentation/rest/task-suggestions.controller.ts` (status-vs-payload rule, `kind === 'batch'` rule);
-  `scheduling/presentation/rest/calendar-events.controller.ts` (wall-clock → instant
-  conversion, also done in `scheduling/application/calendar-sync.service.ts`);
   `conversations/presentation/rest/{threads,guest-messaging}.controller.ts`
   (stitch messages + attachment URLs — read-model assembly).
 
@@ -236,7 +234,7 @@ Stay typed records: `UserSettings`, `UserProfile`, `Attachment`, `Calendar`,
 `PublicView`, `Thread`, `NetworkConnection`, `CalendarEventLink`, `PublicViewGuest`.
 
 Value objects only where a rule attaches: `AnswerMode` (tagging), `RecurrenceRule`
-(scheduling — rejects `COUNT=`, requires `UNTIL` + `TZID=`, caps `UNTIL`).
+(scheduling — rejects `COUNT=`, strips `TZID=`, requires and caps `UNTIL`).
 `AttentionSource` is a plain `{ context, kind, id }` type — no rule attaches.
 
 ## 8. Enforcement

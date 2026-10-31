@@ -49,7 +49,8 @@ export class DrizzleCalendarOccurrenceQuery extends CalendarOccurrencePort {
           e.rrule,
           e.start,
           ${afterIso}::timestamptz - (e.duration_seconds * INTERVAL '1 second'),
-          ${windowEndIso}::timestamptz
+          ${windowEndIso}::timestamptz,
+          e.timezone
         ) AS occurrence
         WHERE cet.tag_id IN (${sql.join(
           tagIds.map((id) => sql`${id}::uuid`),

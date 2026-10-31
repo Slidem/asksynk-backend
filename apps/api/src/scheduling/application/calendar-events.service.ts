@@ -23,7 +23,6 @@ import { toCalendarEventInstance } from "@/api/scheduling/domain/calendar-event-
 import { CalendarEventInstance } from "@/api/scheduling/domain/calendar-event-instance.model";
 import { CalendarRepository } from "@/api/scheduling/domain/ports/calendar.repository";
 import { CalendarEventsRepository } from "@/api/scheduling/domain/ports/calendar-events.repository";
-import { parseIsoWallClockInTimezone } from "@/api/scheduling/domain/recurrence";
 import { RecurrenceRule } from "@/api/scheduling/domain/recurrence-rule.vo";
 import { TagCatalogPort } from "@/api/tagging/contract/tag-catalog.port";
 
@@ -66,7 +65,7 @@ export class CalendarEventsService {
     const calendar = await this.ensureCalendar(userId);
 
     const rrule = input.rrule
-      ? RecurrenceRule.create(input.rrule, input.timezone, input.start).value
+      ? RecurrenceRule.create(input.rrule, input.start).value
       : null;
 
     await this.tagCatalog.assertOwnedBy(userId, input.tagIds ?? []);
@@ -197,7 +196,7 @@ export class CalendarEventsService {
 
     if (input.rrule !== undefined) {
       event.rrule = input.rrule
-        ? RecurrenceRule.create(input.rrule, event.timezone, event.start).value
+        ? RecurrenceRule.create(input.rrule, event.start).value
         : null;
     }
 
@@ -238,7 +237,7 @@ export class CalendarEventsService {
   async addException(
     userId: string,
     eventId: string,
-    occurrenceStart: string,
+    occurrenceStart: Date,
   ): Promise<void> {
     const event = await this.getCalendarEvent(userId, eventId);
     if (!event.isRecurring) {
@@ -246,11 +245,7 @@ export class CalendarEventsService {
         id: eventId,
       });
     }
-    const occStart = parseIsoWallClockInTimezone(
-      occurrenceStart,
-      event.timezone,
-    );
-    await this.calendarEventsRepository.addException(eventId, occStart);
+    await this.calendarEventsRepository.addException(eventId, occurrenceStart);
     await this.emitUpdated(userId, event);
   }
 
@@ -258,7 +253,7 @@ export class CalendarEventsService {
   async detachInstance(
     userId: string,
     eventId: string,
-    instanceStart: string,
+    occStart: Date,
     input: Omit<
       DetachCalendarEventInstanceInput,
       "eventId" | "occurrenceStart"
@@ -271,7 +266,6 @@ export class CalendarEventsService {
       });
     }
 
-    const occStart = parseIsoWallClockInTimezone(instanceStart, event.timezone);
     const timezone = input.timezone ?? event.timezone;
     const start = input.start ?? occStart;
 
@@ -311,7 +305,7 @@ export class CalendarEventsService {
   async splitSeries(
     userId: string,
     eventId: string,
-    splitStart: string,
+    splitDate: Date,
     input: Omit<SplitCalendarEventSeriesInput, "eventId">,
   ): Promise<CalendarEventInstance> {
     const event = await this.getCalendarEvent(userId, eventId);
@@ -321,7 +315,6 @@ export class CalendarEventsService {
       });
     }
 
-    const splitDate = parseIsoWallClockInTimezone(splitStart, event.timezone);
     const timezone = input.timezone ?? event.timezone;
 
     // Split at recurrence start — no actual split, just update in-place
@@ -330,19 +323,13 @@ export class CalendarEventsService {
       event.description = mergeNullable(input.description, event.description);
       event.location = mergeNullable(input.location, event.location);
       event.link = mergeNullable(input.link, event.link);
-      event.start = input.start
-        ? parseIsoWallClockInTimezone(input.start, timezone)
-        : event.start;
+      event.start = input.start ?? event.start;
       event.durationSeconds = input.durationSeconds ?? event.durationSeconds;
       event.timezone = timezone;
       event.color = mergeNullable(input.color, event.color);
 
       if (input.rrule) {
-        event.rrule = RecurrenceRule.create(
-          input.rrule,
-          timezone,
-          event.start,
-        ).value;
+        event.rrule = RecurrenceRule.create(input.rrule, event.start).value;
       }
 
       if (input.tagIds !== undefined) {
@@ -355,18 +342,14 @@ export class CalendarEventsService {
       return this.toInstance(inPlaceUpdated);
     }
 
-    // UNTIL = splitDate - 1 day + 1 second (just after previous occurrence)
-    const newUntil = new Date(splitDate.getTime() - 86400000 + 1000);
+    // UNTIL just before the split occurrence (keeps every earlier one, DST-safe)
+    const newUntil = new Date(splitDate.getTime() - 1000);
     const truncatedRrule = RecurrenceRule.restore(event.rrule!).withUntil(
       newUntil,
     ).value;
 
     const newRruleBase = input.rrule ?? event.rrule!;
-    const newRrule = RecurrenceRule.create(
-      newRruleBase,
-      timezone,
-      splitDate,
-    ).value;
+    const newRrule = RecurrenceRule.create(newRruleBase, splitDate).value;
 
     await this.tagCatalog.assertOwnedBy(userId, input.tagIds ?? []);
 
@@ -377,9 +360,7 @@ export class CalendarEventsService {
       description: mergeNullable(input.description, event.description),
       location: mergeNullable(input.location, event.location),
       link: mergeNullable(input.link, event.link),
-      start: input.start
-        ? parseIsoWallClockInTimezone(input.start, timezone)
-        : splitDate,
+      start: input.start ?? splitDate,
       durationSeconds: input.durationSeconds ?? event.durationSeconds,
       allDay: event.allDay,
       timezone,

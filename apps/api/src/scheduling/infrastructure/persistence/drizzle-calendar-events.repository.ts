@@ -7,9 +7,7 @@ import { TxAdapter } from "@/api/platform/db/tx.module";
 import { CalendarEvent } from "@/api/scheduling/domain/calendar-event";
 import { CalendarEventInstance } from "@/api/scheduling/domain/calendar-event-instance.model";
 import { getInstanceId } from "@/api/scheduling/domain/instance-id";
-import {
-  CalendarEventsRepository,
-} from "@/api/scheduling/domain/ports/calendar-events.repository";
+import { CalendarEventsRepository } from "@/api/scheduling/domain/ports/calendar-events.repository";
 import { calendarEvents } from "@/migrations/schema/calendarEvents";
 import { calendarEventExceptions } from "@/migrations/schema/calendarEventsExceptions";
 import { calendarEventTags } from "@/migrations/schema/calendarEventTags";
@@ -165,8 +163,8 @@ export class DrizzleCalendarEventsRepository extends CalendarEventsRepository {
         FROM calendar_events e
         WHERE e.calendar_id IN (${calendarIdsFragment})
           AND e.rrule IS NULL
-          AND e.start < ${windowEndIso}::timestamp
-          AND e.start + (e.duration_seconds * INTERVAL '1 second') > ${windowStartIso}::timestamp
+          AND e.start < ${windowEndIso}::timestamptz
+          AND e.start + (e.duration_seconds * INTERVAL '1 second') > ${windowStartIso}::timestamptz
       ),
       recurring AS (
         SELECT
@@ -183,7 +181,7 @@ export class DrizzleCalendarEventsRepository extends CalendarEventsRepository {
           e.rrule,
           occurrence AS occ_start
         FROM calendar_events e
-        CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${windowStartIso}::timestamp, ${windowEndIso}::timestamp) AS occurrence
+        CROSS JOIN LATERAL rrule.between(e.rrule, e.start, ${windowStartIso}::timestamptz, ${windowEndIso}::timestamptz, e.timezone) AS occurrence
         WHERE e.calendar_id IN (${calendarIdsFragment})
           AND e.rrule IS NOT NULL
           AND NOT EXISTS (
@@ -223,7 +221,7 @@ export class DrizzleCalendarEventsRepository extends CalendarEventsRepository {
     `);
 
     return (result.rows as Record<string, unknown>[]).map((row) => {
-      const instanceStart = new Date((row.instance_start as string) + "Z");
+      const instanceStart = new Date(row.instance_start as string);
       const source = row.calendar_source as string;
 
       return {
